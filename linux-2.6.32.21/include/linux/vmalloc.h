@@ -10,7 +10,7 @@ struct vm_area_struct;		/* vma defining user mapping in mm_types.h */
 /* bits in flags of vmalloc's vm_struct below */
 #define VM_IOREMAP	0x00000001	/* ioremap() and friends *///表示将几乎随机的物理内存区域映射到vmalloc区域中. 这是一个特定于体系结构的操作
 #define VM_ALLOC	0x00000002	/* vmalloc() *///指定由vmalloc产生的子区域
-#define VM_MAP		0x00000004	/* vmap()ed pages *///指定由vmalloc产生的子区域
+#define VM_MAP		0x00000004	/* vmap()ed pages 用于表示将现存pages集合映射到连续的虚拟地址空间中*/
 #define VM_USERMAP	0x00000008	/* suitable for remap_vmalloc_range */
 #define VM_VPAGES	0x00000010	/* buffer for pages was vmalloc'ed */
 /* bits [20..32] reserved for arch specific ioremap internals */
@@ -23,15 +23,15 @@ struct vm_area_struct;		/* vma defining user mapping in mm_types.h */
 #define IOREMAP_MAX_ORDER	(7 + PAGE_SHIFT)	/* 128 pages */
 #endif
 
-//vmalloc的管理结构  vmlist为链表头 VMALLOC_START为第一个节点的地址
+//对于vmalloc分配的子区域 都对应内存中一个该结构 vmlist为链表头 VMALLOC_START为第一个节点的地址
 //和用户空间对应(vm_area_struct)，内核使用vm_struct。只是内核所有的vm_struct放在一起，与单个进程无关
 struct vm_struct {
 	struct vm_struct	*next;//所有的vm_struct通过next 组成一个单链表，表头为全局变量vmlist
-	void			*addr;//虚拟内存的起始地址
-	unsigned long		size;//定义了这个虚拟地址空间子区域的起始地址
+	void			    *addr;//分配的子区域在虚拟地址中的起始地址
+	unsigned long		size;//vmalloc分配的该子区域的长度
 	unsigned long		flags;//存储了与该内存区关联的标志VM_ALLOC
 	struct page		**pages;//是一个指针，指向page指针的数组，每个数组成员都表示一个映射到这个地址空间的物理页面的实例
-	unsigned int		nr_pages; //页数
+	unsigned int		nr_pages; //pages数组中页的个数
 	unsigned long		phys_addr; //仅当用ioremap映射了由物理地址描述的物理内存区域才有效。
 	void			*caller;
 };
@@ -81,9 +81,10 @@ static inline size_t get_vm_area_size(const struct vm_struct *area)
 	return area->size - PAGE_SIZE;
 }
 
+//试图在虚拟的vmalloc空间中找到一个适当的位置
 extern struct vm_struct *get_vm_area(unsigned long size, unsigned long flags);
-extern struct vm_struct *get_vm_area_caller(unsigned long size,
-					unsigned long flags, void *caller);
+
+extern struct vm_struct *get_vm_area_caller(unsigned long size,unsigned long flags, void *caller);
 extern struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags,
 					unsigned long start, unsigned long end);
 extern struct vm_struct *__get_vm_area_caller(unsigned long size,

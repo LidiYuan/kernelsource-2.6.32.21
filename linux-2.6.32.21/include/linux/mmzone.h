@@ -91,9 +91,10 @@ struct zone_padding {
 #define ZONE_PADDING(name)
 #endif
 
+//zone->vm_stat[]
 enum zone_stat_item {
 	/* First 128 byte cacheline (assuming 64 bit words) */
-	NR_FREE_PAGES,
+	NR_FREE_PAGES,//空闲页面数 
 	NR_LRU_BASE,
 	NR_INACTIVE_ANON = NR_LRU_BASE, /* must match order of LRU_[IN]ACTIVE */
 	NR_ACTIVE_ANON,		/*  "     "     "   "       "         */
@@ -183,6 +184,7 @@ enum zone_watermarks {
 #define low_wmark_pages(z) (z->watermark[WMARK_LOW])
 #define high_wmark_pages(z) (z->watermark[WMARK_HIGH])
 
+
 struct per_cpu_pages {
 	int count;		/* number of pages in the list 列表中的页数 */
 	int high;		/* high watermark, emptying needed  页数上限水位 在需要的情况下清空列表*/
@@ -192,6 +194,8 @@ struct per_cpu_pages {
 	struct list_head lists[MIGRATE_PCPTYPES] ; //页链表
 };
 
+//为了加速分配流程，每个CPU也会维护页框高速缓存,通过per_cpu_pageset管理
+//其中pcp维护了各种性质的页面链表
 struct per_cpu_pageset {
 	struct per_cpu_pages pcp;
 	
@@ -214,7 +218,8 @@ struct per_cpu_pageset {
 
 #endif /* !__GENERATING_BOUNDS.H */
 
-enum zone_type {
+enum zone_type 
+{
 #ifdef CONFIG_ZONE_DMA
 	/*
 	 * ZONE_DMA is used when there are devices that are not able
@@ -262,8 +267,8 @@ enum zone_type {
 	ZONE_HIGHMEM,//标记了超出内核段的物理内存
 #endif
 
-                  //kernelcore 参数用于指定不可移动分配的内存数量 结果保存在required_kernelcore
-	ZONE_MOVABLE,//伪内核域，在防止物理内存碎片的机制中需要使用该内存域
+                   //kernelcore 参数用于指定不可移动分配的内存数量 结果保存在required_kernelcore
+	ZONE_MOVABLE,  //伪内核域，在防止物理内存碎片的机制中需要使用该内存域
 	__MAX_NR_ZONES //结束标记
 };
 
@@ -386,7 +391,7 @@ struct zone
 	unsigned long		flags;		   /*ZONE_OOM_LOCKED zone flags, see below //描述了内存域的当前状态 */
 
 	/* Zone statistics */
-	//zone_page_state() 来读取vm_stat中的信息
+	//zone_page_state() 来读取vm_stat中的信息 如NR_FREE_PAGES
 	atomic_long_t		vm_stat[NR_VM_ZONE_STAT_ITEMS];//维护了大量有关该内存域的统计信息
 
 	/*
@@ -968,13 +973,12 @@ struct zoneref *next_zones_zonelist(struct zoneref *z,
  * used to iterate the zonelist with next_zones_zonelist by advancing it by
  * one before calling.
  */
-static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist,
-					enum zone_type highest_zoneidx,
-					nodemask_t *nodes,
-					struct zone **zone)
+static inline struct zoneref *first_zones_zonelist(struct zonelist *zonelist, //内存区域列表
+					                                           enum zone_type highest_zoneidx,//内存区索引
+					                                           nodemask_t *nodes,
+					                                           struct zone **zone)//返回的值 发现的第一个适合的内存区
 {
-	return next_zones_zonelist(zonelist->_zonerefs, highest_zoneidx, nodes,
-								zone);
+	return next_zones_zonelist(zonelist->_zonerefs, highest_zoneidx, nodes,zone);
 }
 
 /**

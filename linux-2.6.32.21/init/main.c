@@ -510,9 +510,16 @@ static void __init mm_init(void)
 	 * and it's bigger than MAX_ORDER unless SPARSEMEM.
 	 */
 	page_cgroup_init_flatmem();
+
+	//停用bootmem分配器
 	mem_init();
+	
+	//对slab进行初始化
 	kmem_cache_init();
+	
 	pgtable_cache_init();
+	
+	
 	vmalloc_init();
 }
 

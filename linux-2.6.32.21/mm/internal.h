@@ -57,6 +57,7 @@ extern void prep_compound_page(struct page *page, unsigned long order);
  * zone->lock is already acquired when we use these.
  * So, we don't need atomic page->flags operations here.
  */
+ //»ñµÃpageµÄorder
 static inline unsigned long page_order(struct page *page)
 {
 	VM_BUG_ON(!PageBuddy(page));

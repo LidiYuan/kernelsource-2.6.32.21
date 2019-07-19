@@ -158,14 +158,22 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 
 	pr_debug("device class '%s': registering\n", cls->name);
 
+    //创建class的私有数据结构
 	cp = kzalloc(sizeof(*cp), GFP_KERNEL);
 	if (!cp)
 		return -ENOMEM;
-	
+
+	//初始化设备链表    
 	klist_init(&cp->class_devices, klist_class_dev_get, klist_class_dev_put);
+
+    //初始化类接口链表
 	INIT_LIST_HEAD(&cp->class_interfaces);
+
+    
 	kset_init(&cp->class_dirs);
 	__mutex_init(&cp->class_mutex, "struct class mutex", key);
+
+	//设置对象名 即在sys/class/下显示的名字
 	error = kobject_set_name(&cp->class_subsys.kobj, "%s", cls->name);
 	if (error) {
 		kfree(cp);
@@ -176,13 +184,17 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 	if (!cls->dev_kobj)
 		cls->dev_kobj = sysfs_dev_char_kobj;
 
+//早期将block放在/sys/目录下 现在将block放在/sys/class下， 下面的宏就是对block的位置进行控制
 #if defined(CONFIG_SYSFS_DEPRECATED) && defined(CONFIG_BLOCK)
-	/* let the block class directory show up in the root of sysfs */
+    //让block在/sys/目录下  
 	if (cls != &block_class)
 		cp->class_subsys.kobj.kset = class_kset;
 #else
+    //将所有的类放在/sys/class/下
 	cp->class_subsys.kobj.kset = class_kset;
 #endif
+
+
 	cp->class_subsys.kobj.ktype = &class_ktype;
 	cp->class = cls;
 	cls->p = cp;
@@ -192,6 +204,8 @@ int __class_register(struct class *cls, struct lock_class_key *key)
 		kfree(cp);
 		return error;
 	}
+
+	//添加类属性
 	error = add_class_attrs(class_get(cls));
 	class_put(cls);
 	return error;
@@ -229,6 +243,7 @@ struct class *__class_create(struct module *owner, const char *name,
 	struct class *cls;
 	int retval;
 
+	//创建class结构体
 	cls = kzalloc(sizeof(*cls), GFP_KERNEL);
 	if (!cls) 
 	{
@@ -236,10 +251,12 @@ struct class *__class_create(struct module *owner, const char *name,
 		goto error;
 	}
 
+    //对class进行初始化
 	cls->name = name;
 	cls->owner = owner;
 	cls->class_release = class_create_release;
 
+    //注册class
 	retval = __class_register(cls, key);
 	if (retval)
 		goto error;

@@ -58,7 +58,10 @@ unsigned int nr_free_highpages (void)
 	return pages;
 }
 
+//每一个元素对应一个持久映射页 kmap(),实际是被映射页的一个使用计数器,值为2 则一处使用了该映射页
+//值为5 则四处使用了该映射页
 static int pkmap_count[LAST_PKMAP];
+
 static unsigned int last_pkmap_nr;
 static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(kmap_lock);
 
@@ -144,15 +147,20 @@ static inline unsigned long map_new_virtual(struct page *page)
 start:
 	count = LAST_PKMAP;
 	/* Find an empty entry */
-	for (;;) {
+
+	/*从最后的使用位置last_pkmap_nr开始,反向扫描pkmap_count数组
+      直至找到一个空闲的位置
+	 */
+	for(;;)
+	{
 		last_pkmap_nr = (last_pkmap_nr + 1) & LAST_PKMAP_MASK;
 		if (!last_pkmap_nr) {
-			flush_all_zero_pkmaps();
+			flush_all_zero_pkmaps();//刷出高速缓存
 			count = LAST_PKMAP;
 		}
 		if (!pkmap_count[last_pkmap_nr])
 			break;	/* Found a usable entry */
-		if (--count)
+		if (--count)//检测了一遍 没有找到空闲位置  则执行下面进行休眠直到有空闲的腾出来
 			continue;
 
 		/*
@@ -162,6 +170,8 @@ start:
 			DECLARE_WAITQUEUE(wait, current);
 
 			__set_current_state(TASK_UNINTERRUPTIBLE);
+
+			//进行休眠等待有空闲位置
 			add_wait_queue(&pkmap_map_wait, &wait);
 			unlock_kmap();
 			schedule();
@@ -169,18 +179,22 @@ start:
 			lock_kmap();
 
 			/* Somebody else might have mapped it while we slept */
+			//检查是否被别的流程给映射了在我们睡眠的时候
 			if (page_address(page))
 				return (unsigned long)page_address(page);
 
-			/* Re-start */
+			/*  Re-start  */
 			goto start;
 		}
 	}
 	vaddr = PKMAP_ADDR(last_pkmap_nr);
-	set_pte_at(&init_mm, vaddr,
-		   &(pkmap_page_table[last_pkmap_nr]), mk_pte(page, kmap_prot));
+
+     //修改内核页表
+	set_pte_at(&init_mm, vaddr,&(pkmap_page_table[last_pkmap_nr]), mk_pte(page, kmap_prot));
 
 	pkmap_count[last_pkmap_nr] = 1;
+
+	//将页添加到持久内核映射的数据结构
 	set_page_address(page, (void *)vaddr);
 
 	return vaddr;
@@ -203,11 +217,15 @@ void *kmap_high(struct page *page)
 	 * after we have the lock.
 	 */
 	lock_kmap();
+	//检查该页是否已经映射
 	vaddr = (unsigned long)page_address(page);
 	if (!vaddr)
-		vaddr = map_new_virtual(page);
+		vaddr = map_new_virtual(page);//对该页进行映射
+
+	//对页的使用次数加1	
 	pkmap_count[PKMAP_NR(vaddr)]++;
 	BUG_ON(pkmap_count[PKMAP_NR(vaddr)] < 2);
+
 	unlock_kmap();
 	return (void*) vaddr;
 }
@@ -296,6 +314,7 @@ EXPORT_SYMBOL(kunmap_high);
 
 /*
  * Describes one page->virtual association
+   用于建立page->virtual的映射
  */
 struct page_address_map {
 	struct page *page;

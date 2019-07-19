@@ -198,24 +198,24 @@ struct device *driver_find_device(struct device_driver *drv,
  * device classes
  */
 struct class {
-	const char		*name;//类名称
+	const char		*name;//类名称 会在“/sys/class/”目录下体现
 	struct module		*owner;//该类模块的指针
 
-	struct class_attribute		*class_attrs;//类的属性
-	struct device_attribute		*dev_attrs;//设备属性
+	struct class_attribute		*class_attrs;//类的属性 在“/sys/class/xxx_class”下创建对应的attribute文件
+	struct device_attribute		*dev_attrs;//该类下设备属性 会在设备注册到内核时，自动在该设备的sysfs目录下创建对应的attribute文件
 	
-	struct kobject			*dev_kobj;//代表当前类中设备的内核对象
+	struct kobject			*dev_kobj;//表示该class下的设备在/sys/dev/下的目录，现在一般有char和block两个，如果dev_kobj为NULL，则默认选择char
 
-	int (*dev_uevent)(struct device *dev, struct kobj_uevent_env *env);
+	int (*dev_uevent)(struct device *dev, struct kobj_uevent_env *env);//当该class下有设备发生变化时，会调用class的uevent回调函数
 	char *(*devnode)(struct device *dev, mode_t *mode);
 
-	void (*class_release)(struct class *class);
-	void (*dev_release)(struct device *dev);
+	void (*class_release)(struct class *class);//用于release自身的回调函数
+	void (*dev_release)(struct device *dev);//用于release class内设备的回调函数。在device_release接口中，会依次检查Device、Device Type以及Device所在的class，是否注册release接口，如果有则调用相应的release接口release设备指针
 
 	int (*suspend)(struct device *dev, pm_message_t state);
 	int (*resume)(struct device *dev);
 
-	const struct dev_pm_ops *pm;
+	const struct dev_pm_ops *pm; 
 
 	struct class_private *p;//类的私有数据 用于处理类的子系统及其所包含的设备链表
 };
@@ -434,10 +434,11 @@ struct device
 	spinlock_t		devres_lock;
 	struct list_head	devres_head;
 
-	struct klist_node	knode_class;
+	struct klist_node	knode_class;//用于加入到class->p->class_devices   
 	struct class		*class;
 	const struct attribute_group **groups;	/* optional groups */
 
+                                            //device_create_release()
 	void	(*release)(struct device *dev);//当设备最后一个引用删除时 内核调用此方法 将从内嵌的kobject->release中调用
 };
 

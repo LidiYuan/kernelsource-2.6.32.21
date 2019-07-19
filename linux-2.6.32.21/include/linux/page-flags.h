@@ -98,7 +98,7 @@ enum pageflags
 	PG_head,		/* A head page */
 	PG_tail,		/* A tail page */
 #else
-	PG_compound,		/* A compound page */
+	PG_compound,		/* A compound page 复合页*/
 #endif
 	PG_swapcache,		/* Swap page: swp_entry_t in private *///表示该page处于swap cache中
 	PG_mappedtodisk,	/* Has blocks allocated on-disk *///表示page中的数据在后备存储器中有对应

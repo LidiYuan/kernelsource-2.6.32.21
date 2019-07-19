@@ -58,7 +58,7 @@ struct driver_private {
 struct class_private {
 	struct kset class_subsys;//代表class在sysfs中的位置
 	struct klist class_devices;//是class下的设备链表
-	struct list_head class_interfaces;
+	struct list_head class_interfaces;//class 接口 class_interface 它允许class driver在class下有设备添加或移除的时候，调用预先设置好的回调函数
 	struct kset class_dirs;
 	struct mutex class_mutex;//用于保护class内部的数据结构
 	struct class *class;//指回struct class的指针

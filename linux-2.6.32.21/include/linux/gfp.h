@@ -18,10 +18,35 @@ struct vm_area_struct;
  * without the underscores and use the consistently. The definitions here may
  * be used in bit comparisons.
  */
-#define __GFP_DMA	((__force gfp_t)0x01u)
+ //GFP get free page
+
+/*
+会将下面8中错误的组合写到一个表中 即GFP_ZONE_BAD
+
+__GFP_DMA   __GFP_HIGHMEM    __GFP_DMA32   __GFP_MOVABLE   结果
+   0            0               0              0           从GFP_NORMAL中分配
+   1            0               0              0           从NORMAL或DMA分配
+   0            1               0              0           从NORMAL或HIGHMEM分配
+   1            1               0              0           不能同时满足 错误    (_GFP_DMA | GFP_HIGHMEM)
+   0            0               1              0           从NORMAL或DMA32
+   1            0               1              0           不能同时满足  错误   (__GFP_DMA | __GFP_DMA32)
+   0            1               1              0            不能同时满足 错误   (__GFP_HIGHMEM | __GFP_DMA32)
+   1            1               1              0            不能同时满足错误    (__GFP_DMA|__GFP_HIGHMEM|__GFP_DMA32)
+   0            0               0              1           从NORMAL 或MOVABLE
+   1            0               0              1           从NORMAL或MOVABLE+DMA
+   0            1               0              1           从MOVABLE获得
+   1            1               0              1           错误                 (__GFP_DMA|__GFP_HIGHMEM|__GFP_MOVABLE__GFP_MOVABLE)
+   0            0               1              1           ZONE_DMA
+   1            0               1              1           错误                 (__GFP_DMA|__GFP_DMA32|__GFP_MOVABLE)
+   0            1               1              1           错误                 (__GFP_HIGHMEM|__GFP_DMA32|__GFP_MOVABLE)
+   1            1               1              1           错误                 (__GFP_DMA|__GFP_HIGHMEM|__GFP_DMA32|__GFP_MOVABLE)
+*/
+#define __GFP_DMA	((__force gfp_t)0x01u)  //0x01
 #define __GFP_HIGHMEM	((__force gfp_t)0x02u)//这个标志指示分配的内存可以位于高端内存.
 #define __GFP_DMA32	((__force gfp_t)0x04u)
 #define __GFP_MOVABLE	((__force gfp_t)0x08u)  /* Page is movable 从可移动内存分配*/
+
+//gfp的低三位来表示从哪个zone获得
 #define GFP_ZONEMASK	(__GFP_DMA|__GFP_HIGHMEM|__GFP_DMA32|__GFP_MOVABLE)
 /*
  * Action modifiers - doesn't change the zoning
@@ -38,19 +63,38 @@ struct vm_area_struct;
  * mechanism or reclaimed
  */
 #define __GFP_WAIT	((__force gfp_t)0x10u)	/* Can wait and reschedule?  分配器可以睡眠*/
+
+//表示内核急切的需要内存 内存分配失败可能给内核带来严重后果时 会用此标志
 #define __GFP_HIGH	((__force gfp_t)0x20u)	/* Should access emergency pools? *///这个标志标识了一个高优先级请求, 它被允许来消耗甚至被内核保留给紧急状况的最后的内存页.
+
+//在查找空闲内存期间内核可以进行IO操作, 这意味着如果内核在内存分配期间换出页，只有在设置此标志时 才能将选择的页写回磁盘
 #define __GFP_IO	((__force gfp_t)0x40u)	/* Can start physical IO? 分配器可以启动磁盘IO*/
+
+//允许内核执行VFS操作 在于vfs层有连续的内核子系统中必须禁用 可能会引起循环递归调用
 #define __GFP_FS	((__force gfp_t)0x80u)	/* Can call down to low-level FS?分配器可以启动文件系统 */
+
+//如果需要分配不在cpu 高速缓存的冷页时 则设置此标志
 #define __GFP_COLD	((__force gfp_t)0x100u)	/* Cache-cold page required *///正常地, 内存分配器尽力返回"缓冲热"的页 -- 可能在处理器缓冲中找到的页. 相反, 这个标志请求一个"冷"页, 它在一段时间没被使用. 它对分配页作 DMA 读是有用的, 此时在处理器缓冲中出现是无用的
+
 #define __GFP_NOWARN	((__force gfp_t)0x200u)	/* 分配器不打印失败警告 *///这个很少用到的标志阻止内核来发出警告(使用 printk ), 当一个分配无法满足
+
 #define __GFP_REPEAT	((__force gfp_t)0x400u)	/* See above 分配器失败后重新进行分配 但这次存在失败的可能*/
+
 #define __GFP_NOFAIL	((__force gfp_t)0x800u)	/* See above 分配器无限的重复分配  分配不能失败*/
+
 #define __GFP_NORETRY	((__force gfp_t)0x1000u)/* See above 分配器失败后 绝不重新分配*/
-#define __GFP_COMP	((__force gfp_t)0x4000u)/* Add compound page metadata */
-#define __GFP_ZERO	((__force gfp_t)0x8000u)/* Return zeroed page on success */
-#define __GFP_NOMEMALLOC ((__force gfp_t)0x10000u) /* Don't use emergency reserves */
+#define __GFP_COMP	((__force gfp_t)0x4000u)/* Add compound page metadata 将多个连续物理页合并成巨型TLB页*/
+#define __GFP_ZERO	((__force gfp_t)0x8000u)/* Return zeroed page on success 填充0*/
+#define __GFP_NOMEMALLOC ((__force gfp_t)0x10000u) /* Don't use emergency reserves 不使用紧急分配链表*/
+
+//只允许在进程允许运行的cpu所关联的节点分配内存 只在NUMA系统上有意义
+//在分配失败的情况下 不允许在其他节点作为备用 
 #define __GFP_HARDWALL   ((__force gfp_t)0x20000u) /* Enforce hardwall cpuset memory allocs */
+
+//没有备用节点 没有策略
 #define __GFP_THISNODE	((__force gfp_t)0x40000u)/* No fallback, no policies */
+
+//页是可回收的
 #define __GFP_RECLAIMABLE ((__force gfp_t)0x80000u) /* Page is reclaimable */
 
 #ifdef CONFIG_KMEMCHECK
@@ -74,7 +118,9 @@ struct vm_area_struct;
 #define GFP_ATOMIC	(__GFP_HIGH)//用来从中断处理和进程上下文之外的其他代码中分配内存. 从不睡眠
 #define GFP_NOIO	(__GFP_WAIT)//绝不会启动磁盘IO来满足要求
 #define GFP_NOFS	(__GFP_WAIT | __GFP_IO)//绝不会启动文件系统
+
 #define GFP_KERNEL	(__GFP_WAIT | __GFP_IO | __GFP_FS)//内核内存的正常分配. 可能睡眠
+
 #define GFP_TEMPORARY	(__GFP_WAIT | __GFP_IO | __GFP_FS | \
 			 __GFP_RECLAIMABLE) // 类似于GFP_KERNEL，并且在内存不足时，还允许进行内存回收
 #define GFP_USER	(__GFP_WAIT | __GFP_IO | __GFP_FS | __GFP_HARDWALL)//用来为用户空间页来分配内存; 它可能睡眠.
@@ -115,7 +161,7 @@ struct vm_area_struct;
 /* 4GB DMA on some platforms */
 #define GFP_DMA32	__GFP_DMA32
 
-/* Convert GFP flags to their corresponding migrate type */
+//根据gfp标志转换成相应的迁移类型
 static inline int allocflags_to_migratetype(gfp_t gfp_flags)
 {
 	WARN_ON((gfp_flags & GFP_MOVABLE_MASK) == GFP_MOVABLE_MASK);
@@ -182,7 +228,14 @@ static inline int allocflags_to_migratetype(gfp_t gfp_flags)
 #if 16 * ZONES_SHIFT > BITS_PER_LONG
 #error ZONES_SHIFT too large to create GFP_ZONE_TABLE integer
 #endif
+//__GFP_DMA上面的表格
+/*
+OPT_ZONE_DMA代表 GFP_NORMAL 或者 GFP_NORMAL
+OPT_ZONE_HGIHMEM 代表 GFP_NORMAL 或者 GFP_HIGHMEM
+OPT_ZONE_DMA32 代表 GFP_NORMAL 或者 GFP_DMA32
+ZONES_SHIFT:每个选项的位宽
 
+*/
 #define GFP_ZONE_TABLE ( \
 	(ZONE_NORMAL << 0 * ZONES_SHIFT)				\
 	| (OPT_ZONE_DMA << __GFP_DMA * ZONES_SHIFT) 			\
@@ -200,6 +253,7 @@ static inline int allocflags_to_migratetype(gfp_t gfp_flags)
  * entry starting with bit 0. Bit is set if the combination is not
  * allowed.
  */
+ //__GFP_DMA上面的表格
 #define GFP_ZONE_BAD ( \
 	1 << (__GFP_DMA | __GFP_HIGHMEM)				\
 	| 1 << (__GFP_DMA | __GFP_DMA32)				\
@@ -211,14 +265,15 @@ static inline int allocflags_to_migratetype(gfp_t gfp_flags)
 	| 1 << (__GFP_MOVABLE | __GFP_DMA32 | __GFP_DMA | __GFP_HIGHMEM)\
 )
 
+//根据gfp_flags 获得内存区域
 static inline enum zone_type gfp_zone(gfp_t flags)
 {
 	enum zone_type z;
 	int bit = flags & GFP_ZONEMASK;
 
-	z = (GFP_ZONE_TABLE >> (bit * ZONES_SHIFT)) &
-					 ((1 << ZONES_SHIFT) - 1);
+	z = (GFP_ZONE_TABLE >> (bit * ZONES_SHIFT)) & ((1 << ZONES_SHIFT) - 1);
 
+    //下面检查是否错误的区域组合
 	if (__builtin_constant_p(bit))
 		MAYBE_BUILD_BUG_ON((GFP_ZONE_BAD >> bit) & 1);
 	else {
@@ -269,19 +324,18 @@ struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 		       struct zonelist *zonelist, nodemask_t *nodemask);
 
-static inline struct page *
-__alloc_pages(gfp_t gfp_mask, unsigned int order,
-		struct zonelist *zonelist)
+//伙伴系统分配的主函数
+static inline struct page *__alloc_pages(gfp_t gfp_mask, unsigned int order,
+		                                         struct zonelist *zonelist)
 {
 	return __alloc_pages_nodemask(gfp_mask, order, zonelist, NULL);
 }
 
-static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
-						unsigned int order)
+static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,unsigned int order)
 {
 	/* Unknown node is current node */
 	if (nid < 0)
-		nid = numa_node_id();
+		nid = numa_node_id();//获得当前cpu节点
 
 	return __alloc_pages(gfp_mask, order, node_zonelist(nid, gfp_mask));
 }
@@ -291,6 +345,7 @@ static inline struct page *alloc_pages_exact_node(int nid, gfp_t gfp_mask,
 {
 	VM_BUG_ON(nid < 0 || nid >= MAX_NUMNODES);
 
+	//从伙伴系统进行分配
 	return __alloc_pages(gfp_mask, order, node_zonelist(nid, gfp_mask));
 }
 
@@ -319,6 +374,8 @@ extern struct page *alloc_page_vma(gfp_t gfp_mask,
 #define alloc_page(gfp_mask) alloc_pages(gfp_mask, 0)
 
 extern unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order);
+
+//分配一个页 并且将页内容填充0
 extern unsigned long get_zeroed_page(gfp_t gfp_mask);
 
 void *alloc_pages_exact(size_t size, gfp_t gfp_mask);
@@ -327,6 +384,7 @@ void free_pages_exact(void *virt, size_t size);
 #define __get_free_page(gfp_mask) \
 		__get_free_pages((gfp_mask),0)
 
+//用来获得适用于DMA的页
 #define __get_dma_pages(gfp_mask, order) \
 		__get_free_pages((gfp_mask) | GFP_DMA,(order))
 

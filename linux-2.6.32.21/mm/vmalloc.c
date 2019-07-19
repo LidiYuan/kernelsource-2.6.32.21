@@ -97,7 +97,7 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
 	 * nr is a running index into the array which helps higher level
 	 * callers keep track of where we're up to.
 	 */
-
+    //分配页表
 	pte = pte_alloc_kernel(pmd, addr);
 	if (!pte)
 		return -ENOMEM;
@@ -120,6 +120,7 @@ static int vmap_pmd_range(pud_t *pud, unsigned long addr,
 	pmd_t *pmd;
 	unsigned long next;
 
+    //分配中间页目录
 	pmd = pmd_alloc(&init_mm, pud, addr);
 	if (!pmd)
 		return -ENOMEM;
@@ -137,10 +138,13 @@ static int vmap_pud_range(pgd_t *pgd, unsigned long addr,
 	pud_t *pud;
 	unsigned long next;
 
+
+	//分配上级页目录
 	pud = pud_alloc(&init_mm, pgd, addr);
 	if (!pud)
 		return -ENOMEM;
-	do {
+	do 
+	{
 		next = pud_addr_end(addr, end);
 		if (vmap_pmd_range(pud, addr, next, prot, pages, nr))
 			return -ENOMEM;
@@ -164,6 +168,7 @@ static int vmap_page_range_noflush(unsigned long start, unsigned long end,
 	int nr = 0;
 
 	BUG_ON(addr >= end);
+	//获得全局页目录
 	pgd = pgd_offset_k(addr);
 	do {
 		next = pgd_addr_end(addr, end);
@@ -1230,8 +1235,13 @@ static void insert_vmalloc_vm(struct vm_struct *vm, struct vmap_area *va,
 }
 
 static struct vm_struct *__get_vm_area_node(unsigned long size,
-		unsigned long align, unsigned long flags, unsigned long start,
-		unsigned long end, int node, gfp_t gfp_mask, void *caller)
+		                                               unsigned long align, 
+		                                               unsigned long flags, 
+		                                               unsigned long start,
+		                                               unsigned long end, 
+		                                               int node, 
+		                                               gfp_t gfp_mask, 
+		                                               void *caller)
 {
 	static struct vmap_area *va;
 	struct vm_struct *area;
@@ -1304,10 +1314,10 @@ struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
  *	and reserved it for out purposes.  Returns the area descriptor
  *	on success or %NULL on failure.
  */
+ //用于保留一个连续的内核虚拟区域
 struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
 {
-	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
-				-1, GFP_KERNEL, __builtin_return_address(0));
+	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,-1, GFP_KERNEL, __builtin_return_address(0));
 }
 
 struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
@@ -1343,6 +1353,8 @@ static struct vm_struct *find_vm_area(const void *addr)
  *	This function returns the found VM area, but using it is NOT safe
  *	on SMP machines, except for its size or flags.
  */
+ //将一个现存的子区域从vmalloc地址空间删除
+ //addr:待删除的虚拟地址
 struct vm_struct *remove_vm_area(const void *addr)
 {
 	struct vmap_area *va;
@@ -1460,6 +1472,8 @@ EXPORT_SYMBOL(vunmap);
  *	Maps @count pages from @pages into contiguous kernel virtual
  *	space.
  */
+ //以page数组为起点,来创建虚拟连续内存区 与vmalloc相比该函数所用的物理内存区
+ //位置是已经分配好的(pages数组不为空)
 void *vmap(struct page **pages, unsigned int count,
 		unsigned long flags, pgprot_t prot)
 {
@@ -1485,8 +1499,8 @@ void *vmap(struct page **pages, unsigned int count,
 EXPORT_SYMBOL(vmap);
 
 static void *__vmalloc_node(unsigned long size, unsigned long align,
-			    gfp_t gfp_mask, pgprot_t prot,
-			    int node, void *caller);
+			                         gfp_t gfp_mask, pgprot_t prot,
+			                         int node, void *caller);
 
 
 static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
@@ -1498,7 +1512,7 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 	/*分配一块虚拟地址空间*/
 	nr_pages = (area->size - PAGE_SIZE) >> PAGE_SHIFT;
 
-	/*需要一个数组管理涉及到的物理页面地址即page指针，这个数组的大小*/
+	/*计算物理页的个数*/
 	array_size = (nr_pages * sizeof(struct page *));
 	
 	area->nr_pages = nr_pages;
@@ -1510,7 +1524,9 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		pages = __vmalloc_node(array_size, 1, gfp_mask | __GFP_ZERO,
 				PAGE_KERNEL, node, caller);
 		area->flags |= VM_VPAGES;
-	} else {
+	} 
+	else 
+	{
 		pages = kmalloc_node(array_size,
 				(gfp_mask & GFP_RECLAIM_MASK) | __GFP_ZERO,
 				node);
@@ -1523,12 +1539,14 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		return NULL;
 	}
 
-	for (i = 0; i < area->nr_pages; i++) {
+    //从伙伴系统分配物理页 一个页一个页的分配而不是一次性多个页
+	for (i = 0; i < area->nr_pages; i++) 
+	{
 		struct page *page;
 
-		if (node < 0)
+		if (node < 0)//从当前节点分配
 			page = alloc_page(gfp_mask);
-		else
+		else //指定了分配节点
 			page = alloc_pages_node(node, gfp_mask, 0);
 
 		if (unlikely(!page)) {
@@ -1538,7 +1556,9 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 		}
 		area->pages[i] = page;
 	}
-	//为页面建立映射，这个过程就是填充页表的过程
+	
+	//将分散的物理页内存映射到连续的虚拟内存vmalloc区域
+	//并且填充页表
 	if (map_vm_area(area, prot, &pages))
 		goto fail;
 	return area->addr;

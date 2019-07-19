@@ -21,26 +21,23 @@
  *
  * manages a cache.
  */
-
+//每个kemem_cache 连接到链表cache_chain中 
 struct kmem_cache {
 /* 1) per-cpu data, touched during every alloc/free */
 	/*per-CPU数据，记录了本地高速缓存的信息，也用于跟踪最近释放的对象，每次分配和释放都要直接访问它*/
-    /*
-      array是一个指向数组的指针，每个数组项都对应于系统中的一个CPU。
-      每个数组项都包含了另一个指针，指向下文讨论的array_cache结构的实例
-   */
 	struct array_cache *array[NR_CPUS];
 
 /* 2) Cache tunables. Protected by cache_chain_mutex */
-	unsigned int batchcount;/*本地高速缓存转入或转出的大批对象数量 指定了在每CPU列表为空的情况下，从缓存的slab中获取对象的数目。它还表示在缓存增长时分配的对象数目*/
-	unsigned int limit; /*本地高速缓存中空闲对象的最大数目//limit指定了每CPU列表中保存的对象的最大数目，如果超出该值，内核会将batchcount个对象返回到slab*/
+	unsigned int batchcount;/*指定了在per-cpu列表为空的情况下，从缓存的slab中获取对象的数目。它还表示在缓存增长时分配的对象数目*/
+	unsigned int limit; /*指定了per-cpu列表中保存的对象的最大数目，如果超出该值，内核会将batchcount个对象返回到slab*/
 	unsigned int shared;
 
 	unsigned int buffer_size;/*管理对象的大小*/
 	u32 reciprocal_buffer_size;/*buffer_size的倒数值*/ 
-/* 3) touched by every alloc & free from the backend */
 
-	unsigned int flags;		/* constant flags */ /* 用于标记slab头得管理数据是在slab内还是外*/
+	
+/* 3) touched by every alloc & free from the backend */
+	unsigned int flags;  //如果管理结构存储在slab外部则置位CFLGS_OFF_SLAB
 	unsigned int num;		/* # of objs per slab */ /*每个slab包含对象的个数*/
 
 /* 4) cache_grow/shrink */
@@ -50,15 +47,15 @@ struct kmem_cache {
 	/* force GFP flags, e.g. GFP_DMA */
 	gfp_t gfpflags;/*与伙伴系统交互时所提供的分配标识*/
 
-	size_t colour;			/* cache colouring range *//* 颜色的个数*/
-	unsigned int colour_off;	/* colour offset *//* 着色的偏移量  /是基本偏移量乘以颜色值获得的绝对偏移量*/ 
+	size_t colour;			    /* cache colouring range 缓存着色范围*/
+	unsigned int colour_off;	/* colour offset 着色的偏移量 是基本偏移量乘以颜色值获得的绝对偏移量 */ 
 	struct kmem_cache *slabp_cache;/*/如果slab头部的管理数据存储在slab外部，则slabp_cache指向分配所需内存的一般性
                                       缓存；如果slab头部在slab上，则其为NULL*/
 	unsigned int slab_size;/*slab管理区的大小*/
 	unsigned int dflags;		/* dynamic flags */
 
 	/* constructor func */
-	void (*ctor)(void *obj);////创建高速缓存时的构造函数指针
+	void (*ctor)(void *obj);//创建高速缓存时的构造函数指针
 
 /* 5) cache creation/removal */
 	const char *name;//缓存的名称
@@ -98,7 +95,7 @@ struct kmem_cache {
 	 * We still use [MAX_NUMNODES] and not [1] or [0] because cache_cache
 	 * is statically defined, so we reserve the max number of nodes.
 	 */
-	 
+	//每个数字项对应系统中一个可能的内存节点	
 	struct kmem_list3 *nodelists[MAX_NUMNODES];
 	/*
 	 * Do not add fields after nodelists[]
@@ -106,13 +103,16 @@ struct kmem_cache {
 };
 
 /* Size description struct for general caches. */
+//通用缓存 用于kmalloc()
 struct cache_sizes {
-	size_t		 	cs_size;
+	size_t		 	cs_size; //该项负责的内存区的长度
 	struct kmem_cache	*cs_cachep;
 #ifdef CONFIG_ZONE_DMA
 	struct kmem_cache	*cs_dmacachep;
 #endif
 };
+
+//包含了所有的可用长度 
 extern struct cache_sizes malloc_sizes[];
 
 void *kmem_cache_alloc(struct kmem_cache *, gfp_t);
@@ -138,7 +138,8 @@ static __always_inline void *kmalloc(size_t size, gfp_t flags)
 	struct kmem_cache *cachep;
 	void *ret;
 
-	if (__builtin_constant_p(size)) {
+	if (__builtin_constant_p(size)) 
+	{
 		int i = 0;
 
 		if (!size)

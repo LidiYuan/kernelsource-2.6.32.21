@@ -116,8 +116,10 @@ Following are the RCU equivalents for these two functions:
 
 		/* Do not use the _rcu iterator here, since this is the only
 		 * deletion routine. */
-		list_for_each_entry(e, list, list) {
-			if (!audit_compare_rule(rule, &e->rule)) {
+		list_for_each_entry(e, list, list) 
+		{
+			if (!audit_compare_rule(rule, &e->rule)) 
+			{
 				list_del_rcu(&e->list);
 				call_rcu(&e->rcu, audit_free_rule);
 				return 0;
@@ -126,13 +128,15 @@ Following are the RCU equivalents for these two functions:
 		return -EFAULT;		/* No matching rule */
 	}
 
-	static inline int audit_add_rule(struct audit_entry *entry,
-					 struct list_head *list)
+	static inline int audit_add_rule(struct audit_entry *entry,struct list_head *list)
 	{
-		if (entry->rule.flags & AUDIT_PREPEND) {
+		if (entry->rule.flags & AUDIT_PREPEND) 
+		{
 			entry->rule.flags &= ~AUDIT_PREPEND;
 			list_add_rcu(&entry->list, list);
-		} else {
+		} 
+		else 
+		{
 			list_add_tail_rcu(&entry->list, list);
 		}
 		return 0;

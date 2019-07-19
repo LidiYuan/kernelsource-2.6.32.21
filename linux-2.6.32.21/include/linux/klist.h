@@ -17,11 +17,12 @@
 #include <linux/list.h>
 
 struct klist_node;
+
 struct klist {
 	spinlock_t		k_lock;
 	struct list_head	k_list;
-	void			(*get)(struct klist_node *);
-	void			(*put)(struct klist_node *);
+	void			(*get)(struct klist_node *);//klist_class_dev_get()
+	void			(*put)(struct klist_node *);//klist_class_dev_put()
 } __attribute__ ((aligned (4)));
 
 #define KLIST_INIT(_name, _get, _put)					\

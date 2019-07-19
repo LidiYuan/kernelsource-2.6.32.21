@@ -27,8 +27,7 @@ early_ioremap (unsigned long phys_addr, unsigned long size)
 	return __ioremap(phys_addr);
 }
 
-void __iomem *
-ioremap (unsigned long phys_addr, unsigned long size)
+void __iomem *ioremap (unsigned long phys_addr, unsigned long size)
 {
 	void __iomem *addr;
 	struct vm_struct *area;

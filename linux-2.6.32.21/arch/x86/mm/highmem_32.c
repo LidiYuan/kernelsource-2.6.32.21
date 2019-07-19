@@ -2,7 +2,8 @@
 #include <linux/module.h>
 #include <linux/swap.h> /* for totalram_pages */
 
-//只能用于进程上下文
+//如果需要将高端内存页帧长期映射到内核地址空间中
+//只能用于进程上下文 PKMAP_BASE ~ FIXADDR_SIZE为持久映射区域
 void *kmap(struct page *page)
 {
 	might_sleep();
@@ -49,7 +50,8 @@ void *kmap_atomic_prot(struct page *page, enum km_type type, pgprot_t prot)
 	return (void *)vaddr;
 }
 
-//临时映射 不会睡眠
+//临时映射 不会睡眠(原子操作)
+//type: 定义了所需要的映射类型 
 void *kmap_atomic(struct page *page, enum km_type type)
 {
 	return kmap_atomic_prot(page, type, kmap_prot);

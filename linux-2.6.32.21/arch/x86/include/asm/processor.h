@@ -159,6 +159,7 @@ static inline int hlt_works(int cpu)
 #endif
 }
 
+//该宏返回特定于处理器的的L1缓存大小
 #define cache_line_size()	(boot_cpu_data.x86_cache_alignment)
 
 extern void cpu_detect(struct cpuinfo_x86 *c);

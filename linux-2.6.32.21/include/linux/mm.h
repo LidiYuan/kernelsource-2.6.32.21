@@ -369,9 +369,9 @@ static inline compound_page_dtor *get_compound_page_dtor(struct page *page)
 
 static inline int compound_order(struct page *page)
 {
-	if (!PageHead(page))
+	if (!PageHead(page))//是否为复合页首页
 		return 0;
-	return (unsigned long)page[1].lru.prev;
+	return (unsigned long)page[1].lru.prev;//获得复合页的order
 }
 
 static inline void set_compound_order(struct page *page, unsigned long order)

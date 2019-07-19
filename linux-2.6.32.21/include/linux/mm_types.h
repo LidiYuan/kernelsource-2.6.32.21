@@ -97,6 +97,7 @@ struct page {
 		void *freelist;		/* SLUB: freelist req. slab lock */
 	};
 
+     //对于slab 此值另做他用page_set_slab()和page_set_cache()
 	//是一个表头，用于在各种链表上维护该页，一遍将页按不用类别分组，最重要的类别是活动页和不活动页					             
 	//根据页面替换策略可能被换出的页面存放在active_list或inactive_list链表中
 	struct list_head lru;		/* Pageout list, eg. active_list

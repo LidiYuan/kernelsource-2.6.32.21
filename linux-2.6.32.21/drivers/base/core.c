@@ -562,7 +562,7 @@ static void klist_children_put(struct klist_node *n)
  */
  //对设备进行初始化
 void device_initialize(struct device *dev)
-{
+{   
 	dev->kobj.kset = devices_kset;
 	kobject_init(&dev->kobj, &device_ktype);
 	INIT_LIST_HEAD(&dev->dma_pools);
@@ -954,6 +954,7 @@ int device_add(struct device *dev)
 	/* we require the name to be set before, and pass NULL 
        建立kobject层次关系
 	*/
+	//会在/sys/devices 目录下创建目录
 	error = kobject_add(&dev->kobj, dev->kobj.parent, NULL);
 	if (error)
 		goto Error;
@@ -962,11 +963,13 @@ int device_add(struct device *dev)
 	if (platform_notify)
 		platform_notify(dev);
 
+	//在设备下创建uevent文件
 	error = device_create_file(dev, &uevent_attr);
 	if (error)
 		goto attrError;
 
-	if (MAJOR(dev->devt)) {
+	if (MAJOR(dev->devt)) 
+	{
 		error = device_create_file(dev, &devt_attr);
 		if (error)
 			goto ueventattrError;
@@ -978,6 +981,7 @@ int device_add(struct device *dev)
 		devtmpfs_create_node(dev);
 	}
 
+	//创建 /sys/class 到 /sys/device/xx/dev->name的符号链接  ll /sys/class/input
 	error = device_add_class_symlinks(dev);
 	if (error)
 		goto SymlinkError;
@@ -1005,6 +1009,7 @@ int device_add(struct device *dev)
 		klist_add_tail(&dev->p->knode_parent,
 			       &parent->p->klist_children);
 
+    //将设备加入到类的链表中
 	if (dev->class) {
 		mutex_lock(&dev->class->p->class_mutex);
 		/* tie the class to the device */
@@ -1012,10 +1017,12 @@ int device_add(struct device *dev)
 			       &dev->class->p->class_devices);
 
 		/* notify any interfaces that the device is here */
+        //遍历该类的接口 调用接口的add_dev回调函数
 		list_for_each_entry(class_intf,
 				    &dev->class->p->class_interfaces, node)
 			if (class_intf->add_dev)
 				class_intf->add_dev(dev, class_intf);
+			
 		mutex_unlock(&dev->class->p->class_mutex);
 	}
 done:
@@ -1476,18 +1483,21 @@ struct device *device_create_vargs(struct class *class, struct device *parent,
 	if (class == NULL || IS_ERR(class))
 		goto error;
 
+    //创建设备结构体
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev) {
 		retval = -ENOMEM;
 		goto error;
 	}
 
+	//对设备对象进行初始化
 	dev->devt = devt;
 	dev->class = class;
 	dev->parent = parent;
 	dev->release = device_create_release;
 	dev_set_drvdata(dev, drvdata);
 
+	//设置在sysfs中的设备模型名
 	retval = kobject_set_name_vargs(&dev->kobj, fmt, args);
 	if (retval)
 		goto error;
@@ -1526,6 +1536,7 @@ EXPORT_SYMBOL_GPL(device_create_vargs);
  * Note: the struct class passed to this function must have previously
  * been created with a call to class_create().
  */
+ //创建一个设备 并将其加入到设备模型中
 struct device *device_create(struct class *class, struct device *parent,
 			     dev_t devt, void *drvdata, const char *fmt, ...)
 {

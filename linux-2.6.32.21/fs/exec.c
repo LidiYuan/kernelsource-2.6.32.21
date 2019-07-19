@@ -1248,9 +1248,11 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 		return retval;
 
 	retval = -ENOENT;
-	for (try=0; try<2; try++) {
+	for (try=0; try<2; try++) 
+	{
 		read_lock(&binfmt_lock);
-		list_for_each_entry(fmt, &formats, lh) {
+		list_for_each_entry(fmt, &formats, lh) 
+		{
 			                                                           //¶ÔÓÚelfÎªload_elf_binary
 			                                                           //¶ÔÓÚ½Å±¾Îªload_script
 			int (*fn)(struct linux_binprm *, struct pt_regs *) = fmt->load_binary;//ÓÃÓÚ¼ÓÔØÖ´ĞĞ³ÌĞòµÄ¼ÓÔØÆ÷
@@ -1266,7 +1268,8 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			 * load_binary function to restore it on return.
 			 */
 			bprm->recursion_depth = depth;
-			if (retval >= 0) {
+			if (retval >= 0) 
+			{
 				if (depth == 0)
 					tracehook_report_exec(fmt, bprm, regs);
 				put_binfmt(fmt);
@@ -1388,7 +1391,7 @@ int do_execve(char * filename, //Õâ¸öÊÇÈ«Â·¾¶(»òÏà¶ÔÂ·¾¶) ÈôÎª½Å±¾ ´Ë´¦ÊÇ½Å±¾Ãû×
 	if (retval < 0)
 		goto out;
 
-	////µ½Á´±íÖĞÑ°ÕÒºÏÊÊµÄ¼ÓÔØÄ£¿é
+	//µ½Á´±íÖĞÑ°ÕÒºÏÊÊµÄ¼ÓÔØÄ£¿é
 	current->flags &= ~PF_KTHREAD;
 	retval = search_binary_handler(bprm,regs);
 	if (retval < 0)

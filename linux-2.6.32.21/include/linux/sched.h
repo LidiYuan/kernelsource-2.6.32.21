@@ -1592,7 +1592,7 @@ struct task_struct
 
 
 /* VM state */
-	struct reclaim_state *reclaim_state;
+	struct reclaim_state *reclaim_state;//»ØÊÕ×´Ì¬
 
 	struct backing_dev_info *backing_dev_info;
 

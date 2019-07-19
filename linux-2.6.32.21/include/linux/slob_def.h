@@ -7,11 +7,9 @@ void *kmem_cache_alloc_node(struct kmem_cache *, gfp_t flags, int node);
 /*
 cachep:描述给定的缓存的结构指针
 flags: 分配标志选项 如GFP_KERNEL GFP_ATOMIC
-
 若slab没有空闲对象 则使用kmem_getpages()获取新的页
 */
-static __always_inline void *kmem_cache_alloc(struct kmem_cache *cachep,
-					      gfp_t flags)
+static __always_inline void *kmem_cache_alloc(struct kmem_cache *cachep,gfp_t flags)
 {
 	return kmem_cache_alloc_node(cachep, flags, -1);
 }
