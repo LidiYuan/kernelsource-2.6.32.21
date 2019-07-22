@@ -863,7 +863,9 @@ extern int			bootloader_version;
 
 extern char			ignore_fpu_irq;
 
+//如果体系结构想要在不同mmap区域布局之间做出选择 则需要设置此值 并提供arch_pick_mmap_layout()函数
 #define HAVE_ARCH_PICK_MMAP_LAYOUT 1
+
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 

@@ -444,7 +444,8 @@ static inline unsigned long msleep_interruptible_rsl(unsigned int msecs)
 {
          unsigned long timeout = MSECS(msecs) + 1;
 
-         while (timeout) {
+         while (timeout) 
+		 {
                  set_current_state(TASK_INTERRUPTIBLE);
                  timeout = schedule_timeout(timeout);
          }

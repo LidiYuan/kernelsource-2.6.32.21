@@ -541,6 +541,7 @@ extern struct page *zero_page_memmap_ptr;
 #define ZERO_PAGE(vaddr) (zero_page_memmap_ptr)
 
 /* We provide our own get_unmapped_area to cope with VA holes for userland */
+//
 #define HAVE_ARCH_UNMAPPED_AREA
 
 #ifdef CONFIG_HUGETLB_PAGE

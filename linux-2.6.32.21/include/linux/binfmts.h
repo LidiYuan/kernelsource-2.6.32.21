@@ -115,7 +115,11 @@ extern int suid_dumpable;
 
 /* Stack area protections */
 #define EXSTACK_DEFAULT   0	/* Whatever the arch defaults to */
+
+//堆栈没有可执行权限
 #define EXSTACK_DISABLE_X 1	/* Disable executable stacks */
+
+//堆栈有可执行权限
 #define EXSTACK_ENABLE_X  2	/* Enable executable stacks */
 
 extern int setup_arg_pages(struct linux_binprm * bprm,

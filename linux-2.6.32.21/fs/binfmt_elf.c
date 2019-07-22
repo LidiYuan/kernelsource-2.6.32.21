@@ -576,9 +576,13 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	unsigned long interp_load_addr = 0;
 	unsigned long start_code, end_code, start_data, end_data;
 	unsigned long reloc_func_desc = 0;
+
+	//堆栈执行权限标记
 	int executable_stack = EXSTACK_DEFAULT;
 	unsigned long def_flags = 0;
-	struct {
+	
+	struct 
+	{
 		struct elfhdr elf_ex;
 		struct elfhdr interp_elf_ex;
 	} *loc;
@@ -588,41 +592,51 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 		retval = -ENOMEM;
 		goto out_ret;
 	}
-	
-	/* Get the exec-header */
+
+	//获得ELF头部
 	loc->elf_ex = *((struct elfhdr *)bprm->buf);
 
 	retval = -ENOEXEC;
-	/* First of all, some simple consistency checks */
+
+	//检测ELF魔术数字
 	if (memcmp(loc->elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
 		goto out;
 
+    //是否为可执行文件或动态库文件(注意动态库也允许被执行)
 	if (loc->elf_ex.e_type != ET_EXEC && loc->elf_ex.e_type != ET_DYN)
 		goto out;
+
+	//检测体系架构
 	if (!elf_check_arch(&loc->elf_ex))
 		goto out;
-	
+
+	//对文件系统的操作
 	if (!bprm->file->f_op||!bprm->file->f_op->mmap)
 		goto out;
 
 	/* Now read in all of the header information */
+    //程序头部表项的大小
 	if (loc->elf_ex.e_phentsize != sizeof(struct elf_phdr))
 		goto out;
-	
-	if (loc->elf_ex.e_phnum < 1 ||
-	 	loc->elf_ex.e_phnum > 65536U / sizeof(struct elf_phdr))
+
+    //程序头部表项的个数范围( 1, 65536U / sizeof(struct elf_phdr) )
+	if (loc->elf_ex.e_phnum < 1 ||  
+	 	loc->elf_ex.e_phnum > 65536U / sizeof(struct elf_phdr)) 
 		goto out;
-	
+
+	//获得程序表的大小  (表项个数 * 表项大小)
 	size = loc->elf_ex.e_phnum * sizeof(struct elf_phdr);
+
 	retval = -ENOMEM;
-	
+	//分配程序表大小相等的空间 存储程序表的数据
 	elf_phdata = kmalloc(size, GFP_KERNEL);
 	if (!elf_phdata)
 		goto out;
 
-	retval = kernel_read(bprm->file, loc->elf_ex.e_phoff,
-			     (char *)elf_phdata, size);
-	if (retval != size) {
+    //从文件读取程序表的数据
+	retval = kernel_read(bprm->file, loc->elf_ex.e_phoff, (char *)elf_phdata, size);
+	if (retval != size) 
+	{
 		if (retval >= 0)
 			retval = -EIO;
 		goto out_free_ph;
@@ -637,36 +651,46 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	start_data = 0;
 	end_data = 0;
 
-	for (i = 0; i < loc->elf_ex.e_phnum; i++) {
-		if (elf_ppnt->p_type == PT_INTERP) {
+    //次循环就是为了获得连接器路径和读取连接器ELF头部
+	for (i = 0; i < loc->elf_ex.e_phnum; i++) 
+	{
+	    //此程序表项与程序连接器相关
+		if (elf_ppnt->p_type == PT_INTERP) 
+		{
 			/* This is the program interpreter used for
 			 * shared libraries - for now assume that this
 			 * is an a.out format binary
 			 */
 			retval = -ENOEXEC;
+
+			//此表项对应的数据在文件中的大小范围为(2, PATH_MAX) 起始存储的是个连接器路径
 			if (elf_ppnt->p_filesz > PATH_MAX || 
 			    elf_ppnt->p_filesz < 2)
 				goto out_free_ph;
 
 			retval = -ENOMEM;
-			elf_interpreter = kmalloc(elf_ppnt->p_filesz,
-						  GFP_KERNEL);
+
+			//分配内存保存连接器信息
+			elf_interpreter = kmalloc(elf_ppnt->p_filesz,GFP_KERNEL);
 			if (!elf_interpreter)
 				goto out_free_ph;
 
-			retval = kernel_read(bprm->file, elf_ppnt->p_offset,
-					     elf_interpreter,
-					     elf_ppnt->p_filesz);
-			if (retval != elf_ppnt->p_filesz) {
+            //从文件中读取连接器信息  elf_ppnt->p_offset表示该信息在文件中的偏移
+			retval = kernel_read(bprm->file, elf_ppnt->p_offset,elf_interpreter,elf_ppnt->p_filesz);
+			if (retval != elf_ppnt->p_filesz) 
+			{
 				if (retval >= 0)
 					retval = -EIO;
 				goto out_free_interp;
 			}
+			
 			/* make sure path is NULL terminated */
 			retval = -ENOEXEC;
+			//确定路径是否以'\0'结尾
 			if (elf_interpreter[elf_ppnt->p_filesz - 1] != '\0')
 				goto out_free_interp;
 
+			//打开连接器路径
 			interpreter = open_exec(elf_interpreter);
 			retval = PTR_ERR(interpreter);
 			if (IS_ERR(interpreter))
@@ -677,18 +701,21 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 			 * mm->dumpable = 0 regardless of the interpreter's
 			 * permissions.
 			 */
+			//检测是否有读的权限 
 			if (file_permission(interpreter, MAY_READ) < 0)
 				bprm->interp_flags |= BINPRM_FLAGS_ENFORCE_NONDUMP;
 
-			retval = kernel_read(interpreter, 0, bprm->buf,
-					     BINPRM_BUF_SIZE);
-			if (retval != BINPRM_BUF_SIZE) {
+			//读取连接器文件内容到bprm->buf中
+			retval = kernel_read(interpreter, 0, bprm->buf,BINPRM_BUF_SIZE);
+			if (retval != BINPRM_BUF_SIZE) 
+			{
 				if (retval >= 0)
 					retval = -EIO;
 				goto out_free_dentry;
 			}
 
 			/* Get the exec headers */
+			//取得连接器ELF头部
 			loc->interp_elf_ex = *((struct elfhdr *)bprm->buf);
 			break;
 		}
@@ -696,22 +723,32 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	}
 
 	elf_ppnt = elf_phdata;
+
+	//此循环查找类型为PT_GNU_STACK的程序段 看是否设置了 有执行权限的堆栈
+	//通过 gcc -z noexecstack来设置没有执行权限  或者 gcc -z execstack 堆栈有可执行权限 
 	for (i = 0; i < loc->elf_ex.e_phnum; i++, elf_ppnt++)
-		if (elf_ppnt->p_type == PT_GNU_STACK) {
-			if (elf_ppnt->p_flags & PF_X)
+		if (elf_ppnt->p_type == PT_GNU_STACK) 
+		{
+			if (elf_ppnt->p_flags & PF_X)//堆栈有可执行权限
 				executable_stack = EXSTACK_ENABLE_X;
 			else
-				executable_stack = EXSTACK_DISABLE_X;
+				executable_stack = EXSTACK_DISABLE_X;//堆栈没有可执行权限
 			break;
 		}
 
 	/* Some simple consistency checks for the interpreter */
-	if (elf_interpreter) {
+	//对连接器进一步检查
+	if (elf_interpreter) 
+	{
 		retval = -ELIBBAD;
+
+		//是否为ELF格式
 		/* Not an ELF interpreter */
 		if (memcmp(loc->interp_elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
 			goto out_free_dentry;
+		
 		/* Verify the interpreter has a valid arch */
+		//检查此ELF对应的体系结构
 		if (!elf_check_arch(&loc->interp_elf_ex))
 			goto out_free_dentry;
 	}
@@ -751,15 +788,16 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 
 	/* Now we do a little grungy work by mmaping the ELF image into
 	   the correct location in memory. */
-	for(i = 0, elf_ppnt = elf_phdata;
-	    i < loc->elf_ex.e_phnum; i++, elf_ppnt++) {
+	for(i = 0, elf_ppnt = elf_phdata;i < loc->elf_ex.e_phnum; i++, elf_ppnt++) 
+	{
 		int elf_prot = 0, elf_flags;
 		unsigned long k, vaddr;
 
 		if (elf_ppnt->p_type != PT_LOAD)
 			continue;
 
-		if (unlikely (elf_brk > elf_bss)) {
+		if (unlikely (elf_brk > elf_bss)) 
+		{
 			unsigned long nbyte;
 	            
 			/* There was a PT_LOAD segment with p_memsz > p_filesz
@@ -797,9 +835,12 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 		elf_flags = MAP_PRIVATE | MAP_DENYWRITE | MAP_EXECUTABLE;
 
 		vaddr = elf_ppnt->p_vaddr;
-		if (loc->elf_ex.e_type == ET_EXEC || load_addr_set) {
+		if (loc->elf_ex.e_type == ET_EXEC || load_addr_set) 
+		{
 			elf_flags |= MAP_FIXED;
-		} else if (loc->elf_ex.e_type == ET_DYN) {
+		} 
+		else if (loc->elf_ex.e_type == ET_DYN) 
+		{
 			/* Try and get dynamic programs out of the way of the
 			 * default mmap base, as well as whatever program they
 			 * might try to exec.  This is because the brk will
@@ -811,9 +852,9 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 #endif
 		}
 
-		error = elf_map(bprm->file, load_bias + vaddr, elf_ppnt,
-				elf_prot, elf_flags, 0);
-		if (BAD_ADDR(error)) {
+		error = elf_map(bprm->file, load_bias + vaddr, elf_ppnt,elf_prot, elf_flags, 0);
+		if (BAD_ADDR(error)) 
+		{
 			send_sig(SIGKILL, current, 0);
 			retval = IS_ERR((void *)error) ?
 				PTR_ERR((void*)error) : -EINVAL;
@@ -887,14 +928,16 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 		goto out_free_dentry;
 	}
 
-	if (elf_interpreter) {
+	if (elf_interpreter) 
+	{
 		unsigned long uninitialized_var(interp_map_addr);
 
 		elf_entry = load_elf_interp(&loc->interp_elf_ex,
 					    interpreter,
 					    &interp_map_addr,
 					    load_bias);
-		if (!IS_ERR((void *)elf_entry)) {
+		if (!IS_ERR((void *)elf_entry)) 
+		{
 			/*
 			 * load_elf_interp() returns relocation
 			 * adjustment
@@ -913,9 +956,13 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 		allow_write_access(interpreter);
 		fput(interpreter);
 		kfree(elf_interpreter);
-	} else {
+	} 
+	else 
+	{
+	    //没有连接器  发送段错误
 		elf_entry = loc->elf_ex.e_entry;
-		if (BAD_ADDR(elf_entry)) {
+		if (BAD_ADDR(elf_entry)) 
+		{
 			force_sig(SIGSEGV, current);
 			retval = -EINVAL;
 			goto out_free_dentry;
@@ -923,12 +970,13 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	}
 
 	kfree(elf_phdata);
-
+    
 	set_binfmt(&elf_format);
 
 #ifdef ARCH_HAS_SETUP_ADDITIONAL_PAGES
 	retval = arch_setup_additional_pages(bprm, !!elf_interpreter);
-	if (retval < 0) {
+	if (retval < 0) 
+	{
 		send_sig(SIGKILL, current, 0);
 		goto out;
 	}

@@ -287,6 +287,7 @@ struct desc_struct {
 struct ia64_partial_page_list;
 #endif
 
+//用于保存进程上下文信息
 struct thread_struct {
 	__u32 flags;			/* various thread flags (see IA64_THREAD_*) */
 	/* writing on_ustack is performance-critical, so it's worth spending 8 bits on it... */

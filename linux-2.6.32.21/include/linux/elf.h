@@ -418,7 +418,7 @@ other					SHN_UNDEF								0
 #define	ELFMAG1		'E'
 #define	ELFMAG2		'L'
 #define	ELFMAG3		'F'
-#define	ELFMAG		"\177ELF"
+#define	ELFMAG		"\177ELF" // '\'后跟的为8进制  也可以\xhh \x后跟16进制  \177 是ASCII中的 DEL
 #define	SELFMAG		4
 
 #define	ELFCLASSNONE	0	//未识别 I_CLASS */

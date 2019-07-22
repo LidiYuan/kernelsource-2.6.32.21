@@ -1482,8 +1482,9 @@ struct task_struct
 /* hung task detection */
 	unsigned long last_switch_count;//是nvcsw和nivcsw的总和
 #endif
+
 /* CPU-specific state of this task */
-	struct thread_struct thread;
+	struct thread_struct thread; //用于保存进程上下文信息 在进程上下文切换使用
 
 
 /**********************文件****************************/
@@ -1910,7 +1911,10 @@ extern void thread_group_times(struct task_struct *p, cputime_t *ut, cputime_t *
 #define PF_OOM_ORIGIN	0x00080000	/* Allocating much memory to others */
 #define PF_LESS_THROTTLE 0x00100000	/* Throttle me less: I clean memory */
 #define PF_KTHREAD	0x00200000	/* I am a kernel thread */
+
+//设置了此标志内核不会为栈和内存映射的起点选择固定位置
 #define PF_RANDOMIZE	0x00400000	/* randomize virtual address space */
+
 #define PF_SWAPWRITE	0x00800000	/* Allowed to write to swap */
 #define PF_SPREAD_PAGE	0x01000000	/* Spread page cache over cpuset */
 #define PF_SPREAD_SLAB	0x02000000	/* Spread some slab caches over cpuset */
@@ -2123,6 +2127,7 @@ void yield(void);
  */
 extern struct exec_domain	default_exec_domain;
 
+//内核栈联合体
 union thread_union {
 	struct thread_info thread_info;
 	unsigned long stack[THREAD_SIZE/sizeof(long)];

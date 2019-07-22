@@ -251,8 +251,14 @@ struct mm_struct {
 	//释放线性区时调用的方法， 
 	void (*unmap_area) (struct mm_struct *mm, unsigned long addr);
 	
-	unsigned long mmap_base;		/* base of mmap area mmap_base是维护共享映射区的起始地址*/
-	unsigned long task_size;		/* size of task vm space */
+	unsigned long mmap_base;		/* base of mmap area 虚拟地址空间中用于内存映射的起始地址
+                                       调用get_unmapped_area()在mmap区域为新映射找到合适的位置
+	                                   */
+
+	unsigned long task_size;		/* 存储了对应进程的地址空间长度 该值通常为TASK_SIZE
+                                       但在64上执行32位程序  此值为该进程真正可见的长度
+									   */
+									   
 	unsigned long cached_hole_size; 	/* if non-zero, the largest hole below free_area_cache */
 
 	 //内核进程搜索进程地址空间中线性地址的空间
@@ -305,15 +311,16 @@ struct mm_struct {
 		          start_data, 
 		          end_data;
 	
-	unsigned long start_brk, 
-		          brk, //用来维护heap和heap的指针
+	unsigned long start_brk, //堆的起始地址
+		          brk, //堆区域当前的结束地址
+		          
 		          start_stack;//是用来维护stack段空间范围
 		          
-	unsigned long arg_start, 
-		          arg_end,  
-		          
-		          env_start, 
-		          env_end;
+	unsigned long arg_start,//参数起始地址  
+		          arg_end,  //参数结束地址
+		           
+		          env_start,//环境变量起始地址 
+		          env_end;//环境变量结束地址
 
 	unsigned long saved_auxv[AT_VECTOR_SIZE]; /* for /proc/PID/auxv */
 
