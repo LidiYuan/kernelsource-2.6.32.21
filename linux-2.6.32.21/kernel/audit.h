@@ -57,8 +57,9 @@ struct audit_watch;
 struct audit_tree;
 struct audit_chunk;
 
+//内核过滤规则链表由audit_entry类型的元素组成
 struct audit_entry {
-	struct list_head	list;
+	struct list_head	list; //加入到audit_filter_list[]链表
 	struct rcu_head		rcu;
 	struct audit_krule	rule;
 };

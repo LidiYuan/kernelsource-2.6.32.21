@@ -115,12 +115,15 @@ void vma_prio_tree_remove(struct vm_area_struct *vma,
 {
 	struct vm_area_struct *node, *head, *new_head;
 
-	if (!vma->shared.vm_set.head) {
+	if (!vma->shared.vm_set.head) 
+	{
 		if (!vma->shared.vm_set.parent)
 			list_del_init(&vma->shared.vm_set.list);
 		else
 			raw_prio_tree_remove(root, &vma->shared.prio_tree_node);
-	} else {
+	} 
+	else 
+	{
 		/* Leave this BUG_ON till prio_tree patch stabilizes */
 		BUG_ON(vma->shared.vm_set.head->shared.vm_set.head != vma);
 		if (vma->shared.vm_set.parent) {

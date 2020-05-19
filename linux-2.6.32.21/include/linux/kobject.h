@@ -70,14 +70,14 @@ struct kobject {
 	const char		*name; //表示kobject对象的名字，对应sysfs下的一个目录
 	                       //kobject_set_name()
 	                       
-	struct list_head	entry; //连接到kset 建立层次结构 是kobject中插入的head_list结构
-	struct kobject		*parent;// 是指向当前kobject父对象的指针，体现在sys结构中就是包含当前kobject对象的目录对象
-	struct kset		*kset; //kset代表一个subsystem 其中容纳了一系列同类型的kobject
+	struct list_head	entry;  //将kobject连接到kset的连接件
+	struct kobject		*parent;//是指向当前kobject父对象的指针，体现在sys结构中就是包含当前kobject对象的目录对象
+	struct kset		*kset;      //若kobject已经连接到kset则用此指针指向他
 	struct kobj_type	*ktype;//该内核对象一组sysfs文件系统相关的操作函数和属性
-	struct sysfs_dirent	*sd;//该内核对象在sysfs文件系统中对应的目录项实例
+	struct sysfs_dirent	*sd;   //该内核对象在sysfs文件系统中对应的目录项实例
 	struct kref		kref; //是对kobject的引用计数，当引用计数为0时，就回调之前注册的release方法释放该对象
 	unsigned int state_initialized:1;// 1表示已经初始化  0表示未被初始化
-	unsigned int state_in_sysfs:1;//表示在sysfs系统中是否建立一个入口点
+	unsigned int state_in_sysfs:1;//表示已经在sysfs系统中建立一个入口点
 	unsigned int state_add_uevent_sent:1;//添加事件是否发往用户空间
 	unsigned int state_remove_uevent_sent:1;//删除事件是否发往用户空间
 	unsigned int uevent_suppress:1;// 1表示在该对象状态发生变化时 不让所属kset往用户空间发送uevent消息
@@ -95,8 +95,8 @@ static inline const char *kobject_name(const struct kobject *kobj)
 
 extern void kobject_init(struct kobject *kobj, struct kobj_type *ktype);
 extern int __must_check kobject_add(struct kobject *kobj,
-				    struct kobject *parent,
-				    const char *fmt, ...);
+				                           struct kobject *parent,
+				                           const char *fmt, ...);
 extern int __must_check kobject_init_and_add(struct kobject *kobj,
 					     struct kobj_type *ktype,
 					     struct kobject *parent,
@@ -136,20 +136,27 @@ struct kobj_uevent_env {
 	int buflen;//buf中数据长度
 };
 
-struct kset_uevent_ops {
+struct kset_uevent_ops 
+{
+	//过滤回调函数 返回0 表示不需要向用户空间报告该事件
 	int (*filter)(struct kset *kset, struct kobject *kobj);
 
+    //名字回调函数 返回子系统名字 即环境变量SUBSYSTEM的名称
 	const char *(*name)(struct kset *kset, struct kobject *kobj);
 
-	int (*uevent)(struct kset *kset, struct kobject *kobj,
-		             struct kobj_uevent_env *env);
+    //添加子系统特定的环境变量
+	int (*uevent)(struct kset *kset, struct kobject *kobj,struct kobj_uevent_env *env);
 };
 
 struct kobj_attribute 
 {
 	struct attribute attr;
+
+	//读取属性的内容
 	ssize_t (*show)(struct kobject *kobj, struct kobj_attribute *attr,
 			char *buf);
+
+	//存取属性的内容
 	ssize_t (*store)(struct kobject *kobj, struct kobj_attribute *attr,
 			 const char *buf, size_t count);
 };
@@ -183,8 +190,8 @@ kset_get()
 kset_put();
 */
 struct kset {
-	struct list_head list;//用来将其中的kobject连接起来
-	spinlock_t list_lock;//对list操作时候的自旋锁
+	struct list_head list;//这个kset的所有kobject的链表
+	spinlock_t list_lock;//遍历list时候的自旋锁
 	struct kobject kobj;//代表当前kset的kobj内核对象
 	struct kset_uevent_ops *uevent_ops; //一组函数指针 当kset中的kobject发生状态变化需要通知用户空间 调用其中的函数来实现
 };

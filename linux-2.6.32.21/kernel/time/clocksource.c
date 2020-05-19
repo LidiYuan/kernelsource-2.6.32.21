@@ -554,6 +554,7 @@ static void clocksource_enqueue(struct clocksource *cs)
  *
  * Returns -EBUSY if registration fails, zero otherwise.
  */
+ //注册一个时钟源 将其加入到clocksource_list链表中
 int clocksource_register(struct clocksource *cs)
 {
 	/* calculate max idle time permitted for this clocksource */

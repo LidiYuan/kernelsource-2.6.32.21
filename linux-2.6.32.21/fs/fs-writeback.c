@@ -1005,8 +1005,7 @@ static void bdi_writeback_all(struct super_block *sb, long nr_pages)
 void wakeup_flusher_threads(long nr_pages)
 {
 	if (nr_pages == 0)
-		nr_pages = global_page_state(NR_FILE_DIRTY) +
-				global_page_state(NR_UNSTABLE_NFS);
+		nr_pages = global_page_state(NR_FILE_DIRTY) + global_page_state(NR_UNSTABLE_NFS);
 
 	//Ω´‘‡“≥–¥ªÿ¥≈≈Ã
 	bdi_writeback_all(NULL, nr_pages);

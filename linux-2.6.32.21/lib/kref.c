@@ -19,6 +19,7 @@
  * @kref: object in question.
  * @num: initial reference counter
  */
+ //设置对象的kreg值
 void kref_set(struct kref *kref, int num)
 {
 	atomic_set(&kref->refcount, num);
@@ -29,6 +30,7 @@ void kref_set(struct kref *kref, int num)
  * kref_init - initialize object.
  * @kref: object in question.
  */
+//初始化对象 将对象的引用计数设置为1 
 void kref_init(struct kref *kref)
 {
 	kref_set(kref, 1);
@@ -38,9 +40,12 @@ void kref_init(struct kref *kref)
  * kref_get - increment refcount for object.
  * @kref: object.
  */
+ //增加引用计数
 void kref_get(struct kref *kref)
 {
+    //确保不调用kref_init就调用kref_get
 	WARN_ON(!atomic_read(&kref->refcount));
+	
 	atomic_inc(&kref->refcount);
 	smp_mb__after_atomic_inc();
 }
@@ -59,6 +64,7 @@ void kref_get(struct kref *kref)
  * memory.  Only use the return value if you want to see if the kref is now
  * gone, not present.
  */
+ //递减对象的引用计数 如果引用计数变为1则调用回调释放相应的内存
 int kref_put(struct kref *kref, void (*release)(struct kref *kref))
 {
 	WARN_ON(release == NULL);

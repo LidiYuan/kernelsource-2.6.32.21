@@ -371,7 +371,8 @@ void __init dmi_scan_machine(void)
 	char __iomem *p, *q;
 	int rc;
 
-	if (efi_enabled) {
+	if (efi_enabled) 
+	{
 		if (efi.smbios == EFI_INVALID_TABLE_ADDR)
 			goto error;
 
@@ -390,7 +391,8 @@ void __init dmi_scan_machine(void)
 			goto out;
 		}
 	}
-	else {
+	else 
+	{
 		/*
 		 * no iounmap() for that ioremap(); it would be a no-op, but
 		 * it's so early in setup that sucker gets confused into doing

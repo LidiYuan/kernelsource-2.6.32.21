@@ -119,41 +119,48 @@ EXPORT_SYMBOL_GPL(cn_netlink_send);
  * Callback helper - queues work and setup destructor for given data.
  */
 static int cn_call_callback(struct sk_buff *skb)
-{
+{   
+
 	struct cn_callback_entry *__cbq, *__new_cbq;
 	struct cn_dev *dev = &cdev;
 	struct cn_msg *msg = NLMSG_DATA(nlmsg_hdr(skb));
 	int err = -ENODEV;
 
 	spin_lock_bh(&dev->cbdev->queue_lock);
-	list_for_each_entry(__cbq, &dev->cbdev->queue_list, callback_entry) {
-		if (cn_cb_equal(&__cbq->id.id, &msg->id)) {
-			if (likely(!work_pending(&__cbq->work) &&
-					__cbq->data.skb == NULL)) {
+
+    //遍历链表 根据id查找适合的处理项
+	list_for_each_entry(__cbq, &dev->cbdev->queue_list, callback_entry) 
+	{
+		if (cn_cb_equal(&__cbq->id.id, &msg->id)) 
+		{
+			if (likely(!work_pending(&__cbq->work) && __cbq->data.skb == NULL)) 
+			{
 				__cbq->data.skb = skb;
 
 				if (queue_cn_work(__cbq, &__cbq->work))
 					err = 0;
 				else
 					err = -EINVAL;
-			} else {
+			} 
+			else 
+			{
+			    //防止同一个消息遗漏  如果消息被挂起的时候 又来消息
+			    //将其创建新的工作项  加入到工作队列
 				struct cn_callback_data *d;
 
 				err = -ENOMEM;
 				__new_cbq = kzalloc(sizeof(struct cn_callback_entry), GFP_ATOMIC);
-				if (__new_cbq) {
+				if (__new_cbq) 
+				{
 					d = &__new_cbq->data;
 					d->skb = skb;
 					d->callback = __cbq->data.callback;
 					d->free = __new_cbq;
-
 					__new_cbq->pdev = __cbq->pdev;
 
-					INIT_WORK(&__new_cbq->work,
-							&cn_queue_wrapper);
-
-					if (queue_cn_work(__new_cbq,
-						    &__new_cbq->work))
+					INIT_WORK(&__new_cbq->work,&cn_queue_wrapper);
+                    
+					if (queue_cn_work(__new_cbq,&__new_cbq->work))
 						err = 0;
 					else {
 						kfree(__new_cbq);
@@ -182,9 +189,11 @@ static void cn_rx_skb(struct sk_buff *__skb)
 
 	skb = skb_get(__skb);
 
-	if (skb->len >= NLMSG_SPACE(0)) {
+	if (skb->len >= NLMSG_SPACE(0)) 
+	{
 		nlh = nlmsg_hdr(skb);
 
+		//检验消息的长度
 		if (nlh->nlmsg_len < sizeof(struct cn_msg) ||
 		    skb->len < nlh->nlmsg_len ||
 		    nlh->nlmsg_len > CONNECTOR_MAX_MSG_SIZE) {
@@ -275,6 +284,7 @@ static int __devinit cn_init(void)
 {
 	struct cn_dev *dev = &cdev;
 
+	//netlink 接收消息处理函数
 	dev->input = cn_rx_skb;
 
 	dev->nls = netlink_kernel_create(&init_net, NETLINK_CONNECTOR,
@@ -284,13 +294,20 @@ static int __devinit cn_init(void)
 		return -EIO;
 
 	dev->cbdev = cn_queue_alloc_dev("cqueue", dev->nls);
-	if (!dev->cbdev) {
+	if (!dev->cbdev) 
+	{
 		netlink_kernel_release(dev->nls);
 		return -EINVAL;
 	}
 
 	cn_already_initialized = 1;
 
+	//在 /proc/net下面创建connector 
+	//显示如下:
+	/*
+	Name			ID
+	cn_proc 		1:1
+	*/
 	proc_net_fops_create(&init_net, "connector", S_IRUGO, &cn_file_ops);
 
 	return 0;

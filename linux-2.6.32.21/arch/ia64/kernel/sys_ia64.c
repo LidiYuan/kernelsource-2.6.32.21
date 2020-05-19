@@ -146,8 +146,7 @@ int ia64_mmap_check(unsigned long addr, unsigned long len,
  * of PAGE_SIZE (instead of bytes).  This allows to mmap2() (pieces
  * of) files that are larger than the address space of the CPU.
  */
-asmlinkage unsigned long
-sys_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, long pgoff)
+asmlinkage unsigned long sys_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, long pgoff)
 {
 	addr = sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
 	if (!IS_ERR((void *) addr))
@@ -155,8 +154,7 @@ sys_mmap2 (unsigned long addr, unsigned long len, int prot, int flags, int fd, l
 	return addr;
 }
 
-asmlinkage unsigned long
-sys_mmap (unsigned long addr, unsigned long len, int prot, int flags, int fd, long off)
+asmlinkage unsigned long sys_mmap (unsigned long addr, unsigned long len, int prot, int flags, int fd, long off)
 {
 	if (offset_in_page(off) != 0)
 		return -EINVAL;

@@ -6,9 +6,9 @@
 #define MREMAP_MAYMOVE	1
 #define MREMAP_FIXED	2
 
-#define OVERCOMMIT_GUESS		0
-#define OVERCOMMIT_ALWAYS		1
-#define OVERCOMMIT_NEVER		2
+#define OVERCOMMIT_GUESS		0 //启发式方式，根据当前系统中空闲内存状况来决定是否可以分配内存。
+#define OVERCOMMIT_ALWAYS		1 //直接返回成功，不做任何限制。
+#define OVERCOMMIT_NEVER		2 //系统中所有进程占用的虚拟内存空间不能超过上限
 
 #ifdef __KERNEL__
 #include <linux/mm.h>

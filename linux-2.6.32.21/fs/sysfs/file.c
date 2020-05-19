@@ -46,18 +46,20 @@ struct sysfs_open_dirent {
 	atomic_t		refcnt;
 	atomic_t		event;
 	wait_queue_head_t	poll;
-	struct list_head	buffers; /* goes through sysfs_buffer.list */
+	struct list_head	buffers; /* goes through sysfs_buffer.list  每次open都会有一个file{}->sysfs_buffer 
+	                                但他们底层对应的只有一个sysfs_open_dirent  将这些buffer连接到sysfs_open_dirent{}->buffers中*/
 };
 
+//是在open的时候填充 看sysfs_open_file
 struct sysfs_buffer {
-	size_t			count;
-	loff_t			pos;
-	char			* page;
-	struct sysfs_ops	* ops;
-	struct mutex		mutex;
-	int			needs_read_fill;
-	int			event;
-	struct list_head	list;
+	size_t			count;//缓冲区中数据字节数
+	loff_t			pos; //缓冲区数据偏移位置
+	char			* page;//保存缓冲区数据的页面的指针
+	struct sysfs_ops	* ops;//指向sysfs操作表的指针 该操作表包含show和store方法
+	struct mutex		mutex;//用于保护的互斥量
+	int			needs_read_fill;//如果为1  表示缓冲区数据无效  需要重新填入
+	int			event; //事件计数器 用于在属性变化时是否重新读入填充
+	struct list_head	list; //连接到sysfs_open_dirent.buffers
 };
 
 /**
@@ -90,6 +92,8 @@ static int fill_read_buffer(struct dentry * dentry, struct sysfs_buffer * buffer
 		return -ENODEV;
 
 	buffer->event = atomic_read(&attr_sd->s_attr.open->event);
+
+	//进行数据填充
 	count = ops->show(kobj, attr_sd->s_attr.attr, buffer->page);//填充数据
 
 	sysfs_put_active_two(attr_sd);
@@ -104,7 +108,9 @@ static int fill_read_buffer(struct dentry * dentry, struct sysfs_buffer * buffer
 		/* Try to struggle along */
 		count = PAGE_SIZE - 1;
 	}
-	if (count >= 0) {
+	
+	if (count >= 0) 
+	{
 		buffer->needs_read_fill = 0;
 		buffer->count = count;
 	} else {
@@ -135,10 +141,12 @@ static int fill_read_buffer(struct dentry * dentry, struct sysfs_buffer * buffer
 static ssize_t
 sysfs_read_file(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
+   //用sysfs_buffer作为数据中转 做到一次填充 多次使用
 	struct sysfs_buffer * buffer = file->private_data;
 	ssize_t retval = 0;
 
 	mutex_lock(&buffer->mutex);
+	//判断数据是否无效
 	if (buffer->needs_read_fill || *ppos == 0) {
 
 		//申请缓存,填充数据
@@ -146,11 +154,9 @@ sysfs_read_file(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		if (retval)
 			goto out;
 	}
-	pr_debug("%s: count = %zd, ppos = %lld, buf = %s\n",
-		 __func__, count, *ppos, buffer->page);
+	pr_debug("%s: count = %zd, ppos = %lld, buf = %s\n",__func__, count, *ppos, buffer->page);
 	//将数据copy到用户层
-	retval = simple_read_from_buffer(buf, count, ppos, buffer->page,
-					 buffer->count);
+	retval = simple_read_from_buffer(buf, count, ppos, buffer->page,buffer->count);
 out:
 	mutex_unlock(&buffer->mutex);
 	return retval;
@@ -171,6 +177,7 @@ fill_write_buffer(struct sysfs_buffer * buffer, const char __user * buf, size_t 
 {
 	int error;
 
+    //缓冲区的判断
 	if (!buffer->page)
 		buffer->page = (char *)get_zeroed_page(GFP_KERNEL);
 	if (!buffer->page)
@@ -178,10 +185,15 @@ fill_write_buffer(struct sysfs_buffer * buffer, const char __user * buf, size_t 
 
 	if (count >= PAGE_SIZE)
 		count = PAGE_SIZE - 1;
+
+	//将数据拷贝到缓冲区中
 	error = copy_from_user(buffer->page,buf,count);
+
+	//设置数据更新标志
 	buffer->needs_read_fill = 1;
 	/* if buf is assumed to contain a string, terminate it by \0,
 	   so e.g. sscanf() can scan the string easily */
+	//设置'/0'结尾   
 	buffer->page[count] = 0;
 	return error ? -EFAULT : count;
 }
@@ -197,19 +209,22 @@ fill_write_buffer(struct sysfs_buffer * buffer, const char __user * buf, size_t 
  *	dealing with, then call the store() method for the attribute, 
  *	passing the buffer that we acquired in fill_write_buffer().
  */
-
+//将缓冲区中的数据刷新到 底层的属性文件中
 static int
 flush_write_buffer(struct dentry * dentry, struct sysfs_buffer * buffer, size_t count)
 {
 	struct sysfs_dirent *attr_sd = dentry->d_fsdata;
 	struct kobject *kobj = attr_sd->s_parent->s_dir.kobj;
-	struct sysfs_ops * ops = buffer->ops;
+
+
+	struct sysfs_ops * ops = buffer->ops;//ops是在sysfs_create_dir()的时候调用者填入
 	int rc;
 
 	/* need attr_sd for attr and ops, its parent for kobj */
 	if (!sysfs_get_active_two(attr_sd))
 		return -ENODEV;
 
+    //调用store方法 将数据进行存储
 	rc = ops->store(kobj, attr_sd->s_attr.attr, buffer->page, count);
 
 	sysfs_put_active_two(attr_sd);
@@ -235,15 +250,18 @@ flush_write_buffer(struct dentry * dentry, struct sysfs_buffer * buffer, size_t 
  *	the value you're changing, then write entire buffer back. 
  */
 
-static ssize_t
-sysfs_write_file(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+static ssize_t sysfs_write_file(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
+    //获得数据缓冲区
 	struct sysfs_buffer * buffer = file->private_data;
 	ssize_t len;
 
 	mutex_lock(&buffer->mutex);
+
+	//将数据放到缓冲区
 	len = fill_write_buffer(buffer, buf, count);
 	if (len > 0)
+		//将数据从缓冲区写到属性文件中
 		len = flush_write_buffer(file->f_path.dentry, buffer, len);
 	if (len > 0)
 		*ppos += len;
@@ -299,7 +317,7 @@ static int sysfs_get_open_dirent(struct sysfs_dirent *sd,
 
 	atomic_set(&new_od->refcnt, 0);
 	atomic_set(&new_od->event, 1);
-	init_waitqueue_head(&new_od->poll);
+	init_waitqueue_head(&new_od->poll);//初始化等待队列
 	INIT_LIST_HEAD(&new_od->buffers);
 	goto retry;
 }
@@ -336,9 +354,11 @@ static void sysfs_put_open_dirent(struct sysfs_dirent *sd,
 
 static int sysfs_open_file(struct inode *inode, struct file *file)
 {
+   //获得这个sysfs dentry的内部表示结构
 	struct sysfs_dirent *attr_sd = file->f_path.dentry->d_fsdata;
 	struct kobject *kobj = attr_sd->s_parent->s_dir.kobj;
-	struct sysfs_buffer *buffer;
+	
+	struct sysfs_buffer *buffer;//用于数据缓存
 	struct sysfs_ops *ops;
 	int error = -EACCES;
 	char *p;
@@ -389,9 +409,9 @@ static int sysfs_open_file(struct inode *inode, struct file *file)
 		goto err_out;
 
 	mutex_init(&buffer->mutex);
-	buffer->needs_read_fill = 1;
-	buffer->ops = ops;
-	file->private_data = buffer;
+	buffer->needs_read_fill = 1; //需要往buffer中填入数据
+	buffer->ops = ops;           //记录此kobject的操作方法
+	file->private_data = buffer; //将数据缓存描述对象放入私有数据中 用户后续操作使用
 
 	/* make sure we have open dirent struct */
 	error = sysfs_get_open_dirent(attr_sd, buffer);

@@ -27,7 +27,7 @@ struct module;
  */
 struct attribute {
 	const char		*name;//属性名 也即文件名
-	struct module		*owner;//所属模块
+	struct module		*owner;//所属模块 X86下不使用该域
 	mode_t			mode;//文件访问权限 读写
 };
 

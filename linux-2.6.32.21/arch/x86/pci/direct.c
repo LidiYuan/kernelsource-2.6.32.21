@@ -202,14 +202,20 @@ static int __init pci_sanity_check(struct pci_raw_ops *o)
 	if (year >= 2001)
 		return 1;
 
-	for (devfn = 0; devfn < 0x100; devfn++) {
+	//遍历总线0上的256个功能(逻辑设备) 
+	for (devfn = 0; devfn < 0x100; devfn++) 
+	{
 		if (o->read(0, 0, devfn, PCI_CLASS_DEVICE, 2, &x))
 			continue;
+
+		//一定在某个设备在pci配置空间中设置的所属类代码为PCI_CLASS_BRIDGE_HOST和PCI_CLASS_DISPLAY_VGA两者之一
 		if (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)
 			return 1;
 
+		//读取厂商id
 		if (o->read(0, 0, devfn, PCI_VENDOR_ID, 2, &x))
 			continue;
+		
 		if (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ)
 			return 1;
 	}
@@ -218,6 +224,7 @@ static int __init pci_sanity_check(struct pci_raw_ops *o)
 	return 0;
 }
 
+//检测访问配置空间的机制#1是否支持
 static int __init pci_check_type1(void)
 {
 	unsigned long flags;
@@ -226,10 +233,14 @@ static int __init pci_check_type1(void)
 
 	local_irq_save(flags);
 
+	
 	outb(0x01, 0xCFB);
 	tmp = inl(0xCF8);
+
+	//向0xcf8写入一个0x80000000值 然后读回  看值是否相同
 	outl(0x80000000, 0xCF8);
-	if (inl(0xCF8) == 0x80000000 && pci_sanity_check(&pci_direct_conf1)) {
+	if (inl(0xCF8) == 0x80000000 &&  //值相同说明它可能是个主桥 还要通过pci_sanity_check进一步验证
+		pci_sanity_check(&pci_direct_conf1)) {
 		works = 1;
 	}
 	outl(tmp, 0xCF8);
@@ -264,7 +275,8 @@ void __init pci_direct_init(int type)
 		return;
 	printk(KERN_INFO "PCI: Using configuration type %d for base access\n",
 		 type);
-	if (type == 1) {
+	if (type == 1) 
+	{
 		raw_pci_ops = &pci_direct_conf1;
 		if (raw_pci_ext_ops)
 			return;
@@ -282,20 +294,28 @@ int __init pci_direct_probe(void)
 {
 	struct resource *region, *region2;
 
+    //看命令行中是否禁止了使用机制#1来访问配置空间
 	if ((pci_probe & PCI_PROBE_CONF1) == 0)
 		goto type2;
+
+	//机制#1要使用0xcf8和0xcfc共8个字节的地址资源(IO空间) 必须确保没有其他设备使用这些地址资源,如果有冲突返回NULL
 	region = request_region(0xCF8, 8, "PCI conf1");
 	if (!region)
 		goto type2;
 
-	if (pci_check_type1()) {
+    //对机制#1进行探测
+	if (pci_check_type1()) 
+	{
 		raw_pci_ops = &pci_direct_conf1;
 		port_cf9_safe = true;
-		return 1;
+		return 1; //放回1说明使用机制#!
 	}
+	//如果不支持机制#1 在释放占有的资源
 	release_resource(region);
 
  type2:
+
+	//在不使用机制#1的情况下 对机制#2进行检测
 	if ((pci_probe & PCI_PROBE_CONF2) == 0)
 		return 0;
 	region = request_region(0xCF8, 4, "PCI conf2");
@@ -308,7 +328,7 @@ int __init pci_direct_probe(void)
 	if (pci_check_type2()) {
 		raw_pci_ops = &pci_direct_conf2;
 		port_cf9_safe = true;
-		return 2;
+		return 2; //返回2说明使用机制#2
 	}
 
 	release_resource(region2);

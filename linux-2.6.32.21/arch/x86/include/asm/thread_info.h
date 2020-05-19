@@ -185,6 +185,7 @@ struct thread_info {
 /* how to get the current stack pointer from C */
 register unsigned long current_stack_pointer asm("esp") __used;
 
+
 /* how to get the thread information struct from C */
 static inline struct thread_info *current_thread_info(void)
 {
@@ -196,7 +197,7 @@ static inline struct thread_info *current_thread_info(void)
 
 /* how to get the thread information struct from ASM */
 #define GET_THREAD_INFO(reg)	 \
-	movl $-THREAD_SIZE, reg; \
+	movl $-THREAD_SIZE, reg; \   //$-THREAD_SIZE ≤√¥“‚Àº
 	andl %esp, reg
 
 /* use this one if reg already contains %esp */

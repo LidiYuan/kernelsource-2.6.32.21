@@ -1090,9 +1090,10 @@ int locks_mandatory_locked(struct inode *inode)
  * This function is called from rw_verify_area() and
  * locks_verify_truncate().
  */
-int locks_mandatory_area(int read_write, struct inode *inode,
-			 struct file *filp, loff_t offset,
-			 size_t count)
+int locks_mandatory_area(int read_write, 
+                               struct inode *inode,
+			                   struct file *filp, loff_t offset,
+			                   size_t count)
 {
 	struct file_lock fl;
 	int error;

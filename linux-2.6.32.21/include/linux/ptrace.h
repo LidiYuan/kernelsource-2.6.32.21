@@ -5,7 +5,7 @@
 
 /* has the defines to get at the registers. */
 
-#define PTRACE_TRACEME		   0
+#define PTRACE_TRACEME		   0 //是被父进程用来跟踪子进程的
 #define PTRACE_PEEKTEXT		   1
 #define PTRACE_PEEKDATA		   2
 #define PTRACE_PEEKUSR		   3
@@ -16,8 +16,8 @@
 #define PTRACE_KILL		   8
 #define PTRACE_SINGLESTEP	   9
 
-#define PTRACE_ATTACH		  16
-#define PTRACE_DETACH		  17
+#define PTRACE_ATTACH		  16 //一个进程想要控制另外一个进程
+#define PTRACE_DETACH		  17//用来停止跟踪一个进程
 
 #define PTRACE_SYSCALL		  24
 

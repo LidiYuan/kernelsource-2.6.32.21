@@ -274,19 +274,24 @@ EXPORT_SYMBOL_GPL(get_user_pages_fast);
 
 //mmap->sys_mmap_pgoff->do_mmap_pgoff
 SYSCALL_DEFINE6(mmap_pgoff, unsigned long, addr, unsigned long, len,
-		unsigned long, prot, unsigned long, flags,
-		unsigned long, fd, unsigned long, pgoff)
+		                             unsigned long, prot, unsigned long, flags,
+		                             unsigned long, fd, unsigned long, pgoff)
 {
 	struct file * file = NULL;
 	unsigned long retval = -EBADF;
 
-	if (!(flags & MAP_ANONYMOUS)) {
+    //不是匿名映射
+	if (!(flags & MAP_ANONYMOUS)) 
+	{
 		if (unlikely(flags & MAP_HUGETLB))
 			return -EINVAL;
-		file = fget(fd);
+		file = fget(fd);//根据fd获得file{}结构
 		if (!file)
 			goto out;
-	} else if (flags & MAP_HUGETLB) {
+	}
+	//是匿名映射并且需要一个大页
+	else if (flags & MAP_HUGETLB) 
+	{
 		struct user_struct *user = NULL;
 		/*
 		 * VM_NORESERVE is used because the reservations will be

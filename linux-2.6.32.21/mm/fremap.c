@@ -67,6 +67,7 @@ static int install_file_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pte_none(*pte))
 		zap_pte(mm, vma, addr, pte);
 
+    //pgoff_to_pte构建一个新页表项
 	set_pte_at(mm, addr, pte, pgoff_to_pte(pgoff));
 	/*
 	 * We don't need to run update_mmu_cache() here because the "file pte"
@@ -81,12 +82,17 @@ out:
 	return err;
 }
 
-static int populate_range(struct mm_struct *mm, struct vm_area_struct *vma,
-			unsigned long addr, unsigned long size, pgoff_t pgoff)
+//文件偏移量为pgoff 大小为size 从新映射到addr处
+static int populate_range(struct mm_struct *mm, 
+	                              struct vm_area_struct *vma,
+			                      unsigned long addr, 
+			                      unsigned long size, 
+			                      pgoff_t pgoff) 
 {
 	int err;
 
 	do {
+		//设置新页表项 
 		err = install_file_pte(mm, vma, addr, pgoff, vma->vm_page_prot);
 		if (err)
 			return err;
@@ -94,7 +100,7 @@ static int populate_range(struct mm_struct *mm, struct vm_area_struct *vma,
 		size -= PAGE_SIZE;
 		addr += PAGE_SIZE;
 		pgoff++;
-	} while (size);
+	} while (size);//可能涉及多页所以用while循环
 
         return 0;
 
@@ -120,8 +126,19 @@ static int populate_range(struct mm_struct *mm, struct vm_area_struct *vma,
  * and the vma's default protection is used. Arbitrary protections
  * might be implemented in the future.
  */
-SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
-		unsigned long, prot, unsigned long, pgoff, unsigned long, flags)
+ //非线性地址映射  如果需要将文件的不同部分 不同顺序的映射到虚拟内存连续空间 为了降低资源的消耗 
+ //采用如下非线性地址映射
+ //该函数可以将现存映射移动到虚拟内存中的一个新位置
+ /*
+ 所有建立的非线性映射的vm_area_struct 实例维护在一个链表中,表头为struct address_space 的i_mmap_nonliner,链表中的各个vm_area_struct可以
+ 采用shared.vm_set.list作为链表元素
+*/
+SYSCALL_DEFINE5(remap_file_pages, 
+                         unsigned long, start, // 标识移动的目标位置
+                         unsigned long, size, //要移动的区域的长度
+		                 unsigned long, prot, //必须为0
+		                 unsigned long, pgoff, //制定了要移动区域在文件中的偏移量 以页为单位
+		                 unsigned long, flags)//和mmap中的flags的含义是一样的
 {
 	struct mm_struct *mm = current->mm;
 	struct address_space *mapping;
@@ -130,14 +147,17 @@ SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
 	int err = -EINVAL;
 	int has_write_lock = 0;
 
-	if (prot)
+	if (prot)//prot必须为0，否则出错
 		return err;
 	/*
 	 * Sanitize the syscall parameters:
 	 */
+	//将start和size按页大小对齐，因此传递这两个参数的时候最好是页大小的整数倍。
 	start = start & PAGE_MASK;
 	size = size & PAGE_MASK;
 
+
+    //地址返回越界
 	/* Does the address range wrap, or is the span zero-sized? */
 	if (start + size <= start)
 		return err;
@@ -151,6 +171,8 @@ SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
 	/* We need down_write() to change vma->vm_flags. */
 	down_read(&mm->mmap_sem);
  retry:
+
+	//选中目标区域vm_area_struct 在调用此函数前需要用mmap先生成vma
 	vma = find_vma(mm, start);
 
 	/*
@@ -158,23 +180,31 @@ SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
 	 * and that the remapped range is valid and fully within
 	 * the single existing vma.  vm_private_data is used as a
 	 * swapout cursor in a VM_NONLINEAR vma.
-	 */
+	 */ 
+	 
+	 //必须存在vma能够包含start地址，而且该vma的vm_flags中必须有VM_SHARED
 	if (!vma || !(vma->vm_flags & VM_SHARED))
 		goto out;
 
+     
 	if (vma->vm_private_data && !(vma->vm_flags & VM_NONLINEAR))
 		goto out;
 
 	if (!(vma->vm_flags & VM_CAN_NONLINEAR))
 		goto out;
 
+	//地址start必须在vma的映射范围内
 	if (end <= start || start < vma->vm_start || end > vma->vm_end)
 		goto out;
 
+    //如果vma目前不是非线性映射，则要走这个分支
 	/* Must set VM_NONLINEAR before any pages are populated. */
-	if (!(vma->vm_flags & VM_NONLINEAR)) {
+	if (!(vma->vm_flags & VM_NONLINEAR)) 
+	{
 		/* Don't need a nonlinear mapping, exit success */
-		if (pgoff == linear_page_index(vma, start)) {
+        //如果地址start在原来的映射中就是pgoff所映射的位置，就不需要做什么了
+		if (pgoff == linear_page_index(vma, start)) 
+		{
 			err = 0;
 			goto out;
 		}
@@ -185,13 +215,16 @@ SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
 			has_write_lock = 1;
 			goto retry;
 		}
+
+		//得到该文件对应的address_space
 		mapping = vma->vm_file->f_mapping;
 		/*
 		 * page_mkclean doesn't work on nonlinear vmas, so if
 		 * dirty pages need to be accounted, emulate with linear
 		 * vmas.
 		 */
-		if (mapping_cap_account_dirty(mapping)) {
+		if (mapping_cap_account_dirty(mapping)) 
+		{
 			unsigned long addr;
 			struct file *file = vma->vm_file;
 
@@ -210,14 +243,15 @@ SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
 		}
 		spin_lock(&mapping->i_mmap_lock);
 		flush_dcache_mmap_lock(mapping);
-		vma->vm_flags |= VM_NONLINEAR;
-		vma_prio_tree_remove(vma, &mapping->i_mmap);
-		vma_nonlinear_insert(vma, &mapping->i_mmap_nonlinear);
+		vma->vm_flags |= VM_NONLINEAR;//设置非线性映射的标志，下次如果再有同一个vma区域中的非线性映射，就不会再走这个分支了，将会直接跳到下面去修改页表。
+		vma_prio_tree_remove(vma, &mapping->i_mmap);//将该vma从该文件的线性映射相关的数据结构（优先树）上删除
+		vma_nonlinear_insert(vma, &mapping->i_mmap_nonlinear);//将该vma插入到该文件的非线性映射链表中
 		flush_dcache_mmap_unlock(mapping);
 		spin_unlock(&mapping->i_mmap_lock);
 	}
 
-	if (vma->vm_flags & VM_LOCKED) {
+	if (vma->vm_flags & VM_LOCKED) 
+	{
 		/*
 		 * drop PG_Mlocked flag for over-mapped range
 		 */
@@ -227,9 +261,13 @@ SYSCALL_DEFINE5(remap_file_pages, unsigned long, start, unsigned long, size,
 	}
 
 	mmu_notifier_invalidate_range_start(mm, start, start + size);
+
+	//设置修改过的页表项
 	err = populate_range(mm, vma, start, size, pgoff);
+
 	mmu_notifier_invalidate_range_end(mm, start, start + size);
-	if (!err && !(flags & MAP_NONBLOCK)) {
+	if (!err && !(flags & MAP_NONBLOCK)) 
+	{
 		if (vma->vm_flags & VM_LOCKED) {
 			/*
 			 * might be mapping previously unmapped range of file

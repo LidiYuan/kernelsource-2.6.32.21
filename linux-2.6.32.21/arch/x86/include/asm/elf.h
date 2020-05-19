@@ -21,8 +21,8 @@ typedef struct user_i387_struct elf_fpregset_t;
 typedef struct user_fxsr_struct elf_fpxregset_t;
 
 #define R_386_NONE	0
-#define R_386_32	1
-#define R_386_PC32	2
+#define R_386_32	1 //绝对寻址修正 S+A     A:保存在被修正位置的值  S:符号的实际地址即r_info的高24位指定的的符号的实际地址
+#define R_386_PC32	2 //相对寻址修正 S+A-P   p:被修正的位置 通过r_offset计算得到
 #define R_386_GOT32	3
 #define R_386_PLT32	4
 #define R_386_COPY	5

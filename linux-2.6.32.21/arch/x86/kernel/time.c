@@ -103,7 +103,7 @@ void __init setup_default_timer_irq(void)
 /* Default timer init function */
 void __init hpet_time_init(void)
 {
-	if (!hpet_enable())
+	if (!hpet_enable())//对hpet时钟进行初始化
 		setup_pit_timer();
 	setup_default_timer_irq();
 }

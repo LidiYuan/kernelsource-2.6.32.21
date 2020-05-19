@@ -31,14 +31,26 @@ int noioapicreroute = 1;
 int pcibios_last_bus = -1;
 unsigned long pirq_table_addr;
 struct pci_bus *pci_root_bus;
+
+//负责原生pci配置空间的访问 赋值是在pci_arch_init()
 struct pci_raw_ops *raw_pci_ops;
+
+//用于扩展pci配置空间的访问 赋值是在pci_arch_init()
 struct pci_raw_ops *raw_pci_ext_ops;
 
-int raw_pci_read(unsigned int domain, unsigned int bus, unsigned int devfn,
-						int reg, int len, u32 *val)
+int raw_pci_read(unsigned int domain, //pci总线域 
+                        unsigned int bus,  //总线编号
+                        unsigned int devfn,//插槽号和功能号
+						int reg, //寄存器编号
+						int len, //读取的数据长度
+						u32 *val)//数据缓冲区
 {
-	if (domain == 0 && reg < 256 && raw_pci_ops)
+    
+	if (domain == 0 &&  //总线域为0 
+		reg < 256 &&  //寄存器编号小于256 即在pci配置空间范围
+		raw_pci_ops)  //raw_pci_ops不是空
 		return raw_pci_ops->read(domain, bus, devfn, reg, len, val);
+	
 	if (raw_pci_ext_ops)
 		return raw_pci_ext_ops->read(domain, bus, devfn, reg, len, val);
 	return -EINVAL;
@@ -56,16 +68,15 @@ int raw_pci_write(unsigned int domain, unsigned int bus, unsigned int devfn,
 
 static int pci_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
-	return raw_pci_read(pci_domain_nr(bus), bus->number,
-				 devfn, where, size, value);
+	return raw_pci_read(pci_domain_nr(bus), bus->number,devfn, where, size, value);
 }
 
 static int pci_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
 {
-	return raw_pci_write(pci_domain_nr(bus), bus->number,
-				  devfn, where, size, value);
+	return raw_pci_write(pci_domain_nr(bus), bus->number,devfn, where, size, value);
 }
 
+//用于pci_bus{}.ops域 对pci总线的配置空间访问操作表
 struct pci_ops pci_root_ops = {
 	.read = pci_read,
 	.write = pci_write,
@@ -378,15 +389,18 @@ void __init dmi_check_pciprobe(void)
 	dmi_check_system(pciprobe_dmi_table);
 }
 
-//扫描总线作为跟
+//扫描总线 参数busnum:根总线编号 返回这跟总线的pci_bus
+//若扫描正常完成的话 这条根总线的所有下级PCI总线以及PCI设备的数据结构在内存中都会构建好 
 struct pci_bus * __devinit pcibios_scan_root(int busnum)
 {
 	struct pci_bus *bus = NULL;
 	struct pci_sysdata *sd;
 
 	//遍历所有的PCI总线，检查指定的总线是否扫秒过  是的话 直接返回
+	//内核扫描过的总线将连入pci_root_buses为表头的链表中
 	while ((bus = pci_find_next_bus(bus)) != NULL) {
-		if (bus->number == busnum) {
+		if (bus->number == busnum) 
+		{
 			/* Already scanned */
 			return bus;
 		}
@@ -421,6 +435,7 @@ int __init pcibios_init(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 
+	//确保raw_pci_ops不为空   负责配置空间的访问
 	if (!raw_pci_ops) {
 		printk(KERN_WARNING "PCI: System does not support PCI\n");
 		return 0;
@@ -431,14 +446,18 @@ int __init pcibios_init(void)
 	 * and P4. It's also good for 386/486s (which actually have 16)
 	 * as quite a few PCI devices do not support smaller values.
 	 */
+	//设置pci缓存线 
 	pci_cache_line_size = 32 >> 2;
 	if (c->x86 >= 6 && c->x86_vendor == X86_VENDOR_AMD)
 		pci_cache_line_size = 64 >> 2;	/* K7 & K8 */
 	else if (c->x86 > 6 && c->x86_vendor == X86_VENDOR_INTEL)
 		pci_cache_line_size = 128 >> 2;	/* P4 */
 
+    //保留已有的资源分配  若配置空间分配好了资源  在资源空间不冲突的情况下 我们尽量使用分配的资源空间
 	pcibios_resource_survey();
 
+	//linux2.6是默认深度优先算法进行总线枚举  但2.4是广度优先, 在这里用户可疑选择是否和2.4一样的广度优先算法枚举总线
+	//若采用广度优先  则进行重新排序
 	if (pci_bf_sort >= pci_force_bf)
 		pci_sort_breadthfirst();
 	return 0;

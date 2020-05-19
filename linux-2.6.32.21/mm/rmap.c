@@ -351,7 +351,8 @@ static int page_referenced_one(struct page *page,
 	address = vma_address(page, vma);
 	if (address == -EFAULT)
 		goto out;
-
+	
+    //找到指向该页的页表项 
 	pte = page_check_address(page, mm, address, &ptl, 0);
 	if (!pte)
 		goto out;
@@ -403,11 +404,14 @@ static int page_referenced_anon(struct page *page,
 	struct vm_area_struct *vma;
 	int referenced = 0;
 
+	//找到区域列表
 	anon_vma = page_lock_anon_vma(page);
 	if (!anon_vma)
 		return referenced;
 
 	mapcount = page_mapcount(page);
+
+	//遍历匿名逆向映射列表
 	list_for_each_entry(vma, &anon_vma->head, anon_vma_node) {
 		/*
 		 * If we are reclaiming on behalf of a cgroup, skip
@@ -416,8 +420,8 @@ static int page_referenced_anon(struct page *page,
 		 */
 		if (mem_cont && !mm_match_cgroup(vma->vm_mm, mem_cont))
 			continue;
-		referenced += page_referenced_one(page, vma,
-						  &mapcount, vm_flags);
+		
+		referenced += page_referenced_one(page, vma,&mapcount, vm_flags);
 		if (!mapcount)
 			break;
 	}
@@ -473,6 +477,7 @@ static int page_referenced_file(struct page *page,
 	 */
 	mapcount = page_mapcount(page);
 
+    //遍历优先树中所存储区域包含相关页的所有节点
 	vma_prio_tree_foreach(vma, &iter, &mapping->i_mmap, pgoff, pgoff) {
 		/*
 		 * If we are reclaiming on behalf of a cgroup, skip
@@ -501,6 +506,7 @@ static int page_referenced_file(struct page *page,
  * Quick test_and_clear_referenced for all mappings to a page,
  * returns the number of ptes which referenced the page.
  */
+ //统计了最近活跃的的使用了某个共享页的进程的数目
 int page_referenced(struct page *page,
 		    int is_locked,
 		    struct mem_cgroup *mem_cont,
@@ -513,10 +519,10 @@ int page_referenced(struct page *page,
 
 	*vm_flags = 0;
 	if (page_mapped(page) && page->mapping) {
-		if (PageAnon(page))
+		if (PageAnon(page))//用于匿名页 确定有多少地方使用该页
 			referenced += page_referenced_anon(page, mem_cont,
 								vm_flags);
-		else if (is_locked)
+		else if (is_locked)//用于文件映射页
 			referenced += page_referenced_file(page, mem_cont,
 								vm_flags);
 		else if (!trylock_page(page))
@@ -618,7 +624,12 @@ static void __page_set_anon_rmap(struct page *page,
 	struct anon_vma *anon_vma = vma->anon_vma;
 
 	BUG_ON(!anon_vma);
+
+	//将anon_vma表头的地址加上PAGE_MAPPING_ANON存入page->mapping 这使得内核可以通过最低位来判断是匿名页还是普通页
+	//如果最低位为0 则为普通页 为1则是匿名页
 	anon_vma = (void *) anon_vma + PAGE_MAPPING_ANON;
+
+    
 	page->mapping = (struct address_space *) anon_vma;
 
 	page->index = linear_page_index(vma, address);
@@ -667,6 +678,7 @@ static void __page_check_anon_rmap(struct page *page,
  *
  * The caller needs to hold the pte lock and the page must be locked.
  */
+ //添加一个已有引用计数的匿名页到匿名映射机构中(对新的匿名页用page_add_new_anon_rmap)
 void page_add_anon_rmap(struct page *page,
 	struct vm_area_struct *vma, unsigned long address)
 {
@@ -688,12 +700,13 @@ void page_add_anon_rmap(struct page *page,
  * This means the inc-and-test can be bypassed.
  * Page does not have to be locked.
  */
+ //将匿名页加入到逆向映射数据中(对新的匿名页必须使用此函数) 对有引用计数的匿名页使用page_add_anon_rmap()
 void page_add_new_anon_rmap(struct page *page,
 	struct vm_area_struct *vma, unsigned long address)
 {
 	VM_BUG_ON(address < vma->vm_start || address >= vma->vm_end);
 	SetPageSwapBacked(page);
-	atomic_set(&page->_mapcount, 0); /* increment count (starts at -1) */
+	atomic_set(&page->_mapcount, 0); /* increment count (starts at -1) 设置引用计数为0*/
 	__page_set_anon_rmap(page, vma, address);
 	if (page_evictable(page, vma))
 		lru_cache_add_lru(page, LRU_ACTIVE_ANON);
@@ -707,9 +720,11 @@ void page_add_new_anon_rmap(struct page *page,
  *
  * The caller needs to hold the pte lock.
  */
+ //建立基于文件映射的 逆向映射结构
 void page_add_file_rmap(struct page *page)
 {
-	if (atomic_inc_and_test(&page->_mapcount)) {
+	if (atomic_inc_and_test(&page->_mapcount)) 
+	{
 		__inc_zone_page_state(page, NR_FILE_MAPPED);
 		mem_cgroup_update_mapped_file_stat(page, 1);
 	}
@@ -1204,6 +1219,7 @@ out:
  * SWAP_FAIL	- the page is unswappable
  * SWAP_MLOCK	- page is mlocked.
  */
+ //用于从使用特定物理页的所有进程的页表中删除该项
 int try_to_unmap(struct page *page, enum ttu_flags flags)
 {
 	int ret;

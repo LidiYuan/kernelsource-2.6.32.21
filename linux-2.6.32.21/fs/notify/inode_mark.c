@@ -329,7 +329,7 @@ int fsnotify_add_mark(struct fsnotify_mark_entry *entry,
 		entry->group = group;
 		entry->inode = inode;
 
-		hlist_add_head(&entry->i_list, &inode->i_fsnotify_mark_entries);
+		hlist_add_head(&entry->i_list, &inode->i_fsnotify_mark_entries);//将其加入到inode的监控表中
 		list_add(&entry->g_list, &group->mark_entries);
 
 		fsnotify_get_mark(entry); /* for i_list and g_list */

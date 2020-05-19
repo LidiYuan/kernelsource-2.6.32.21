@@ -5256,18 +5256,19 @@ void account_idle_time(cputime_t cputime)
  * @p: the process that the cpu time gets accounted to
  * @user_tick: indicates if the tick is a user or a system tick
  */
+ //根据当前进程运行了多久时间和当前进程类别，选择调用account_user_time()、account_system_time()，还是account_idle_time()。
 void account_process_tick(struct task_struct *p, int user_tick)
 {
 	cputime_t one_jiffy_scaled = cputime_to_scaled(cputime_one_jiffy);
 	struct rq *rq = this_rq();
 
-	if (user_tick)
+	if (user_tick)//处于用户态，更新用户态统计信息。
 		account_user_time(p, cputime_one_jiffy, one_jiffy_scaled);
-	else if ((p != rq->idle) || (irq_count() != HARDIRQ_OFFSET))
+	else if ((p != rq->idle) || (irq_count() != HARDIRQ_OFFSET)) //-非用户态，则处于内核态；此处统计非idle，或者
 		account_system_time(p, HARDIRQ_OFFSET, cputime_one_jiffy,
 				    one_jiffy_scaled);
 	else
-		account_idle_time(cputime_one_jiffy);
+		account_idle_time(cputime_one_jiffy);//-idle状态时间
 }
 
 /*
@@ -5427,7 +5428,7 @@ void scheduler_tick(void)
 	update_cpu_load(rq);
 
 	//执行当前运行进程所在调度类的task_tick函数进行周期性调度
-	//对于CFS为fair_sched_class{}中声明的task_tick_fair()
+	//对于CFS为fair_sched_class{}中声明的 task_tick_fair()
 	curr->sched_class->task_tick(rq, curr, 0);
 	spin_unlock(&rq->lock);
 

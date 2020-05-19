@@ -666,10 +666,11 @@ SYSCALL_DEFINE1(inotify_init1, int, flags)
 	if (flags & ~(IN_CLOEXEC | IN_NONBLOCK))
 		return -EINVAL;
 
+	//获得一个fd
 	fd = get_unused_fd_flags(flags & O_CLOEXEC);
 	if (fd < 0)
 		return fd;
-
+   
 	filp = get_empty_filp();
 	if (!filp) {
 		ret = -ENFILE;
@@ -683,6 +684,7 @@ SYSCALL_DEFINE1(inotify_init1, int, flags)
 		goto out_free_uid;
 	}
 
+   //新建一个组 对组进行初始化
 	/* fsnotify_obtain_group took a reference to group, we put this when we kill the file in the end */
 	group = inotify_new_group(user, inotify_max_queued_events); //proc/sys/fs/inotify/max_queued_events 
 	if (IS_ERR(group)) {
@@ -717,8 +719,7 @@ SYSCALL_DEFINE0(inotify_init)
 	return sys_inotify_init1(0);
 }
 
-SYSCALL_DEFINE3(inotify_add_watch, int, fd, const char __user *, pathname,
-		u32, mask)
+SYSCALL_DEFINE3(inotify_add_watch, int, fd, const char __user *, pathname,u32, mask)
 {
 	struct fsnotify_group *group;
 	struct inode *inode;

@@ -1677,11 +1677,10 @@ page_not_uptodate:
 EXPORT_SYMBOL(filemap_fault);
 
 const struct vm_operations_struct generic_file_vm_ops = {
-	.fault		= filemap_fault,
+	.fault		= filemap_fault, //在应用层序访问映射区域但映射区域不在物理内存时候调用此函数
 };
 
 /* This is used for a general mmap of a disk file */
-
 int generic_file_mmap(struct file * file, struct vm_area_struct * vma)
 {
 	struct address_space *mapping = file->f_mapping;

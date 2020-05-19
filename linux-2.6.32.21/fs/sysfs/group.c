@@ -94,6 +94,7 @@ static int internal_create_group(struct kobject *kobj, int update,
  *
  * Returns 0 on success or error.
  */
+ //可以在一次调用中添加一系列属性
 int sysfs_create_group(struct kobject *kobj,const struct attribute_group *grp)
 {
 	return internal_create_group(kobj, 0, grp);

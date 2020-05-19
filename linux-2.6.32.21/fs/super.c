@@ -366,7 +366,7 @@ retry:
 	
 	if (!s) {
 		spin_unlock(&sb_lock);
-		s = alloc_super(type); //分配一个新的sb
+		s = alloc_super(type); 
 		if (!s)
 			return ERR_PTR(-ENOMEM);
 		goto retry;
@@ -381,7 +381,7 @@ retry:
 	}
 	s->s_type = type;
 	strlcpy(s->s_id, type->name, sizeof(s->s_id));
-	list_add_tail(&s->s_list, &super_blocks);//将新建的sb加入到链表wei
+	list_add_tail(&s->s_list, &super_blocks);
 	list_add(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);
@@ -934,11 +934,10 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 		return ERR_PTR(-ENODEV);
 
 	error = -ENOMEM;
-	mnt = alloc_vfsmnt(name);//申请vfsmount结构
+	mnt = alloc_vfsmnt(name);
 	if (!mnt)
 		goto out;
-
-	//mount有数据形参data执行下面操作
+	
 	if (data && !(type->fs_flags & FS_BINARY_MOUNTDATA)) {
 		secdata = alloc_secdata();
 		if (!secdata)
@@ -949,13 +948,12 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 			goto out_free_secdata;
 	}
 
-	//执行注册文件系统时设置的函数对于sysfs是sysfs_get_sb
-	error = type->get_sb(type, flags, name, data, mnt);//创建超级快
+   //��ó�����
+	error = type->get_sb(type, flags, name, data, mnt);
 	if (error < 0)
 		goto out_free_secdata;
 	BUG_ON(!mnt->mnt_sb);
-
-	//执行到这说明在get_sb中已经对mnt中的mnt_sb设置了超级快的地址
+	
  	error = security_sb_kern_mount(mnt->mnt_sb, flags, secdata);
  	if (error)
  		goto out_sb;

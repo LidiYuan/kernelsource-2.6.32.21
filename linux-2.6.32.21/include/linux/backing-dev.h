@@ -43,22 +43,30 @@ enum bdi_stat_item {
 
 #define BDI_STAT_BATCH (8*(1+ilog2(nr_cpu_ids)))
 
+/*
+每个设备均为其创建一个写回线程，每个写回线程不仅需要记录创建的进程结构，还需要记录线程的上次刷新时间以及脏inode链表等，因此，内核中为此抽象出的数据结构为struct bdi_writeback
+*/
 struct bdi_writeback {
 	struct list_head list;			/* hangs off the bdi */
 
-	struct backing_dev_info *bdi;		/* our parent bdi */
-	unsigned int nr;
+	struct backing_dev_info *bdi;		/* our parent bdi 成员bdi指向设备结构体*/
+	unsigned int nr;  //要刷入的页的总数
 
-	unsigned long last_old_flush;		/* last old data flush */
+	unsigned long last_old_flush;		/* last old data flush 记录上次刷新的时间 这是用于周期性回写之用*/
 
-	struct task_struct	*task;		/* writeback task */
-	struct list_head	b_dirty;	/* dirty inodes */
-	struct list_head	b_io;		/* parked for writeback */
-	struct list_head	b_more_io;	/* parked for more writeback */
+	struct task_struct	*task;		/* writeback task task是刷新线程的进程结构*/
+	struct list_head	b_dirty;	/* dirty inodes 脏inode链表 每当一个文件被弄脏时，都会将其inode添加至所在设备的b_dirty链表中*/
+	struct list_head	b_io;		/* parked for writeback 等待执行的io inode*/
+	struct list_head	b_more_io;	/* parked for more writeback 所有要被刷新的inode先插入到此队列 然后在移到b_io*/
 };
+/*
+系统中每个设备均对应这样一个结构体，该结构体最初是为了设备预读而设计的，但内核后来对其扩充，增加了设备回写相关的成员变量
 
-struct backing_dev_info {
-	struct list_head bdi_list;
+*/
+struct backing_dev_info 
+{
+	struct list_head bdi_list;//连接到链表bdi_list中
+
 	struct rcu_head rcu_head;
 	unsigned long ra_pages;	/* max readahead in PAGE_CACHE_SIZE units */
 	unsigned long state;	/* Always use atomic bitops on this */
@@ -84,7 +92,7 @@ struct backing_dev_info {
 	unsigned long wb_mask;	  /* bitmask of registered tasks */
 	unsigned int wb_cnt;	  /* number of registered tasks */
 
-	struct list_head work_list;
+	struct list_head work_list; //
 
 	struct device *dev;
 

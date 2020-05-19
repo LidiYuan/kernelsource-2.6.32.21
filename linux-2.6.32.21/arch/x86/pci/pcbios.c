@@ -34,14 +34,15 @@
  * and the PCI BIOS specification.
  */
 
+//bios32服务目录
 union bios32 {
 	struct {
 		unsigned long signature;	/* _32_ */
-		unsigned long entry;		/* 32 bit physical address */
-		unsigned char revision;		/* Revision level, 0 */
-		unsigned char length;		/* Length in paragraphs should be 01 */
-		unsigned char checksum;		/* All bytes must add up to zero */
-		unsigned char reserved[5]; 	/* Must be zero */
+		unsigned long entry;		/* 32 bit physical address BIOS32服务目录的入口地址*/
+		unsigned char revision;		/* Revision level, 0 修正号 当前值为0 */
+		unsigned char length;		/* Length in paragraphs should be 01 数据长度以16字节为单位*/
+		unsigned char checksum;		/* All bytes must add up to zero 校验和*/
+		unsigned char reserved[5]; 	/* Must be zero 保留 必须为0*/
 	} fields;
 	char chars[16];
 };
@@ -61,7 +62,7 @@ static struct {
 /*
  * Returns the entry point for the given service, NULL on error
  */
-
+//返回给定服务的入口点 找到返回地址  否则返回NULL
 static unsigned long bios32_service(unsigned long service)
 {
 	unsigned char return_code;	/* %al */
@@ -71,7 +72,7 @@ static unsigned long bios32_service(unsigned long service)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	__asm__("lcall *(%%edi); cld"
+	__asm__("lcall *(%%edi); cld"  //bios32服务目录的功能比较单一 他只确定某个32为的BIOS服务是否被支持 
 		: "=a" (return_code),
 		  "=b" (address),
 		  "=c" (length),
@@ -84,6 +85,7 @@ static unsigned long bios32_service(unsigned long service)
 	switch (return_code) {
 		case 0:
 			return address + entry;
+			
 		case 0x80:	/* Not present */
 			printk(KERN_WARNING "bios32_service(0x%lx): not present\n", service);
 			return 0;
@@ -99,52 +101,80 @@ static struct {
 	unsigned short segment;
 } pci_indirect = { 0, __KERNEL_CS };
 
-static int pci_bios_present;
+static int pci_bios_present; //是否可以通过pci bios获得pci配置空间
 
+//检测pci bios服务是否可以使用
 static int __devinit check_pcibios(void)
 {
 	u32 signature, eax, ebx, ecx;
 	u8 status, major_ver, minor_ver, hw_mech;
 	unsigned long flags, pcibios_entry;
 
-	if ((pcibios_entry = bios32_service(PCI_SERVICE))) {
+	//看是否存在PCI服务 
+	if ((pcibios_entry = bios32_service(PCI_SERVICE))) 
+	{
+	    //保存pci服务的入口地址
 		pci_indirect.address = pcibios_entry + PAGE_OFFSET;
 
 		local_irq_save(flags);
+
+
+		/*
+          功能入口: AH 寄存器值为B1h AL寄存器为 0x01 即PCIBIOS_PCI_BIOS_PRESENT
+          功能出口: edx 存放PCI签名即"pci"
+                    AH存放状态  00表示存在  否则不存在
+                    AL存放硬件支持状态 位0设置表示支持机制#1 
+                                       位1设置表示支持机制#2 
+                                       位4设置表示机制#1支持Special Cycle
+                                       位5设置表示机制#2支持 Special Cycle
+                                       
+                    BX为接口版本号
+                    CL:表示系统中最后一个PCI总线编号
+                    CF:为进位寄存器 如果设备说明有错误 被当成pci bios不指出存在
+		*/
 		__asm__(
-			"lcall *(%%edi); cld\n\t"
+			"lcall *(%%edi); cld\n\t" //调用pci bios服务 传入功能号为PCIBIOS_PCI_BIOS_PRESENT,pci bios 接口函数集是否存在 
 			"jc 1f\n\t"
 			"xor %%ah, %%ah\n"
 			"1:"
-			: "=d" (signature),
-			  "=a" (eax),
+			: "=d" (signature), //edx 赋值到signature
+			  "=a" (eax),  //
 			  "=b" (ebx),
 			  "=c" (ecx)
-			: "1" (PCIBIOS_PCI_BIOS_PRESENT),
+			: "1" (PCIBIOS_PCI_BIOS_PRESENT),//PCIBIOS_PCI_BIOS_PRESENT常量输入到eax
 			  "D" (&pci_indirect)
 			: "memory");
 		local_irq_restore(flags);
 
-		status = (eax >> 8) & 0xff;
-		hw_mech = eax & 0xff;
-		major_ver = (ebx >> 8) & 0xff;
-		minor_ver = ebx & 0xff;
+		status = (eax >> 8) & 0xff;//AH存放的状态  	
+		hw_mech = eax & 0xff; //AL存放硬件支持状态
+		
+		major_ver = (ebx >> 8) & 0xff;//得到接口的主版本号
+		minor_ver = ebx & 0xff; //得到接口的次版本号
+		
 		if (pcibios_last_bus < 0)
-			pcibios_last_bus = ecx & 0xff;
+			pcibios_last_bus = ecx & 0xff; //获得系统中最后一个总线编号
+		
 		DBG("PCI: BIOS probe returned s=%02x hw=%02x ver=%02x.%02x l=%02x\n",
 			status, hw_mech, major_ver, minor_ver, pcibios_last_bus);
-		if (status || signature != PCI_SIGNATURE) {
+
+		
+		if (status ||                  //检测硬件状态是否不为0   00表示存在
+			signature != PCI_SIGNATURE) //上面汇编返回的签名是否正确
+		{
 			printk (KERN_ERR "PCI: BIOS BUG #%x[%08x] found\n",
 				status, signature);
 			return 0;
 		}
+		
 		printk(KERN_INFO "PCI: PCI BIOS revision %x.%02x entry at 0x%lx, last bus=%d\n",
 			major_ver, minor_ver, pcibios_entry, pcibios_last_bus);
+
 #ifdef CONFIG_PCI_DIRECT
 		if (!(hw_mech & PCIBIOS_HW_TYPE1))
-			pci_probe &= ~PCI_PROBE_CONF1;
+			pci_probe &= ~PCI_PROBE_CONF1;//硬件不支持机制#1 禁止使用机制#1来配置pci空间
 		if (!(hw_mech & PCIBIOS_HW_TYPE2))
-			pci_probe &= ~PCI_PROBE_CONF2;
+			pci_probe &= ~PCI_PROBE_CONF2;//硬件不支持机制#2 禁止使用机制#2来配置pci空间
 #endif
 		return 1;
 	}
@@ -287,6 +317,11 @@ static struct pci_raw_ops pci_bios_access = {
  * Try to find PCI BIOS.
  */
 
+/*
+返回值：
+   NULL 说明pcibios不可行
+   返回 &pci_bios_access 
+*/
 static struct pci_raw_ops * __devinit pci_find_bios(void)
 {
 	union bios32 *check;
@@ -298,40 +333,52 @@ static struct pci_raw_ops * __devinit pci_find_bios(void)
 	 * directory by scanning the permissible address range from
 	 * 0xe0000 through 0xfffff for a valid BIOS32 structure.
 	 */
-
-	for (check = (union bios32 *) __va(0xe0000);
-	     check <= (union bios32 *) __va(0xffff0);
-	     ++check) {
+    //在BIOS中查找BIOS32服务目录 
+    //遵循标准的查找BISO32服务目录的过程 在BIOS ROM空间的可允许地址范围(0xe0000 ~ 0xffff0)内扫面有效的bios32结构 步长为16字节
+	for (check = (union bios32 *) __va(0xe0000);check <= (union bios32 *) __va(0xffff0); ++check) 
+    {
 		long sig;
 		if (probe_kernel_address(&check->fields.signature, sig))
 			continue;
 
+		//对签名进行检查
 		if (check->fields.signature != BIOS32_SIGNATURE)
 			continue;
+
+		//获得数据长度  以16字节为单位
 		length = check->fields.length * 16;
 		if (!length)
 			continue;
+
+		//进行校验和计算
 		sum = 0;
 		for (i = 0; i < length ; ++i)
 			sum += check->chars[i];
 		if (sum != 0)
 			continue;
-		if (check->fields.revision != 0) {
+
+       //暂时修改号为0 
+		if (check->fields.revision != 0) 
+		{
 			printk("PCI: unsupported BIOS32 revision %d at 0x%p\n",
 				check->fields.revision, check);
 			continue;
 		}
 		DBG("PCI: BIOS32 Service Directory structure at 0x%p\n", check);
-		if (check->fields.entry >= 0x100000) {
+        //bios32服务目录的入口点  此入口地址不能处于高端地址
+		if (check->fields.entry >= 0x100000) 
+		{
 			printk("PCI: BIOS32 entry (0x%p) in high memory, "
 					"cannot use.\n", check);
 			return NULL;
-		} else {
+		} 
+		else 
+		{
 			unsigned long bios32_entry = check->fields.entry;
 			DBG("PCI: BIOS32 Service Directory entry at 0x%lx\n",
 					bios32_entry);
-			bios32_indirect.address = bios32_entry + PAGE_OFFSET;
-			if (check_pcibios())
+			bios32_indirect.address = bios32_entry + PAGE_OFFSET;//将入口点保存到bios32_indirect中
+			if (check_pcibios()) //检查pci bios是否存在
 				return &pci_bios_access;
 		}
 		break;	/* Hopefully more than one BIOS32 cannot happen... */
@@ -350,6 +397,7 @@ struct irq_routing_options {
 	u16 segment;
 } __attribute__((packed));
 
+//调用BIOS服务目录的API 来获得IRQ路由表
 struct irq_routing_table * pcibios_get_irq_routing_table(void)
 {
 	struct irq_routing_options opt;
@@ -421,9 +469,10 @@ EXPORT_SYMBOL(pcibios_set_irq_routing);
 
 void __init pci_pcbios_init(void)
 {
-	if ((pci_probe & PCI_PROBE_BIOS) 
-		&& ((raw_pci_ops = pci_find_bios()))) {
-		pci_bios_present = 1;
+	if ((pci_probe & PCI_PROBE_BIOS) && //没有从命令行i年至从 
+		((raw_pci_ops = pci_find_bios()))) 
+	{
+		pci_bios_present = 1;//设置此值 标识pci bios可以使用
 	}
 }
 

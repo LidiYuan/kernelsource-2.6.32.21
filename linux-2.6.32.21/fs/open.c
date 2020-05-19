@@ -208,7 +208,8 @@ int do_truncate(struct dentry *dentry, loff_t length, unsigned int time_attrs,
 
 	newattrs.ia_size = length;
 	newattrs.ia_valid = ATTR_SIZE | time_attrs;
-	if (filp) {
+	if (filp) 
+	{
 		newattrs.ia_file = filp;
 		newattrs.ia_valid |= ATTR_FILE;
 	}
@@ -837,9 +838,10 @@ static struct file *__dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 	error = security_dentry_open(f, cred);
 	if (error)
 		goto cleanup_all;
-
+    
 	if (!open && f->f_op)
 		open = f->f_op->open;
+    //文件系统提供了open函数
 	if (open) {
 		error = open(inode, f);
 		if (error)

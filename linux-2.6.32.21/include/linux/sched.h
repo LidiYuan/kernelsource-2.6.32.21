@@ -794,8 +794,8 @@ struct reclaim_state;
 #if defined(CONFIG_SCHEDSTATS) || defined(CONFIG_TASK_DELAY_ACCT)
 struct sched_info {
 	/* cumulative counters */
-	unsigned long pcount;	      /* # of times run on this cpu */
-	unsigned long long run_delay; /* time spent waiting on a runqueue */
+	unsigned long pcount;	      /* # of times run on this cpu cpu上运行的次数*/
+	unsigned long long run_delay; /* time spent waiting on a runqueue 进程在运行队列里面等待的时间*/
 
 	/* timestamps */
 	unsigned long long last_arrival,/* when we last ran on a cpu */
@@ -1443,9 +1443,16 @@ struct task_struct
 	int __user *set_child_tid;		   /* CLONE_CHILD_SETTID */
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
 
-	cputime_t utime, stime, utimescaled, stimescaled;
-	cputime_t gtime;
-	cputime_t prev_utime, prev_stime;
+              //记录进程在用户态/内核态下所经过的节拍数
+	cputime_t utime, //utime是用户态下的执行时间
+		      stime,  //stime是内核态下的执行时间
+
+	          //记录进程在用户态/内核态的运行时间
+		      utimescaled, 
+		      stimescaled;
+	
+	cputime_t gtime;//以节拍计数的虚拟机运行时间
+	cputime_t prev_utime, prev_stime;//记录当前的运行时间
 
 	unsigned long nvcsw,//自愿上下文切换计数 
 		          nivcsw; /* context switch counts *///非自愿上下文切换的次数
@@ -1453,7 +1460,8 @@ struct task_struct
 	struct timespec start_time; 		/* monotonic time */
 	struct timespec real_start_time;	/* boot based time */
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
-	unsigned long min_flt, maj_flt;
+	unsigned long min_flt,  
+	              maj_flt;
 
 	struct task_cputime cputime_expires;
 	struct list_head cpu_timers[3];
@@ -1524,12 +1532,12 @@ struct task_struct
 	void *notifier_data;//notifier()的参数
 	sigset_t *notifier_mask; //驱动程序通过notifier()所阻塞信号的位图
 
-	
+	                                    //用于审计子系统
 	struct audit_context *audit_context;//审计上下文记录进程上下文的审计信息
 	                                  //当进程从进入系统调用和退出系统调用时，使用审计上下文结构audit_context记录系统调用进入和退出的各种属性数据
 #ifdef CONFIG_AUDITSYSCALL
-	uid_t loginuid;
-	unsigned int sessionid;
+	uid_t loginuid;  //用户登录的uid
+	unsigned int sessionid;  //用户登录的会话id
 #endif
 	seccomp_t seccomp;
 

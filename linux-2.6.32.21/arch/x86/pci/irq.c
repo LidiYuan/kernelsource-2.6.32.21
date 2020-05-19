@@ -24,7 +24,7 @@
 static int broken_hp_bios_irq9;
 static int acer_tm360_irqrouting;
 
-static struct irq_routing_table *pirq_table;
+static struct irq_routing_table *pirq_table;//中断路由表
 
 static int pirq_enable_irq(struct pci_dev *dev);
 
@@ -33,27 +33,73 @@ static int pirq_enable_irq(struct pci_dev *dev);
  * Avoid using: 13, 14 and 15 (FP error and IDE).
  * Penalize: 3, 4, 6, 7, 12 (known ISA uses: serial, floppy, parallel and mouse)
  */
+ //操作系统不允许使用0 1 2 这三个中段号
 unsigned int pcibios_irq_mask = 0xfff8;
 
-static int pirq_penalty[16] = {
-	1000000, 1000000, 1000000, 1000, 1000, 0, 1000, 1000,
-	0, 0, 0, 0, 1000, 100000, 100000, 100000
+/*
+pci分配irq号的时候使用 中断号有的可以被共享  有的专用，这种平衡机制是通过下面这个表来说明的
+每个值对用一个irq 一共16个(8259A级联) 值越大 选择对应irq的机会越小 
+定义为1000000的根本不会被pci使用
+定义为 1000的使用几率较小
+定义为0的最可能用到
+*/
+static int pirq_penalty[16] = 
+{
+	1000000, //0 
+	1000000, // 1
+	1000000, // 2
+	1000,    // 3
+	1000,    // 4
+	0,       // 5
+	1000,    // 6
+	1000,    // 7
+	0,       // 8
+	0,       // 9
+	0,       // 10
+	0,       // 11
+	1000,    // 12
+	100000,  // 13
+	100000,  // 14
+	100000   // 15
 };
 
-struct irq_router {
-	char *name;
-	u16 vendor, device;
+//中断路由驱动
+struct irq_router 
+{
+	char *name; //中断路由器的名字
+	u16 vendor,//厂商id 
+		 device;//设备id
+
+	//为pci设备获取中断号	 
+	/*
+        router: 中断路由器对应的pci设备描述符
+        dev:要设置或获取中断号的pci设备的描述符
+        pirq:为链路值 
+        函数返回1 表示成功  否则失败
+	*/
 	int (*get)(struct pci_dev *router, struct pci_dev *dev, int pirq);
-	int (*set)(struct pci_dev *router, struct pci_dev *dev, int pirq,
-		int new);
+
+    //为pci设备设置中断号
+    //new:为irq编号
+	int (*set)(struct pci_dev *router, struct pci_dev *dev, int pirq,int new);
 };
 
+//中断路由驱动句柄 为了查找中断路由驱动
+//就是特定厂商开发的用于判断某个中断路由器是否由他们制造
 struct irq_router_handler {
-	u16 vendor;
+	u16 vendor; //厂商id
+
+	//探测函数  返回1 表示找到中断路由器 填入名字 get和set函数 否则返回0
+	/*
+      r:中断路由驱动描述符
+      router:中断路由器pci设备描述符
+      device:中断路由器的设备id
+	*/
+	//具体的函数可以看pirq_routers表  不同厂商的设备有不同的函数
 	int (*probe)(struct irq_router *r, struct pci_dev *router, u16 device);
 };
 
-int (*pcibios_enable_irq)(struct pci_dev *dev) = NULL;
+int (*pcibios_enable_irq)(struct pci_dev *dev) = NULL;//pirq_enable_irq
 void (*pcibios_disable_irq)(struct pci_dev *dev) = NULL;
 
 /*
@@ -61,6 +107,7 @@ void (*pcibios_disable_irq)(struct pci_dev *dev) = NULL;
  *  and perform checksum verification.
  */
 
+//检查传入的地址是否包含一个有效的irq路由表
 static inline struct irq_routing_table *pirq_check_routing_table(u8 *addr)
 {
 	struct irq_routing_table *rt;
@@ -68,15 +115,18 @@ static inline struct irq_routing_table *pirq_check_routing_table(u8 *addr)
 	u8 sum;
 
 	rt = (struct irq_routing_table *) addr;
-	if (rt->signature != PIRQ_SIGNATURE ||
-	    rt->version != PIRQ_VERSION ||
-	    rt->size % 16 ||
+	if (rt->signature != PIRQ_SIGNATURE || //检查签名
+	    rt->version != PIRQ_VERSION || //检查版本
+	    rt->size % 16 || //size域 必须为16的倍数
 	    rt->size < sizeof(struct irq_routing_table))
 		return NULL;
+
+    //对校验和进行计算
 	sum = 0;
 	for (i = 0; i < rt->size; i++)
 		sum += addr[i];
-	if (!sum) {
+	if (!sum) 
+	{
 		DBG(KERN_DEBUG "PCI: Interrupt Routing Table found at 0x%p\n",
 			rt);
 		return rt;
@@ -89,18 +139,22 @@ static inline struct irq_routing_table *pirq_check_routing_table(u8 *addr)
 /*
  *  Search 0xf0000 -- 0xfffff for the PCI IRQ Routing Table.
  */
-
+//在BIOS ROM空间中查找中断路由表 
 static struct irq_routing_table * __init pirq_find_routing_table(void)
 {
 	u8 *addr;
 	struct irq_routing_table *rt;
 
-	if (pirq_table_addr) {
+    //如果给出了中断路由表的地址
+	if (pirq_table_addr) 
+	{  
+	    //直接在给定的地址中查找中断路由表
 		rt = pirq_check_routing_table((u8 *) __va(pirq_table_addr));
 		if (rt)
 			return rt;
 		printk(KERN_WARNING "PCI: PIRQ table NOT found at pirqaddr\n");
 	}
+	//搜表BIOS ROm映射区 来对中断路由表进行查找
 	for (addr = (u8 *) __va(0xf0000); addr < (u8 *) __va(0x100000); addr += 16) {
 		rt = pirq_check_routing_table(addr);
 		if (rt)
@@ -123,7 +177,8 @@ static void __init pirq_peer_trick(void)
 	struct irq_info *e;
 
 	memset(busmap, 0, sizeof(busmap));
-	for (i = 0; i < (rt->size - sizeof(struct irq_routing_table)) / sizeof(struct irq_info); i++) {
+	for (i = 0; i < (rt->size - sizeof(struct irq_routing_table)) / sizeof(struct irq_info); i++) 
+	{
 		e = &rt->slots[i];
 #ifdef DEBUG
 		{
@@ -538,6 +593,7 @@ static int pirq_bios_set(struct pci_dev *router, struct pci_dev *dev, int pirq, 
 
 #endif
 
+//该函数基本上罗列了intel中断路由器的各种可能设备id
 static __init int intel_router_probe(struct irq_router *r, struct pci_dev *router, u16 device)
 {
 	static struct pci_device_id __initdata pirq_440gx[] = {
@@ -599,7 +655,8 @@ static __init int intel_router_probe(struct irq_router *r, struct pci_dev *route
 	}
 
 	if ((device >= PCI_DEVICE_ID_INTEL_PCH_LPC_MIN) && 
-		(device <= PCI_DEVICE_ID_INTEL_PCH_LPC_MAX)) {
+		(device <= PCI_DEVICE_ID_INTEL_PCH_LPC_MAX)) 
+	{
 		r->name = "PIIX/ICH";
 		r->get = pirq_piix_get;
 		r->set = pirq_piix_set;
@@ -789,8 +846,10 @@ static __init int pico_router_probe(struct irq_router *r, struct pci_dev *router
 	return 0;
 }
 
+//系统中可能存在不同的中断路由器 从而有多种驱动,每个厂商会有自己的中断路由器句柄
+// linux将支持的所有路由器句柄放到全局数组pirq_routers中
 static __initdata struct irq_router_handler pirq_routers[] = {
-	{ PCI_VENDOR_ID_INTEL, intel_router_probe },
+	{ PCI_VENDOR_ID_INTEL, intel_router_probe },//intel厂商
 	{ PCI_VENDOR_ID_AL, ali_router_probe },
 	{ PCI_VENDOR_ID_ITE, ite_router_probe },
 	{ PCI_VENDOR_ID_VIA, via_router_probe },
@@ -804,22 +863,26 @@ static __initdata struct irq_router_handler pirq_routers[] = {
 	/* Someone with docs needs to add the ATI Radeon IGP */
 	{ 0, NULL }
 };
-static struct irq_router pirq_router;
-static struct pci_dev *pirq_router_dev;
+static struct irq_router pirq_router;//中断路由器驱动
+static struct pci_dev *pirq_router_dev;//中断路由器pci设备驱动
 
 
 /*
  *	FIXME: should we have an option to say "generic for
  *	chipset" ?
  */
-
+/*
+查找中断路由驱动
+*/
 static void __init pirq_find_router(struct irq_router *r)
 {
-	struct irq_routing_table *rt = pirq_table;
-	struct irq_router_handler *h;
+	struct irq_routing_table *rt = pirq_table;//中断路由表
+	struct irq_router_handler *h;//中断路由句柄
 
 #ifdef CONFIG_PCI_BIOS
-	if (!rt->signature) {
+	if (!rt->signature) //检查签名是否为空
+	{ 
+	    //通过bios 服务API来设置中断号
 		printk(KERN_INFO "PCI: Using BIOS for IRQ routing\n");
 		r->set = pirq_bios_set;
 		r->name = "BIOS";
@@ -835,14 +898,18 @@ static void __init pirq_find_router(struct irq_router *r)
 	DBG(KERN_DEBUG "PCI: Attempting to find IRQ router for [%04x:%04x]\n",
 	    rt->rtr_vendor, rt->rtr_device);
 
+    //根据pci总线编号和槽/功能号 获得中断路由器pci设备
 	pirq_router_dev = pci_get_bus_and_slot(rt->rtr_bus, rt->rtr_devfn);
-	if (!pirq_router_dev) {
+	if (!pirq_router_dev) 
+	{
 		DBG(KERN_DEBUG "PCI: Interrupt router not found at "
 			"%02x:%02x\n", rt->rtr_bus, rt->rtr_devfn);
 		return;
 	}
 
+    //查找中断路由器句柄表  看使用的哪种厂商的中断路由器
 	for (h = pirq_routers; h->vendor; h++) {
+
 		/* First look for a router match */
 		if (rt->rtr_vendor == h->vendor &&
 			h->probe(r, pirq_router_dev, rt->rtr_device))
@@ -862,10 +929,11 @@ static void __init pirq_find_router(struct irq_router *r)
 static struct irq_info *pirq_get_info(struct pci_dev *dev)
 {
 	struct irq_routing_table *rt = pirq_table;
-	int entries = (rt->size - sizeof(struct irq_routing_table)) /
-		sizeof(struct irq_info);
+	//获得中断路由表项个数
+	int entries = (rt->size - sizeof(struct irq_routing_table)) /sizeof(struct irq_info);
 	struct irq_info *info;
 
+    //遍历所有的中断路由表项  查找此设备对应的路由表项
 	for (info = rt->slots; entries--; info++)
 		if (info->bus == dev->bus->number &&
 			PCI_SLOT(info->devfn) == PCI_SLOT(dev->devfn))
@@ -873,7 +941,9 @@ static struct irq_info *pirq_get_info(struct pci_dev *dev)
 	return NULL;
 }
 
-static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
+//给某个设备查找有效的irq号
+static int pcibios_lookup_irq(struct pci_dev *dev, //pci设备描述符 
+                                         int assign)
 {
 	u8 pin;
 	struct irq_info *info;
@@ -885,6 +955,8 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	char *msg = NULL;
 
 	/* Find IRQ pin */
+	//读取设备的中断引脚
+	//00 表示没有中断引脚  01表示INTA# 0x02表示INTB#  0X03表示INTC# 0x04表示INTD#
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 	if (!pin) {
 		dev_dbg(&dev->dev, "no interrupt pin\n");
@@ -895,35 +967,44 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		return 0;
 
 	/* Find IRQ routing entry */
-
+    //看中断路由表是否为空
 	if (!pirq_table)
 		return 0;
 
+	//获得该设备所属的插槽对应的irq_info中断路由表项
 	info = pirq_get_info(dev);
 	if (!info) {
 		dev_dbg(&dev->dev, "PCI INT %c not found in routing table\n",
 			'A' + pin - 1);
 		return 0;
 	}
+	//获得pci设备中断引脚的链路值
 	pirq = info->irq[pin - 1].link;
+	//允许的irq位图 这个限制是硬件上的限制 在下面还要加上操作系统的限制
 	mask = info->irq[pin - 1].bitmap;
+
 	if (!pirq) {
 		dev_dbg(&dev->dev, "PCI INT %c not routed\n", 'A' + pin - 1);
 		return 0;
 	}
 	dev_dbg(&dev->dev, "PCI INT %c -> PIRQ %02x, mask %04x, excl %04x",
 		'A' + pin - 1, pirq, mask, pirq_table->exclusive_irqs);
+
+	//对位图的使用加上操作系统的限制
 	mask &= pcibios_irq_mask;
 
 	/* Work around broken HP Pavilion Notebooks which assign USB to
 	   IRQ 9 even though it is actually wired to IRQ 11 */
 
-	if (broken_hp_bios_irq9 && pirq == 0x59 && dev->irq == 9) {
+	//这个是针对惠普的特殊设置
+	if (broken_hp_bios_irq9 && pirq == 0x59 && dev->irq == 9) 
+	{
 		dev->irq = 11;
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, 11);
 		r->set(pirq_router_dev, dev, pirq, 11);
 	}
 
+    //针对宏基的特殊设置
 	/* same for Acer Travelmate 360, but with CB and irq 11 -> 10 */
 	if (acer_tm360_irqrouting && dev->irq == 11 &&
 		dev->vendor == PCI_VENDOR_ID_O2) {
@@ -933,48 +1014,71 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
 	}
 
+
 	/*
 	 * Find the best IRQ to assign: use the one
 	 * reported by the device if possible.
 	 */
+	//如果可能先使用设备中记录的irq  最后不一定用这个
 	newirq = dev->irq;
-	if (newirq && !((1 << newirq) & mask)) {
+    //如果irq存在 并且此irq不在允许的mask中
+	if (newirq && !((1 << newirq) & mask)) 
+	{
+	    //如果编译选项设置了PCI_USE_PIRQ_MASK 则在和mask冲突的情况下将 irq设置为0重新分配
 		if (pci_probe & PCI_USE_PIRQ_MASK)
 			newirq = 0;
-		else
+		else  //编译选项没有设置PCI_USE_PIRQ_MASK 则忽略和mask冲突的问题  只是打出一个警告
 			dev_warn(&dev->dev, "IRQ %d doesn't match PIRQ mask "
 				 "%#x; try pci=usepirqmask\n", newirq, mask);
 	}
-	if (!newirq && assign) {
-		for (i = 0; i < 16; i++) {
+
+	//如果irq为0  并且参数中指定要进行分配  则进行分配新的irq
+	if (!newirq && assign) 
+	{
+		for (i = 0; i < 16; i++) 
+		{
+		   //检查掩码中是否允许此中断号
 			if (!(mask & (1 << i)))
 				continue;
-			if (pirq_penalty[i] < pirq_penalty[newirq] &&
-				can_request_irq(i, IRQF_SHARED))
+
+			//寻找惩罚量最小的irq号 进行分配 并将分配号的irq存放到newirq中
+			if (pirq_penalty[i] < pirq_penalty[newirq] &&can_request_irq(i, IRQF_SHARED))
 				newirq = i;
 		}
 	}
 	dev_dbg(&dev->dev, "PCI INT %c -> newirq %d", 'A' + pin - 1, newirq);
 
+    
 	/* Check if it is hardcoded */
-	if ((pirq & 0xf0) == 0xf0) {
+	//如果链路值的高四位为1 则说明它是个硬链接  也就是直接连在了8259A的引脚上
+	//引脚编号即是低四位
+	if ((pirq & 0xf0) == 0xf0) 
+	{
 		irq = pirq & 0xf;
 		msg = "hardcoded";
-	} else if (r->get && (irq = r->get(pirq_router_dev, dev, pirq)) && \
-	((!(pci_probe & PCI_USE_PIRQ_MASK)) || ((1 << irq) & mask))) {
+	} //调用中断路由器回调获得irq  回调看pirq_routers
+	else if (r->get && (irq = r->get(pirq_router_dev, dev, pirq)) && \
+	((!(pci_probe & PCI_USE_PIRQ_MASK)) || ((1 << irq) & mask))) 
+	{
 		msg = "found";
 		eisa_set_level_irq(irq);
-	} else if (newirq && r->set &&
-		(dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) {
-		if (r->set(pirq_router_dev, dev, pirq, newirq)) {
+	} 
+	else if (newirq && r->set &&
+		    (dev->class >> 8) != PCI_CLASS_DISPLAY_VGA) 
+    {    
+        //调用中断路由驱动设置irq  回调看pirq_routers
+		if (r->set(pirq_router_dev, dev, pirq, newirq)) 
+		{
 			eisa_set_level_irq(newirq);
 			msg = "assigned";
 			irq = newirq;
 		}
 	}
 
-	if (!irq) {
-		if (newirq && mask == (1 << newirq)) {
+	if (!irq) 
+	{
+		if (newirq && mask == (1 << newirq)) 
+		{
 			msg = "guessed";
 			irq = newirq;
 		} else {
@@ -985,7 +1089,10 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	dev_info(&dev->dev, "%s PCI INT %c -> IRQ %d\n", msg, 'A' + pin - 1, irq);
 
 	/* Update IRQ for all devices with the same pirq value */
-	while ((dev2 = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev2)) != NULL) {
+    //遍历所有的pci设备
+	while ((dev2 = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev2)) != NULL) 
+	{
+	    
 		pci_read_config_byte(dev2, PCI_INTERRUPT_PIN, &pin);
 		if (!pin)
 			continue;
@@ -993,11 +1100,15 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 		info = pirq_get_info(dev2);
 		if (!info)
 			continue;
-		if (info->irq[pin - 1].link == pirq) {
+
+		//更根据上面获得的设备链路值  看是否和pirq相同
+		if (info->irq[pin - 1].link == pirq) 
+		{
 			/*
 			 * We refuse to override the dev->irq
 			 * information. Give a warning!
 			 */
+			 //设备有自己有效的irq
 			if (dev2->irq && dev2->irq != irq && \
 			(!(pci_probe & PCI_USE_PIRQ_MASK) || \
 			((1 << dev2->irq) & mask))) {
@@ -1008,6 +1119,8 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 #endif
 				continue;
 			}
+			
+			//更新设备的irq
 			dev2->irq = irq;
 			pirq_penalty[irq]++;
 			if (dev != dev2)
@@ -1017,20 +1130,26 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	}
 	return 1;
 }
-
+/*
+给pci设备分配irq中断号
+*/
 static void __init pcibios_fixup_irqs(void)
 {
 	struct pci_dev *dev = NULL;
 	u8 pin;
 
 	DBG(KERN_DEBUG "PCI: IRQ fixup\n");
-	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	//遍历所有的pci设备
+	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) 
+	{
 		/*
 		 * If the BIOS has set an out of range IRQ number, just
 		 * ignore it.  Also keep track of which IRQ's are
 		 * already in use.
 		 */
-		if (dev->irq >= 16) {
+		//该设备使用的irq号是否超出限制
+		if (dev->irq >= 16) 
+		{
 			dev_dbg(&dev->dev, "ignoring bogus IRQ %d\n", dev->irq);
 			dev->irq = 0;
 		}
@@ -1038,17 +1157,24 @@ static void __init pcibios_fixup_irqs(void)
 		 * If the IRQ is already assigned to a PCI device,
 		 * ignore its ISA use penalty
 		 */
-		if (pirq_penalty[dev->irq] >= 100 &&
-				pirq_penalty[dev->irq] < 100000)
+		//如果不希望被设备使用的irq已经被被使用则干脆就消掉对它的惩罚 让他正常参与到下面的irq分配中 
+		if (pirq_penalty[dev->irq] >= 100 && pirq_penalty[dev->irq] < 100000)
 			pirq_penalty[dev->irq] = 0;
+		
+		//将被使用的irq对应的惩罚值加1
 		pirq_penalty[dev->irq]++;
 	}
 
 	if (io_apic_assign_pci_irqs)
 		return;
 
+    //下面对irq进行分配
 	dev = NULL;
-	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	
+    //遍历所有的pci设备
+	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) 
+	{ 
+	    //读取pci设备的配置空间  读取该设备使用的中断引脚
 		pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 		if (!pin)
 			continue;
@@ -1056,6 +1182,7 @@ static void __init pcibios_fixup_irqs(void)
 		/*
 		 * Still no IRQ? Try to lookup one...
 		 */
+		//它当前是否有一个有效的irq 如果有中断引脚 但没有对应的irq号 则进行分配
 		if (!dev->irq)
 			pcibios_lookup_irq(dev, 0);
 	}
@@ -1121,18 +1248,34 @@ int __init pcibios_irq_init(void)
 
 	dmi_check_system(pciirq_dmi_table);
 
+	//查找中断路由表 通过遍历BIOS ROM空间的方式
 	pirq_table = pirq_find_routing_table();
-
+    
 #ifdef CONFIG_PCI_BIOS
+    //如果上面遍历 BIOS rom 空间获得中断路由表失败 ，则在配置CONFIG_PCI_BIOS的情况下
+    //尝试通过BIOS服务目录的 API获得路由表
 	if (!pirq_table && (pci_probe & PCI_BIOS_IRQ_SCAN))
 		pirq_table = pcibios_get_irq_routing_table();
 #endif
-	if (pirq_table) {
+
+	if (pirq_table) 
+	{
+	    //路由表中列出了所有的pci插槽,检查这些插槽所在的pci总线是否都已经扫描到了
+	    //如果没有扫描到 则进行扫描
 		pirq_peer_trick();
+
+		//查找可编程中断路由器的驱动 将他保存到pirq_router全局变量中
+		//查找中断路由器驱动的目的是用于获得为PCI设备中断设置IRQ的回调函数
 		pirq_find_router(&pirq_router);
-		if (pirq_table->exclusive_irqs) {
+
+
+	    //如果中断路由表给出了排它irq位图 则需要为各个irq的惩罚量进行修改 它在操作系统为链路值选择irq的算法中用到
+	    //将位图设置为1所对应的irq的惩罚量增加100 使得在选择中断路由的时候 不太会选择对应的irq
+		if (pirq_table->exclusive_irqs) 
+		{
 			int i;
 			for (i = 0; i < 16; i++)
+				//如果某位设置了1 说明该irq号不想被共享  将惩罚量加100 
 				if (!(pirq_table->exclusive_irqs & (1 << i)))
 					pirq_penalty[i] += 100;
 		}
@@ -1146,6 +1289,7 @@ int __init pcibios_irq_init(void)
 
 	pcibios_enable_irq = pirq_enable_irq;
 
+    //给pci设备分配irq中断号
 	pcibios_fixup_irqs();
 
 	if (io_apic_assign_pci_irqs && pci_routeirq) {

@@ -2358,7 +2358,7 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i, int *len)
 		timer_active	= 0;
 		timer_expires = jiffies;
 	}
-
+    
 	seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX "
 			"%08X %5d %8d %lu %d %p %lu %lu %u %u %d%n",
 		i, src, srcp, dest, destp, sk->sk_state,

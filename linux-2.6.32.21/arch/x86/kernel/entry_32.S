@@ -522,18 +522,18 @@ ENDPROC(ia32_sysenter_target)
 	# system call handler stub
 ENTRY(system_call)
 	RING0_INT_FRAME			# can't unwind into user space anyway
-	pushl %eax			# save orig_eax
+	pushl %eax			# save orig_eax  /*将系统调用号压栈*/
 	CFI_ADJUST_CFA_OFFSET 4
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
 					# system call tracing in operation / emulation
 	testl $_TIF_WORK_SYSCALL_ENTRY,TI_flags(%ebp)
 	jnz syscall_trace_entry
-	cmpl $(nr_syscalls), %eax
+	cmpl $(nr_syscalls), %eax  /*检查系统调用号*/
 	jae syscall_badsys
 syscall_call:
-	call *sys_call_table(,%eax,4) //syscall_table_32.S中
-	movl %eax,PT_EAX(%esp)		# store the return value
+	call *sys_call_table(,%eax,4) //syscall_table_32.S中  #调用系统调用表中调用号为eax的系统调用例程
+	movl %eax,PT_EAX(%esp)		# store the return value #存储返回的值
 syscall_exit:
 	LOCKDEP_SYS_EXIT
 	DISABLE_INTERRUPTS(CLBR_ANY)	# make sure we don't miss an interrupt

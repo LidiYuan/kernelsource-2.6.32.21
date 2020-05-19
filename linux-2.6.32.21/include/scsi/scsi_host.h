@@ -43,9 +43,11 @@ struct blk_queue_tags;
 #define DISABLE_CLUSTERING 0
 #define ENABLE_CLUSTERING 1
 
+//<3:0:0:0> <host:channel:target:lun>
+//scsi 主机适配模板  它给出相同型号主机适配器的公用内容
 struct scsi_host_template {
-	struct module *module;
-	const char *name;//HBA卡的名字
+	struct module *module; //指向实现这个host模板的低层驱动模块指针
+	const char *name;//SCSI HBA驱动的名字
 
 	/*
 	 * Used to initialize old-style drivers.  For new-style drivers
@@ -53,6 +55,7 @@ struct scsi_host_template {
 	 *
 	 * Status:  OBSOLETE
 	 */
+	 //被老式驱动用来检测主机适配器
 	int (* detect)(struct scsi_host_template *);
 
 	/*
@@ -60,6 +63,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OBSOLETE
 	 */
+	 //被老式驱动用来释放主机适配器
 	int (* release)(struct Scsi_Host *);
 
 	/*
@@ -69,13 +73,14 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //返回开发人员觉得有用的任何有用信息
 	const char *(* info)(struct Scsi_Host *);
 
 	/*
 	 * Ioctl interface
-	 *
 	 * Status: OPTIONAL
 	 */
+	//ioctl接口 
 	int (* ioctl)(struct scsi_device *dev, int cmd, void __user *arg);
 
 
@@ -86,6 +91,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	//io接口  在64位内核下执行32位系统调用时候使用 
 	int (* compat_ioctl)(struct scsi_device *dev, int cmd, void __user *arg);
 #endif
 
@@ -121,8 +127,10 @@ struct scsi_host_template {
 	 *
 	 * STATUS: REQUIRED
 	 */
-	int (* queuecommand)(struct scsi_cmnd *, //通过这个函数将scsi命名发送到HBA卡
-			     void (*done)(struct scsi_cmnd *));
+	 //将scsi命令排入到LLDD队列 SCSI中间层调用该回调函数 向HBA发送SCSI命令
+	 //通过这个函数将scsi命名发送到HBA卡
+	int (* queuecommand)(struct scsi_cmnd *,  //指向scsi命令描述符的指针    
+			     void (*done)(struct scsi_cmnd *));//指向完成回调函数的指针 在驱动完成处理命令后 此函数被调用
 
 	/*
 	 * The transfer functions are used to queue a scsi command to
@@ -142,7 +150,8 @@ struct scsi_host_template {
 	 * STATUS: REQUIRED FOR TARGET DRIVERS
 	 */
 	/* TODO: rename */
-	int (* transfer_response)(struct scsi_cmnd *,
+	//如果主机适配器支持STGT的目标器模式 必须实现这一个回调函数  STGT核心在处理完SCSI命令后 调用它向LLD传送相应
+	int (* transfer_response)(struct scsi_cmnd *, //执行scsi命令符指针
 				  void (*done)(struct scsi_cmnd *));
 
 	/*
@@ -163,10 +172,19 @@ struct scsi_host_template {
 	 *
 	 * Status: REQUIRED	(at least one of them)
 	 */
+	//错误恢复动作:放弃给定的命令 
 	int (* eh_abort_handler)(struct scsi_cmnd *);//撤销一个scsi命令
+
+    //错误恢复动作:SCSI设备复位
 	int (* eh_device_reset_handler)(struct scsi_cmnd *);//reset某个硬盘设备
+
+    //错误恢复动作:目标节点恢复
 	int (* eh_target_reset_handler)(struct scsi_cmnd *);
+
+    //错误恢复动作:SCSI总线复位
 	int (* eh_bus_reset_handler)(struct scsi_cmnd *);//reset整个适配器芯片
+
+	//错误恢复动作:主机适配器复位
 	int (* eh_host_reset_handler)(struct scsi_cmnd *);
 
 	/*
@@ -195,6 +213,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //在扫描到一个新scsi设备后 用户可以在这个函数为其分配私有device结构
 	int (* slave_alloc)(struct scsi_device *);
 
 	/*
@@ -226,6 +245,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //在收到SCSI设备的INQUIRY相应之后调用 
 	int (* slave_configure)(struct scsi_device *);
 
 	/*
@@ -237,6 +257,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //在销毁SCSI设备之前调用 SCSI子系统调用这个函数 释放关联的私有device结构
 	void (* slave_destroy)(struct scsi_device *);
 
 	/*
@@ -251,6 +272,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //在发现一个新的scsi目标器后调用 用户可以在这个函数中分配私有target结构
 	int (* target_alloc)(struct scsi_target *);
 
 	/*
@@ -261,6 +283,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //在销毁SCSI设备之前调用 SCSI子系统调用这个函数 释放关联的私有target结构
 	void (* target_destroy)(struct scsi_target *);
 
 	/*
@@ -272,6 +295,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //如果主机适配器实现了自己的扫描逻辑 则需要实现这个回调函数
 	int (* scan_finished)(struct Scsi_Host *, unsigned long);
 
 	/*
@@ -281,6 +305,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //如果主机适配器定义了自己的扫描逻辑 则需要实现这个函数
 	void (* scan_start)(struct Scsi_Host *);
 
 	/*
@@ -294,6 +319,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //改变主机适配器队列深度的回调函数
 	int (* change_queue_depth)(struct scsi_device *, int);
 
 	/*
@@ -307,6 +333,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //改变主机适配器tag类型的回调函数
 	int (* change_queue_type)(struct scsi_device *, int);
 
 	/*
@@ -317,6 +344,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //返回磁盘的BIOS参数(柱面 磁道 扇区)
 	int (* bios_param)(struct scsi_device *, struct block_device *,
 			sector_t, int []);
 
@@ -327,6 +355,7 @@ struct scsi_host_template {
 	 *
 	 * Status: OBSOLETE
 	 */
+	 //用于导出驱动统计喝其他信息到内核外 
 	int (*proc_info)(struct Scsi_Host *, char *, char **, off_t, int, int);
 
 	/*
@@ -340,24 +369,26 @@ struct scsi_host_template {
 	 *
 	 * Status: OPTIONAL
 	 */
+	 //在中间层发送SCSI命令超时 将调用低层驱动的这个回调函数 使底层有机会修正错误
 	enum blk_eh_timer_return (*eh_timed_out)(struct scsi_cmnd *);
 
 	/*
 	 * Name of proc directory
 	 */
-	const char *proc_name;
+	const char *proc_name;//proc目录名
 
 	/*
 	 * Used to store the procfs directory if a driver implements the
 	 * proc_info method.
 	 */
-	struct proc_dir_entry *proc_dir;
+	struct proc_dir_entry *proc_dir;//如果驱动实现了pro_info方法 可以用来保存profs目录
 
 	/*
 	 * This determines if we will use a non-interrupt driven
 	 * or an interrupt driven scheme.  It is set to the maximum number
 	 * of simultaneous commands a given host adapter will accept.
 	 */
+	 //该域为主机适配器可以同时接收的命令数 必须大于0
 	int can_queue;
 
 	/*
@@ -367,24 +398,25 @@ struct scsi_host_template {
 	 * your setup is in single initiator mode, and the host lacks an
 	 * ID.
 	 */
+	 //在很多情况下 尤其支持断开/重连 主机适配器在scsi总线占有一个id 
 	int this_id;
 
 	/*
 	 * This determines the degree to which the host adapter is capable
 	 * of scatter-gather.
 	 */
-	unsigned short sg_tablesize;
+	unsigned short sg_tablesize;//主机适配器支持聚散列表的能力
 
 	/*
 	 * Set this if the host adapter has limitations beside segment count.
 	 */
-	unsigned short max_sectors;
+	unsigned short max_sectors;//主机适配器单个scsi命令能访问扇区的最大数目
 
 	/*
 	 * DMA scatter gather segment boundary limit. A segment crossing this
 	 * boundary will be split in two.
 	 */
-	unsigned long dma_boundary;
+	unsigned long dma_boundary;//dma聚散段边界限制 跨越这个边界的段将被分割为两个
 
 	/*
 	 * This specifies "machine infinity" for host templates which don't
@@ -403,23 +435,23 @@ struct scsi_host_template {
 	 * You should make sure that the host adapter will do the right thing
 	 * before you try setting this above 1.
 	 */
-	short cmd_per_lun;
+	short cmd_per_lun;//允许连接到这个主机适配器的scsi设备的最大数目
 
 	/*
 	 * present contains counter indicating how many boards of this
 	 * type were found when we did the scan.
 	 */
-	unsigned char present;
+	unsigned char present;//一个计数器 给出在扫描过程中发现了多少个这种类型的主机适配器
 
 	/*
 	 * This specifies the mode that a LLD supports.
 	 */
-	unsigned supported_mode:2;
+	unsigned supported_mode:2;//低层驱动支持的模式
 
 	/*
 	 * True if this host adapter uses unchecked DMA onto an ISA bus.
 	 */
-	unsigned unchecked_isa_dma:1;
+	unsigned unchecked_isa_dma:1;//为1表示只能使用arm的低16M作为DMA地址空间 为0表示可以使用全部的32位
 
 	/*
 	 * True if this host adapter can make good use of clustering.
@@ -429,27 +461,27 @@ struct scsi_host_template {
 	 * number of segments (i.e. use clustering).  I guess it is
 	 * inefficient.
 	 */
-	unsigned use_clustering:1;
+	unsigned use_clustering:1;//如果为1 在scsi策略中构建scsi命令聚散列表时 可以合并内存连续的io请求
 
 	/*
 	 * True for emulated SCSI host adapters (e.g. ATAPI).
 	 */
-	unsigned emulated:1;
+	unsigned emulated:1;//若是仿真的SCSI主机适配器 则为TRUE
 
 	/*
 	 * True if the low-level driver performs its own reset-settle delays.
 	 */
-	unsigned skip_settle_delay:1;
+	unsigned skip_settle_delay:1;//如果为1 在主机适配器复位和总该复位后 低层驱动自行执行reset-settle延迟
 
 	/*
 	 * True if we are using ordered write support.
 	 */
-	unsigned ordered_tag:1;
+	unsigned ordered_tag:1;//如果为1 表示正在使用排序写支持
 
 	/*
 	 * Countdown for host blocking with no commands outstanding.
 	 */
-	unsigned int max_host_blocked;
+	unsigned int max_host_blocked;//如果主机适配器没有待处理的命令 则暂时组赛他
 
 	/*
 	 * Default value for the blocking.  If the queue is empty,
@@ -463,12 +495,12 @@ struct scsi_host_template {
 	/*
 	 * Pointer to the sysfs class properties for this host, NULL terminated.
 	 */
-	struct device_attribute **shost_attrs;
+	struct device_attribute **shost_attrs;//属于该模板的公共属性机器操作方法
 
 	/*
 	 * Pointer to the SCSI device properties for this host, NULL terminated.
 	 */
-	struct device_attribute **sdev_attrs;
+	struct device_attribute **sdev_attrs;//连接到这个模板主机适配器上的scsi设备的公共属性及其操作方法
 
 	/*
 	 * List of hosts per template.
@@ -477,7 +509,7 @@ struct scsi_host_template {
 	 * For these access to it is synchronized implicitly by
 	 * module_init/module_exit.
 	 */
-	struct list_head legacy_hosts;
+	struct list_head legacy_hosts;//连接Scsi_Host{}.sht_legacy_list
 
 	/*
 	 * Vendor Identifier associated with the host
@@ -486,7 +518,7 @@ struct scsi_host_template {
 	 *   Vendor Type and ID formatting requirements specified in
 	 *   scsi_netlink.h
 	 */
-	u64 vendor_id;
+	u64 vendor_id;//和主机适配器管理的厂商标识符
 };
 
 /*
@@ -504,6 +536,7 @@ enum scsi_host_state {
 	SHOST_DEL_RECOVERY,
 };
 
+//主机适配器
 struct Scsi_Host {
 	/*
 	 * __devices is protected by the host_lock, but you should
@@ -513,32 +546,34 @@ struct Scsi_Host {
 	 * their __ prefixed variants with the lock held. NEVER
 	 * access this list directly from a driver.
 	 */
-	struct list_head	__devices;
-	struct list_head	__targets;
+	struct list_head	__devices;//这个主机适配器的scsi设备链表
+	struct list_head	__targets;//这个主机适配器的目标节点链表
 	
-	struct scsi_host_cmd_pool *cmd_pool;
-	spinlock_t		free_list_lock;
-	struct list_head	free_list; /* backup store of cmd structs */
-	struct list_head	starved_list;
+	struct scsi_host_cmd_pool *cmd_pool;//用于分配scsi命令结构和感测数据缓冲区的存储结构
+	spinlock_t		free_list_lock;//用户保护free_list链表的自旋锁
+	
+	struct list_head	free_list; /* 预先准备的scsi命令结构的后备仓库链表 如果从cmd_pool分配失败 尝试从这个链表中获得.  backup store of cmd structs */
+	struct list_head	starved_list;//由于主机适配器的处理能力 发送到scsi设备的请求队列中的请求可能无法被立即派发, 这时.将scsi设备连入主机适配器的此链表 
+                                     //连入scsi_device{}.starved_entry
+									   
+	spinlock_t		default_lock; //保护这个主机适配器的自旋锁
+	spinlock_t		*host_lock;//指向default_lock的指针
 
-	spinlock_t		default_lock;
-	spinlock_t		*host_lock;
+	struct mutex		scan_mutex;/* serialize scanning activity 用于异步扫描的互斥量*/
 
-	struct mutex		scan_mutex;/* serialize scanning activity */
-
-	struct list_head	eh_cmd_q;
-	struct task_struct    * ehandler;  /* Error recovery thread. */
-	struct completion     * eh_action; /* Wait for specific actions on the
+	struct list_head	eh_cmd_q; //进入错误恢复的scsi命令链表的表头
+	struct task_struct    * ehandler;  /* Error recovery thread. 错误恢复线程 在分配结构的同时创建*/
+	struct completion     * eh_action; /* Wait for specific actions on the在发送一个用于错误恢复的scsi命令后 需要等待其完成,才能继续
 					      host. */
-	wait_queue_head_t       host_wait;
-	struct scsi_host_template *hostt;
-	struct scsi_transport_template *transportt;
+	wait_queue_head_t       host_wait;//scsi错误恢复等待队列 在scis设备错误恢复过程中 要操作scsi设备的进程在此队列上等待 直到恢复
+	struct scsi_host_template *hostt;//指向创建这个主机适配器的模板指针
+	struct scsi_transport_template *transportt;//指向scsi传输层模板的指针
 
 	/*
 	 * Area to keep a shared tag map (if needed, will be
 	 * NULL if not).
 	 */
-	struct blk_queue_tag	*bqt;
+	struct blk_queue_tag	*bqt;//指向为该主机适配器管理target请求的描述符指针 为连接到它所有的scsi设备的请求队列
 
 	/*
 	 * The following two fields are protected with host_lock;

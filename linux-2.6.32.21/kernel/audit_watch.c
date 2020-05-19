@@ -50,12 +50,12 @@ struct audit_watch {
 	unsigned long		ino;	/* associated inode number */
 	struct audit_parent	*parent; /* associated parent */
 	struct list_head	wlist;	/* entry in parent->watches list */
-	struct list_head	rules;	/* associated rules */
+	struct list_head	rules;	/* associated ruleshe 和audit_krule{}.rlist */
 };
 
 struct audit_parent {
 	struct list_head	ilist;	/* entry in inotify registration list */
-	struct list_head	watches; /* associated watches */
+	struct list_head	watches; /* associated watches 和子节点audit_watch{}.wlist连接  存放该目录下的审计监视结构*/
 	struct inotify_watch	wdata;	/* inotify watch data */
 	unsigned		flags;	/* status flags */
 };
@@ -145,8 +145,7 @@ static struct audit_parent *audit_init_parent(struct nameidata *ndp)
 	inotify_init_watch(&parent->wdata);
 	/* grab a ref so inotify watch hangs around until we take audit_filter_mutex */
 	get_inotify_watch(&parent->wdata);
-	wd = inotify_add_watch(audit_ih, &parent->wdata,
-			       ndp->path.dentry->d_inode, AUDIT_IN_WATCH);
+	wd = inotify_add_watch(audit_ih, &parent->wdata,ndp->path.dentry->d_inode, AUDIT_IN_WATCH);
 	if (wd < 0) {
 		audit_free_parent(&parent->wdata);
 		return ERR_PTR(wd);
@@ -181,12 +180,11 @@ int audit_to_watch(struct audit_krule *krule, char *path, int len, u32 op)
 	if (!audit_ih)
 		return -EOPNOTSUPP;
 
-	if (path[0] != '/' || path[len-1] == '/' ||
-	    krule->listnr != AUDIT_FILTER_EXIT ||
-	    op != Audit_equal ||
+	if (path[0] != '/' || path[len-1] == '/' || krule->listnr != AUDIT_FILTER_EXIT || op != Audit_equal ||
 	    krule->inode_f || krule->watch || krule->tree)
 		return -EINVAL;
 
+	//创建初始化audit_watch结构 
 	watch = audit_init_watch(path);
 	if (IS_ERR(watch))
 		return PTR_ERR(watch);
@@ -451,8 +449,8 @@ int audit_add_watch(struct audit_krule *krule)
 	 * inotify watch is found, inotify_find_watch() grabs a reference before
 	 * returning.
 	 */
-	if (inotify_find_watch(audit_ih, ndp->path.dentry->d_inode,
-			       &i_watch) < 0) {
+	if (inotify_find_watch(audit_ih, ndp->path.dentry->d_inode,&i_watch) < 0) 
+	{
 		parent = audit_init_parent(ndp);
 		if (IS_ERR(parent)) {
 			/* caller expects mutex locked */
@@ -513,8 +511,7 @@ static void audit_handle_ievent(struct inotify_watch *i_watch, u32 wd, u32 mask,
 	parent = container_of(i_watch, struct audit_parent, wdata);
 
 	if (mask & (IN_CREATE|IN_MOVED_TO) && inode)
-		audit_update_watch(parent, dname, inode->i_sb->s_dev,
-				   inode->i_ino, 0);
+		audit_update_watch(parent, dname, inode->i_sb->s_dev,inode->i_ino, 0);
 	else if (mask & (IN_DELETE|IN_MOVED_FROM))
 		audit_update_watch(parent, dname, (dev_t)-1, (unsigned long)-1, 1);
 	/* inotify automatically removes the watch and sends IN_IGNORED */

@@ -704,8 +704,7 @@ static int create_dir(struct kobject *kobj, struct sysfs_dirent *parent_sd,
 	return rc;
 }
 
-int sysfs_create_subdir(struct kobject *kobj, const char *name,
-			struct sysfs_dirent **p_sd)
+int sysfs_create_subdir(struct kobject *kobj, const char *name,struct sysfs_dirent **p_sd)
 {
 	return create_dir(kobj, kobj->sd, name, p_sd);
 }
@@ -734,8 +733,11 @@ int sysfs_create_dir(struct kobject * kobj)
 	return error;
 }
 
-static struct dentry * sysfs_lookup(struct inode *dir, struct dentry *dentry,
-				struct nameidata *nd)
+/*
+dir:是父目录的inode
+dentry:是要查找的节点的dentry
+*/
+static struct dentry * sysfs_lookup(struct inode *dir, struct dentry *dentry,struct nameidata *nd)
 {
 	struct dentry *ret = NULL;
 	struct sysfs_dirent *parent_sd = dentry->d_parent->d_fsdata;

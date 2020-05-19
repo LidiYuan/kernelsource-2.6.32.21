@@ -22,8 +22,8 @@
 struct resource {
 	resource_size_t start;//资源范围的开始
 	resource_size_t end;//资源范围的结束
-	const char *name;//资源拥有者的名字
-	unsigned long flags;//各种标志
+	const char *name;//这块资源的名字
+	unsigned long flags;//各种标志  是否是有效的资源空间
 	struct resource *parent, *sibling, *child;//指向资源树中的父亲 兄弟 和孩子
 };
 

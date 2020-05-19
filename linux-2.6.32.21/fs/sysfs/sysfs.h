@@ -14,7 +14,7 @@ struct sysfs_open_dirent;
 
 /* type-specific structures for sysfs_dirent->s_* union members */
 struct sysfs_elem_dir {
-	struct kobject		*kobj;
+	struct kobject		*kobj;  //在sysfs_create_dir()的时候由调用者传入
 	/* children list starts here and goes through sd->s_sibling */
 	struct sysfs_dirent	*children;
 };
@@ -47,12 +47,12 @@ struct sysfs_inode_attrs {
  * accessible.  Dereferencing s_elem or any other outer entity
  * requires s_active reference.
  */
- /*
+/*
 sysfs文件系统内的每个目录和文件都会有一个此结构
 */
 struct sysfs_dirent {
-	atomic_t		s_count;
-	atomic_t		s_active;
+	atomic_t		s_count;//节点的引用计数  当减到0 该节点释放
+	atomic_t		s_active;//该节点的活动引用计数
 	struct sysfs_dirent	*s_parent;//sysf内部文件系统 指向父对象
 	struct sysfs_dirent	*s_sibling;//指向兄弟对象
 	const char		*s_name; //目录或文件的名字
@@ -64,10 +64,10 @@ struct sysfs_dirent {
 		struct sysfs_elem_bin_attr	s_bin_attr;//对象属相 二进制文件
 	};
 
-	unsigned int		s_flags;//SYSFS_DIR
+	unsigned int		s_flags;//SYSFS_DIR 类型以及是否被删除
 	ino_t			s_ino;  //唯一标识
 	umode_t			s_mode; //访问权限
-	struct sysfs_inode_attrs *s_iattr;
+	struct sysfs_inode_attrs *s_iattr;//如果有非默认的inode属性 就需要设置此域
 };
 
 #define SD_DEACTIVATED_BIAS		INT_MIN

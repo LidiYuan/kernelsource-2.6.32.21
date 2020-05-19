@@ -673,10 +673,10 @@ extern int do_sysinfo(struct sysinfo *info);
 struct sysinfo {
 	long uptime;			/* Seconds since boot */
 	unsigned long loads[3];		/* 1, 5, and 15 minute load averages */
-	unsigned long totalram;		/* Total usable main memory size */
-	unsigned long freeram;		/* Available memory size */
+	unsigned long totalram;		/* Total usable main memory size -物理内存总容量，对应totalram_pages大小。*/
+	unsigned long freeram;		/* Available memory size 空闲内存容量，对应vm_stat[NR_FREE_PAGES]大小 */
 	unsigned long sharedram;	/* Amount of shared memory */
-	unsigned long bufferram;	/* Memory used by buffers */
+	unsigned long bufferram;	/* Memory used by buffers 块设备缓冲区大小*/
 	unsigned long totalswap;	/* Total swap space size */
 	unsigned long freeswap;		/* swap space still available */
 	unsigned short procs;		/* Number of current processes */

@@ -237,13 +237,19 @@ static int __init default_bdi_init(void)
 {
 	int err;
 
+	//创建名为sync_supers的线程 在下面的定时器回调函数sync_supers_timer_fn中将其唤醒
+	//每次醒来后 下刷系统super_blocks链表中所有元数据快信息
 	sync_supers_tsk = kthread_run(bdi_sync_supers, NULL, "sync_supers");
 	BUG_ON(IS_ERR(sync_supers_tsk));
 
+    //创建定时器
 	init_timer(&sync_supers_timer);
 	setup_timer(&sync_supers_timer, sync_supers_timer_fn, 0);
+
+    //设置定时器的时间
 	arm_supers_timer();
 
+	//下面创建bdi-defalut脏数据刷新管理线程
 	err = bdi_init(&default_backing_dev_info);
 	if (!err)
 		bdi_register(&default_backing_dev_info, NULL, "default");
@@ -378,12 +384,14 @@ static void sync_supers_timer_fn(unsigned long unused)
 	arm_supers_timer();
 }
 
+//bdi-default线程的执行体
 static int bdi_forker_task(void *ptr)
 {
 	struct bdi_writeback *me = ptr;
 
 	bdi_task_init(me->bdi, me);
 
+   //死循环  无任何退出条件
 	for (;;) {
 		struct backing_dev_info *bdi, *tmp;
 		struct bdi_writeback *wb;
@@ -400,20 +408,25 @@ static int bdi_forker_task(void *ptr)
 		/*
 		 * Check if any existing bdi's have dirty data without
 		 * a thread registered. If so, set that up.
-		 */
+		 *///遍历所有的bdi对象，检查这些bdi是否存在脏数据
 		list_for_each_entry_safe(bdi, tmp, &bdi_list, bdi_list) {
-			if (bdi->wb.task)
-				continue;
-			if (list_empty(&bdi->work_list) &&
-			    !bdi_has_dirty_io(bdi))
+
+			if (bdi->wb.task)//如果此bdi已经存在了自己的线程  则查找下一个
 				continue;
 
+			//如果此设备不需要执行脏数据刷新工作 则看下一个bdi
+			if (list_empty(&bdi->work_list) &&!bdi_has_dirty_io(bdi))
+				continue;
+
+			//走到此处说明 此bdi还没有执行线程 并且有脏数据要刷新
+			//将此bdi从bdi_list中删除 加入到bdi_pending_list中
 			bdi_add_default_flusher_task(bdi);
 		}
 
 		set_current_state(TASK_INTERRUPTIBLE);
-
-		if (list_empty(&bdi_pending_list)) {
+        
+		if (list_empty(&bdi_pending_list)) 
+		{
 			unsigned long wait;
 
 			spin_unlock_bh(&bdi_lock);
@@ -429,12 +442,16 @@ static int bdi_forker_task(void *ptr)
 		 * This is our real job - check for pending entries in
 		 * bdi_pending_list, and create the tasks that got added
 		 */
-		bdi = list_entry(bdi_pending_list.next, struct backing_dev_info,
-				 bdi_list);
+		// bdi_pending_list获得一个bdi
+		bdi = list_entry(bdi_pending_list.next, struct backing_dev_info,bdi_list);
+
+		//从bdi_pending_list删除
 		list_del_init(&bdi->bdi_list);
+		
 		spin_unlock_bh(&bdi_lock);
 
 		wb = &bdi->wb;
+		//为此bdi创建一个线程 执行体为bdi_start_fn  名字为flush-
 		wb->task = kthread_run(bdi_start_fn, wb, "flush-%s",
 					dev_name(bdi->dev));
 		/*
@@ -501,7 +518,9 @@ void static bdi_add_default_flusher_task(struct backing_dev_info *bdi)
 	 * bdi_add_default_flusher_task() occured, further additions will block
 	 * waiting for previous additions to finish.
 	 */
-	if (!test_and_set_bit(BDI_pending, &bdi->state)) {
+    //将此bdi从bdi_list中删除 加入到bdi_pending_list中
+	if (!test_and_set_bit(BDI_pending, &bdi->state)) 
+	{
 		list_del_rcu(&bdi->bdi_list);
 
 		/*
@@ -525,8 +544,8 @@ static void bdi_remove_from_list(struct backing_dev_info *bdi)
 	synchronize_rcu();
 }
 
-int bdi_register(struct backing_dev_info *bdi, struct device *parent,
-		const char *fmt, ...)
+//只有调用了此函数的设备才会有脏数据写入的功能
+int bdi_register(struct backing_dev_info *bdi, struct device *parent,const char *fmt, ...)
 {
 	va_list args;
 	int ret = 0;
@@ -543,6 +562,7 @@ int bdi_register(struct backing_dev_info *bdi, struct device *parent,
 		goto exit;
 	}
 
+	//将此bdi挂入到bdi_list中
 	spin_lock_bh(&bdi_lock);
 	list_add_tail_rcu(&bdi->bdi_list, &bdi_list);
 	spin_unlock_bh(&bdi_lock);
@@ -554,11 +574,13 @@ int bdi_register(struct backing_dev_info *bdi, struct device *parent,
 	 * and add other bdi's to the list. They will get a thread created
 	 * on-demand when they need it.
 	 */
-	if (bdi_cap_flush_forker(bdi)) {
+	//检查注册的是否为管理线程bdi-default 
+	if (bdi_cap_flush_forker(bdi)) 
+	{
 		struct bdi_writeback *wb = &bdi->wb;
 
-		wb->task = kthread_run(bdi_forker_task, wb, "bdi-%s",
-						dev_name(dev));
+		//bdi_forker_task是bdi-default内核进程的主体  
+		wb->task = kthread_run(bdi_forker_task, wb, "bdi-%s",dev_name(dev));
 		if (IS_ERR(wb->task)) {
 			wb->task = NULL;
 			ret = -ENOMEM;

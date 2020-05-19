@@ -170,7 +170,7 @@ static int kobject_add_internal(struct kobject *kobj)
 		return -EINVAL;
 	}
 
-	//增加父节点的引用计数
+	//增加父节点的引用计数 
 	parent = kobject_get(kobj->parent);
 
 	/* join kset if set, use it as parent if we do not already have one */
@@ -178,7 +178,10 @@ static int kobject_add_internal(struct kobject *kobj)
 	{
 		if (!parent)//若父节点为NULL则使用kobj->kset->kobj作为父节点
 			parent = kobject_get(&kobj->kset->kobj);//看bus_register()
+
+		//将对象加入到kset的链表中
 		kobj_kset_join(kobj);
+        //设置父对象
 		kobj->parent = parent;
 	}
 
@@ -188,6 +191,7 @@ static int kobject_add_internal(struct kobject *kobj)
 		 kobj->kset ? kobject_name(&kobj->kset->kobj) : "<NULL>");
 
 	error = create_dir(kobj);//利用kobj创建目录和属性文件 其中会判断，如果parent为NULL那么就在sysfs_root下创建 
+
 	if (error) 
 	{//如果创建失败。减少相关的引用计数
 		kobj_kset_leave(kobj);
@@ -305,12 +309,13 @@ static int kobject_add_varg(struct kobject *kobj, struct kobject *parent,
 {
 	int retval;
 
+   //设置kobject的名字
 	retval = kobject_set_name_vargs(kobj, fmt, vargs);
 	if (retval) {
 		printk(KERN_ERR "kobject: can not set name properly!\n");
 		return retval;
 	}
-	kobj->parent = parent;
+	kobj->parent = parent;//设置父对象
 	return kobject_add_internal(kobj);
 }
 

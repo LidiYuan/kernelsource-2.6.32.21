@@ -1089,7 +1089,8 @@ int __set_page_dirty_no_writeback(struct page *page)
  */
 void account_page_dirtied(struct page *page, struct address_space *mapping)
 {
-	if (mapping_cap_account_dirty(mapping)) {
+	if (mapping_cap_account_dirty(mapping)) 
+	{
 		__inc_zone_page_state(page, NR_FILE_DIRTY);
 		__inc_bdi_stat(mapping->backing_dev_info, BDI_RECLAIMABLE);
 		task_dirty_inc(current);

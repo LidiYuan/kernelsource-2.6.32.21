@@ -304,6 +304,7 @@ struct fuse_req {
  * destroyed, when the client device is closed and the filesystem is
  * unmounted.
  */
+ //代表了用户空间和内核的通信连接
 struct fuse_conn {
 	/** Lock protecting accessess to  members of this structure */
 	spinlock_t lock;

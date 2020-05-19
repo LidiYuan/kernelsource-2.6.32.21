@@ -709,6 +709,7 @@ static inline int hrtimer_enqueue_reprogram(struct hrtimer *timer,
 /*
  * Switch to high resolution mode
  */
+ //切换到高分辨率模式
 static int hrtimer_switch_to_hres(void)
 {
 	int cpu = smp_processor_id();
@@ -720,6 +721,7 @@ static int hrtimer_switch_to_hres(void)
 
 	local_irq_save(flags);
 
+    //初始化中断处理函数 设置为单触发模式
 	if (tick_init_highres()) 
 	{
 		local_irq_restore(flags);
@@ -731,9 +733,11 @@ static int hrtimer_switch_to_hres(void)
 	base->clock_base[CLOCK_REALTIME].resolution = KTIME_HIGH_RES;
 	base->clock_base[CLOCK_MONOTONIC].resolution = KTIME_HIGH_RES;
 
+	//激活时钟仿真层
 	tick_setup_sched_timer();
 
 	/* "Retrigger" the interrupt to get things going */
+   //对时钟事件设备重新编程 
 	retrigger_next_event(NULL);
 	local_irq_restore(flags);
 	return 1;
@@ -1025,6 +1029,7 @@ EXPORT_SYMBOL_GPL(hrtimer_start_range_ns);
  *  0 on success
  *  1 when the timer was active
  */
+ //设置定时器的到期时间 并启动定时器
 int
 hrtimer_start(struct hrtimer *timer, ktime_t tim, const enum hrtimer_mode mode)
 {
@@ -1069,6 +1074,7 @@ EXPORT_SYMBOL_GPL(hrtimer_try_to_cancel);
  *  0 when the timer was not active
  *  1 when the timer was active
  */
+ //删除一个定时器  若定时器 正在执行而无法停止 则返回-1  在这种情况下 此函数将一直等待
 int hrtimer_cancel(struct hrtimer *timer)
 {
 	for (;;) {
@@ -1171,8 +1177,9 @@ static void __hrtimer_init(struct hrtimer *timer, clockid_t clock_id,
  * @mode:	timer mode abs/rel
  */
  //hrtimer 进行初始化
-void hrtimer_init(struct hrtimer *timer, clockid_t clock_id,
-		  enum hrtimer_mode mode)
+void hrtimer_init(struct hrtimer *timer, 
+                         clockid_t clock_id, //目标时钟 CLOCK_REALTIME或者CLOCK_MONOTONIC
+		                 enum hrtimer_mode mode)
 {
 	debug_init(timer, clock_id, mode);
 	__hrtimer_init(timer, clock_id, mode);
@@ -1208,6 +1215,8 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	WARN_ON(!irqs_disabled());
 
 	debug_deactivate(timer);
+
+	//将定时器状态设置为HRTIMER_STATE_CALLBACK 表示回调函数将在下面立即处理
 	__remove_hrtimer(timer, base, HRTIMER_STATE_CALLBACK, 0);
 	timer_stats_account_hrtimer(timer);
 	fn = timer->function;
@@ -1228,11 +1237,13 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	 * we do not reprogramm the event hardware. Happens either in
 	 * hrtimer_start_range_ns() or in hrtimer_interrupt()
 	 */
-	if (restart != HRTIMER_NORESTART) {
+	 //是否要求重启定时器
+	if (restart != HRTIMER_NORESTART) 
+	{
 		BUG_ON(timer->state != HRTIMER_STATE_CALLBACK);
 		enqueue_hrtimer(timer, base);
 	}
-	timer->state &= ~HRTIMER_STATE_CALLBACK;
+	timer->state &= ~HRTIMER_STATE_CALLBACK;//清除HRTIMER_STATE_CALLBACK
 }
 
 #ifdef CONFIG_HIGH_RES_TIMERS
@@ -1241,6 +1252,7 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
  * High resolution timer interrupt
  * Called with interrupts disabled
  */
+ //高分辨率模式下的高分辨率定时器  
  //高精度时钟中断函数  若开启了hrtimer时钟事件对象中断处理函数被设置成此函数
 void hrtimer_interrupt(struct clock_event_device *dev)
 {
@@ -1269,13 +1281,16 @@ retry:
 
 	base = cpu_base->clock_base;
 
+    //遍历所有的时钟基础  单调时钟和实时时钟
 	for (i = 0; i < HRTIMER_MAX_CLOCK_BASES; i++) {
 		ktime_t basenow;
 		struct rb_node *node;
 
 		basenow = ktime_add(now, base->offset);
 
-		while ((node = base->first)) {
+        //获得到期的节点
+		while ((node = base->first)) 
+		{
 			struct hrtimer *timer;
 
 			timer = rb_entry(node, struct hrtimer, node);
@@ -1292,8 +1307,9 @@ retry:
 			 * are right-of a not yet expired timer, because that
 			 * timer will have to trigger a wakeup anyway.
 			 */
-
-			if (basenow.tv64 < hrtimer_get_softexpires_tv64(timer)) {
+            
+			if (basenow.tv64 < hrtimer_get_softexpires_tv64(timer)) 
+			{
 				ktime_t expires;
 
 				expires = ktime_sub(hrtimer_get_expires(timer),
@@ -1315,9 +1331,10 @@ retry:
 	cpu_base->expires_next = expires_next;
 	spin_unlock(&cpu_base->lock);
 
-	/* Reprogramming necessary ? */
+	/* Reprogramming necessary ? 有必要重新编程? */
 	if (expires_next.tv64 == KTIME_MAX ||
-	    !tick_program_event(expires_next, 0)) {
+	    !tick_program_event(expires_next, 0)) 
+	{
 		cpu_base->hang_detected = 0;
 		return;
 	}
@@ -1413,7 +1430,8 @@ static inline void __hrtimer_peek_ahead_timers(void) { }
  * not been done yet.
  */
 void hrtimer_run_pending(void)
-{
+{   
+    //处于高分辨率设备中 
 	if (hrtimer_hres_active())
 		return;
 
@@ -1425,12 +1443,14 @@ void hrtimer_run_pending(void)
 	 * check bit in the tick_oneshot code, otherwise we might
 	 * deadlock vs. xtime_lock.
 	 */
+	//检查系统中是否存在适用于高分辨率定时器的时钟事件设备 
 	if (tick_check_oneshot_change(!hrtimer_is_hres_enabled()))
 		hrtimer_switch_to_hres();
 }
 
 /*
  * Called from hardirq context every jiffy
+ *低分辨率模式下的高分辨率定时器(即系统没有高分辨率设备 由低分辨率设备提供高分辨率定时器)
  */
 void hrtimer_run_queues(void)
 {

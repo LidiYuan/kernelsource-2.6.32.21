@@ -7,6 +7,9 @@
 typedef unsigned long cputime_t;
 
 #define cputime_zero			(0UL)
+
+// 一个jiffy对应的cpu时间，一个jiffy对应1/HZ秒 
+//将一个时钟中断转换为处理器时间
 #define cputime_one_jiffy		jiffies_to_cputime(1)
 #define cputime_max			((~0UL >> 1) - 1)
 #define cputime_add(__a, __b)		((__a) +  (__b))

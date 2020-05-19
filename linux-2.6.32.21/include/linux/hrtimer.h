@@ -31,8 +31,8 @@ struct hrtimer_cpu_base;
  * Mode arguments of xxx_hrtimer functions:
  */
 enum hrtimer_mode {
-	HRTIMER_MODE_ABS = 0x0,		/* Time value is absolute */
-	HRTIMER_MODE_REL = 0x1,		/* Time value is relative to now */
+	HRTIMER_MODE_ABS = 0x0,		/* Time value is absolute  时间值是绝对的*/
+	HRTIMER_MODE_REL = 0x1,		/* Time value is relative to now 时间值是相当于当前时间的*/
 	HRTIMER_MODE_PINNED = 0x02,	/* Timer is bound to CPU */
 	HRTIMER_MODE_ABS_PINNED = 0x02,
 	HRTIMER_MODE_REL_PINNED = 0x03,
@@ -140,14 +140,15 @@ struct hrtimer_sleeper {
  * @softirq_time:	the time when running the hrtimer queue in the softirq
  * @offset:		offset of this clock to the monotonic base
  */
+ //时钟基础结构 HRTIMER_SOFTIRQ  用于高分辨率定时器
 struct hrtimer_clock_base {
-	struct hrtimer_cpu_base	*cpu_base;
-	clockid_t		index;
-	struct rb_root		active;//指向各自的红黑树
-	struct rb_node		*first;
+	struct hrtimer_cpu_base	*cpu_base;//指向该时钟基础所属的各cpu时钟基础结构
+	clockid_t		index; //用于区分单调时钟基础(系统启动从0开始) 还是实际时间 
+	struct rb_root		active;//所有活动定时器在该树中排序
+	struct rb_node		*first; //第一个到期的定时器
 	ktime_t			resolution;
 	ktime_t			(*get_time)(void);
-	ktime_t			softirq_time;
+	ktime_t			softirq_time;//记录软中断发出的时间 
 #ifdef CONFIG_HIGH_RES_TIMERS
 	ktime_t			offset;
 #endif
@@ -176,9 +177,9 @@ struct hrtimer_cpu_base {
 	struct hrtimer_clock_base	clock_base[HRTIMER_MAX_CLOCK_BASES];
 #ifdef CONFIG_HIGH_RES_TIMERS
 	ktime_t				expires_next; //指向两种hrtimer最先到期的树节点
-	int				hres_active;  //hrtimer高精度定时器是否活跃状态
+	int				hres_active;  //表示高分辨率是否启用 还是只启用了低分辨率
 	int				hang_detected;
-	unsigned long			nr_events;
+	unsigned long			nr_events;//发生中断的次数
 	unsigned long			nr_retries;
 	unsigned long			nr_hangs;
 	ktime_t				max_hang_time;
@@ -365,6 +366,7 @@ static inline int hrtimer_start_expires(struct hrtimer *timer,
 	return hrtimer_start_range_ns(timer, soft, delta, mode);
 }
 
+//重新启动一个取消的定时器
 static inline int hrtimer_restart(struct hrtimer *timer)
 {
 	return hrtimer_start_expires(timer, HRTIMER_MODE_ABS);

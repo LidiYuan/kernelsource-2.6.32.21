@@ -17,17 +17,19 @@
  * core should ever touch these fields.
  */
 struct bus_type_private {
-	struct kset subsys;//定义这个子系统 
+	struct kset subsys;//该总线的内嵌kset 对应/sys/bus下的某个子目录 即/sys/bus/xxx/目录 其中xxx为总线名 例如pci
 	
-	struct kset *drivers_kset;//bus上所有驱动的一个集合
-	struct kset *devices_kset;//bus上所有设备的一个集合
+	struct kset *drivers_kset;//bus上所有驱动的一个集合  指向了该总线下的driver目录对应的指针  即/sys/bus/xxx/drivers
+	struct kset *devices_kset;//bus上所有设备的一个集合  指向了该总线下的device目录对应的指针 即/sys/bus/xxx/device
 	
-	struct klist klist_devices;//用于遍历devices_kset的klist
-	struct klist klist_drivers;//用于遍历drivers_kset的klist
+	struct klist klist_devices;//这个总线类型的设备链表的表头
+	struct klist klist_drivers;//这个总线类型的驱动链表的表头
 	
-	struct blocking_notifier_head bus_notifier;
-	unsigned int drivers_autoprobe:1; //是否支持设备自动探测bus_add_driver()
-	struct bus_type *bus;
+	struct blocking_notifier_head bus_notifier;//总线类型变化通知链表的表头 调用bus_register_notifier或bus_unregister_notifier
+	                                           //总线类型中添加设备/驱动 总线类型移除设备/驱动  驱动绑定/驱动松绑
+	                                           
+	unsigned int drivers_autoprobe:1; //是否支持设备自动探测设备 bus_add_driver()
+	struct bus_type *bus; //指向属于的总线结构
 };
 
 struct driver_private {
@@ -57,7 +59,7 @@ struct driver_private {
  */
 struct class_private {
 	struct kset class_subsys;//代表class在sysfs中的位置
-	struct klist class_devices;//是class下的设备链表
+	struct klist class_devices;//是class下的设备链表  device{}->knode_class
 	struct list_head class_interfaces;//class 接口 class_interface 它允许class driver在class下有设备添加或移除的时候，调用预先设置好的回调函数
 	struct kset class_dirs;
 	struct mutex class_mutex;//用于保护class内部的数据结构
@@ -80,14 +82,17 @@ struct class_private {
  *
  * Nothing outside of the driver core should ever touch these fields.
  */
-struct device_private {
-	struct klist klist_children;
-	struct klist_node knode_parent;
-	struct klist_node knode_driver;
-	struct klist_node knode_bus;
-	void *driver_data;
-	struct device *device;
+ //device_private{}和device描述的是设备
+struct device_private 
+{
+	struct klist klist_children;//本设备孩子链表的表头
+	struct klist_node knode_parent;//连接到所属父设备的孩子链表的连接件
+	struct klist_node knode_driver;//driver_private{}->klist_devices  driver_private和device_driver描述的是驱动 连接到驱动
+	struct klist_node knode_bus; //bus_type_private{}->klist_devices  bus_type_private和bus_type描述的是总线 连接到所属于的总线
+	void *driver_data;//指向驱动私有数据指针
+	struct device *device;//指向所属于的设备
 };
+
 #define to_device_private_parent(obj)	\
 	container_of(obj, struct device_private, knode_parent)
 #define to_device_private_driver(obj)	\

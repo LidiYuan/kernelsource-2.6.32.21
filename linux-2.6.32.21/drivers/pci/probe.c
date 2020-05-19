@@ -91,11 +91,13 @@ static void release_pcibus_dev(struct device *dev)
 	kfree(pci_bus);
 }
 
+//sys/class/pci_bus  pcibus_class_init()
 static struct class pcibus_class = {
 	.name		= "pci_bus",
 	.dev_release	= &release_pcibus_dev,
 };
 
+//注册类 /sys/class/pci_bus 后续的pci核心代码将在该目录下为每条pci总线创建一个目录 目录名称####:## 对应总线域编号和总线编号
 static int __init pcibus_class_init(void)
 {
 	return class_register(&pcibus_class);
@@ -396,7 +398,8 @@ static struct pci_bus * pci_alloc_bus(void)
 }
 
 static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
-					   struct pci_dev *bridge, int busnr)
+					                                   struct pci_dev *bridge, 
+					                                   int busnr)
 {
 	struct pci_bus *child;
 	int i;
@@ -417,7 +420,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
 	 * now as the parent is not properly set up yet.  This device will get
 	 * registered later in pci_bus_add_devices()
 	 */
-	child->dev.class = &pcibus_class;
+	child->dev.class = &pcibus_class; //设置总线设备模型中的名字
 	dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
 
 	/*
@@ -439,7 +442,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
 		child->resource[i] = &bridge->resource[PCI_BRIDGE_RESOURCES+i];
 		child->resource[i]->name = child->name;
 	}
-	bridge->subordinate = child;
+	bridge->subordinate = child;//桥设备指向下一级总线
 
 	return child;
 }
@@ -448,9 +451,11 @@ struct pci_bus *__ref pci_add_new_bus(struct pci_bus *parent, struct pci_dev *de
 {
 	struct pci_bus *child;
 
+    //创建一个新的bus
 	child = pci_alloc_child_bus(parent, dev, busnr);
 	if (child) {
 		down_write(&pci_bus_sem);
+		//将条新总线加入到 父总线的总线链表中
 		list_add_tail(&child->node, &parent->children);
 		up_write(&pci_bus_sem);
 	}
@@ -483,6 +488,13 @@ static void pci_fixup_parent_subordinate_busnr(struct pci_bus *child, int max)
  * them, we proceed to assigning numbers to the remaining buses in
  * order to avoid overlaps between old and new bus numbers.
  */
+ /*
+   函数用于扫描pci 桥设备
+   bus: pci_bus描述符
+   dev:桥设备描述符
+   max:最大的总线编号
+   pass:扫描的轮次  第一次目的是比较  第二次目的是分配
+*/
 int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max, int pass)
 {
 	struct pci_bus *child;
@@ -491,14 +503,16 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 	u16 bctl;
 	int broken = 0;
 
+    //读取pci设备的主总线编号
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
 
 	dev_dbg(&dev->dev, "scanning behind bridge, config %06x, pass %d\n",
 		buses & 0xffffff, pass);
 
 	/* Check if setup is sensible at all */
-	if (!pass &&
-	    ((buses & 0xff) != bus->number || ((buses >> 8) & 0xff) <= bus->number)) {
+    //第一轮进行检测 之前BIOS可能配置过总线编号  检测是否正确,不正确的话需要重新配置
+	if (!pass && ((buses & 0xff) != bus->number || ((buses >> 8) & 0xff) <= bus->number)) 
+	{
 		dev_dbg(&dev->dev, "bus configuration invalid, reconfiguring\n");
 		broken = 1;
 	}
@@ -506,17 +520,20 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 	/* Disable MasterAbortMode during probing to avoid reporting
 	   of bus errors (in some architectures) */ 
 	pci_read_config_word(dev, PCI_BRIDGE_CONTROL, &bctl);
-	pci_write_config_word(dev, PCI_BRIDGE_CONTROL,
-			      bctl & ~PCI_BRIDGE_CTL_MASTER_ABORT);
+	pci_write_config_word(dev, PCI_BRIDGE_CONTROL, bctl & ~PCI_BRIDGE_CTL_MASTER_ABORT);
 
-	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus && !broken) {
+    //BIOS已经记录了配置空间  并且配置是有效的
+	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus && !broken) 
+	{
 		unsigned int cmax, busnr;
 		/*
 		 * Bus already configured by firmware, process it in the first
 		 * pass and just note the configuration.
 		 */
-		if (pass)
+		if (pass)//只有在第一次轮询的时候 才执行下面的代码
 			goto out;
+		
+		//获得次总线编号
 		busnr = (buses >> 8) & 0xFF;
 
 		/*
@@ -525,9 +542,12 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 		 *
 		 * However, we continue to descend down the hierarchy and
 		 * scan remaining child buses.
+		   检查桥设备引出的总线是否已经存在
 		 */
 		child = pci_find_bus(pci_domain_nr(bus), busnr);
-		if (!child) {
+		if (!child) //不存在 创建一个新的总线
+		{   
+		    //将子总线加入到父总线中
 			child = pci_add_new_bus(bus, dev, busnr);
 			if (!child)
 				goto out;
@@ -535,13 +555,15 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 			child->subordinate = (buses >> 16) & 0xFF;
 			child->bridge_ctl = bctl;
 		}
-
+        //扫描子总线 找到最大总线编号 
 		cmax = pci_scan_child_bus(child);
 		if (cmax > max)
 			max = cmax;
 		if (child->subordinate > max)
 			max = child->subordinate;
-	} else {
+	}
+	else 
+	{
 		/*
 		 * We need to assign a number to this bus which we always
 		 * do in the second pass.
@@ -560,12 +582,17 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 		}
 
 		/* Clear errors */
+		//清除桥配置空间以前可能的错误
 		pci_write_config_word(dev, PCI_STATUS, 0xffff);
 
 		/* Prevent assigning a bus number that already exists.
 		 * This can happen when a bridge is hot-plugged */
+        //我们要分配的编号为当前最大总线编号+1 
+        //线查询下max+1的编号是否已经分配出去了
 		if (pci_find_bus(pci_domain_nr(bus), max+1))
 			goto out;
+
+		//创建一个新的pci_bus 将总线编号设置为max+1
 		child = pci_add_new_bus(bus, dev, ++max);
 		buses = (buses & 0xff000000)
 		      | ((unsigned int)(child->primary)     <<  0)
@@ -576,7 +603,8 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 		 * yenta.c forces a secondary latency timer of 176.
 		 * Copy that behaviour here.
 		 */
-		if (is_cardbus) {
+		if (is_cardbus) 
+		{
 			buses &= ~0xff000000;
 			buses |= CARDBUS_LATENCY_TIMER << 24;
 		}
@@ -584,9 +612,11 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 		/*
 		 * We need to blast all three values with a single write.
 		 */
+		//将编号写入配置空间
 		pci_write_config_dword(dev, PCI_PRIMARY_BUS, buses);
 
-		if (!is_cardbus) {
+		if (!is_cardbus) 
+		{
 			child->bridge_ctl = bctl;
 			/*
 			 * Adjust subordinate busnr in parent buses.
@@ -596,13 +626,16 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 			 */
 			pci_fixup_parent_subordinate_busnr(child, max);
 			/* Now we can scan all subordinate buses... */
+			//对于pci桥设备进行递归扫描子总线
 			max = pci_scan_child_bus(child);
 			/*
 			 * now fix it up again since we have found
 			 * the real value of max.
 			 */
 			pci_fixup_parent_subordinate_busnr(child, max);
-		} else {
+		} 
+		else 
+		{
 			/*
 			 * For CardBus bridges, we leave 4 bus numbers
 			 * as cards with a PCI-to-PCI bridge can be
@@ -637,16 +670,19 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 		/*
 		 * Set the subordinate bus number to its real value.
 		 */
-		child->subordinate = max;
+		child->subordinate = max;//修改附属总线 走到此处说明已经递归出来 带回了此总线下的最大总线编号
+		//更新配置空间
 		pci_write_config_byte(dev, PCI_SUBORDINATE_BUS, max);
 	}
 
+	//设置总线名字
 	sprintf(child->name,
 		(is_cardbus ? "PCI CardBus %04x:%02x" : "PCI Bus %04x:%02x"),
 		pci_domain_nr(bus), child->number);
 
 	/* Has only triggered on CardBus, fixup is in yenta_socket */
-	while (bus->parent) {
+	while (bus->parent) 
+	{
 		if ((child->subordinate > bus->subordinate) ||
 		    (child->number > bus->subordinate) ||
 		    (child->number < bus->number) ||
@@ -726,23 +762,26 @@ static void set_pcie_hotplug_bridge(struct pci_dev *pdev)
  * Returns 0 on success and negative if unknown type of device (not normal,
  * bridge or CardBus).
  */
+ //通过从配置空间读取设备信息 对pci_dev进行填充
 int pci_setup_device(struct pci_dev *dev)
 {
 	u32 class;
 	u8 hdr_type;
 	struct pci_slot *slot;
 
+    //获得设备的头类型 pci普通设备或者pci桥设备
 	if (pci_read_config_byte(dev, PCI_HEADER_TYPE, &hdr_type))
 		return -EIO;
 
-	dev->sysdata = dev->bus->sysdata;
-	dev->dev.parent = dev->bus->bridge;
-	dev->dev.bus = &pci_bus_type;
-	dev->hdr_type = hdr_type & 0x7f;
+	dev->sysdata = dev->bus->sysdata; //保存总线特有的数据 pci_sysdata{}结构
+	dev->dev.parent = dev->bus->bridge;//设置设备的父设备 /sys/devices/pci####:##/
+	dev->dev.bus = &pci_bus_type; //指向设备总线类型
+	dev->hdr_type = hdr_type & 0x7f; //头类型
 	dev->multifunction = !!(hdr_type & 0x80);
 	dev->error_state = pci_channel_io_normal;
 	set_pcie_port_type(dev);
 
+    //在pci插槽总线的链表中查找插槽  若找到则记录到dev->slot中
 	list_for_each_entry(slot, &dev->bus->slots, list)
 		if (PCI_SLOT(dev->devfn) == slot->number)
 			dev->slot = slot;
@@ -751,20 +790,23 @@ int pci_setup_device(struct pci_dev *dev)
 	   set this higher, assuming the system even supports it.  */
 	dev->dma_mask = 0xffffffff;
 
-	dev_set_name(&dev->dev, "%04x:%02x:%02x.%d", pci_domain_nr(dev->bus),
-		     dev->bus->number, PCI_SLOT(dev->devfn),
-		     PCI_FUNC(dev->devfn));
+    //设置设备在kobj中的名字 在/sys/devices/pci####:##/####:##:##.#
+	dev_set_name(&dev->dev, "%04x:%02x:%02x.%d", pci_domain_nr(dev->bus), //域号
+	                                             dev->bus->number,  //总线号
+	                                             PCI_SLOT(dev->devfn), //槽号
+		                                         PCI_FUNC(dev->devfn)); //功能号
 
+    //从pci配置空间读取 设备的 类型和修正号
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class);
-	dev->revision = class & 0xff;
+	dev->revision = class & 0xff; //获得设备的修正号
 	class >>= 8;				    /* upper 3 bytes */
-	dev->class = class;
+	dev->class = class;  //获得设备的类型
 	class >>= 8;
 
 	dev_dbg(&dev->dev, "found [%04x:%04x] class %06x header type %02x\n",
 		 dev->vendor, dev->device, class, dev->hdr_type);
 
-	/* need to have dev->class ready */
+	/* need to have dev->class ready 获得配置空间长度*/
 	dev->cfg_size = pci_cfg_space_size(dev);
 
 	/* "Unknown power state" */
@@ -776,6 +818,7 @@ int pci_setup_device(struct pci_dev *dev)
 	class = dev->class >> 8;
 
 	switch (dev->hdr_type) {		    /* header type */
+    //pci 普通设备
 	case PCI_HEADER_TYPE_NORMAL:		    /* standard header */
 		if (class == PCI_CLASS_BRIDGE_PCI)
 			goto bad;
@@ -812,6 +855,7 @@ int pci_setup_device(struct pci_dev *dev)
 		}
 		break;
 
+    //pci桥设备
 	case PCI_HEADER_TYPE_BRIDGE:		    /* bridge header */
 		if (class != PCI_CLASS_BRIDGE_PCI)
 			goto bad;
@@ -824,6 +868,7 @@ int pci_setup_device(struct pci_dev *dev)
 		set_pcie_hotplug_bridge(dev);
 		break;
 
+    //pci cardbus设备
 	case PCI_HEADER_TYPE_CARDBUS:		    /* CardBus bridge header */
 		if (class != PCI_CLASS_BRIDGE_CARDBUS)
 			goto bad;
@@ -953,22 +998,32 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 	u32 l;
 	int delay = 1;
 
+	//读取bus总线配置空间中功能号为devfn的设备厂商id 并把返回值放到l中
+	//如果读取失败 则说明功能号没有对应的设备
 	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l))
 		return NULL;
 
+	//有些板子返回0 后者~0 如果slot是空的
 	/* some broken boards return 0 or ~0 if a slot is empty: */
 	if (l == 0xffffffff || l == 0x00000000 ||
 	    l == 0x0000ffff || l == 0xffff0000)
 		return NULL;
 
 	/* Configuration request Retry Status */
-	while (l == 0xffff0001) {
-		msleep(delay);
+    //返回状态说明设备还没有设备好需要重新读取配置空间
+	while (l == 0xffff0001) 
+	{
+		msleep(delay); //延迟段时间
 		delay *= 2;
+
+		//重新读取厂商id
 		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l))
 			return NULL;
+		
 		/* Card hasn't responded in 60 seconds?  Must be stuck. */
-		if (delay > 60 * 1000) {
+        //如果延迟时间已经增加到1分钟 但还是返回让重新读取 则返回失败
+		if (delay > 60 * 1000) 
+		{
 			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not "
 					"responding\n", pci_domain_nr(bus),
 					bus->number, PCI_SLOT(devfn),
@@ -977,15 +1032,18 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 		}
 	}
 
+    //分配一个pci_dev
 	dev = alloc_pci_dev();
 	if (!dev)
 		return NULL;
 
-	dev->bus = bus;
-	dev->devfn = devfn;
-	dev->vendor = l & 0xffff;
-	dev->device = (l >> 16) & 0xffff;
+    //对pci_dev进行初始化
+	dev->bus = bus;//关联到所属于的总线
+	dev->devfn = devfn;//设置 设备/功能号
+	dev->vendor = l & 0xffff; //厂商id 
+	dev->device = (l >> 16) & 0xffff;//设备id
 
+    //从设备配置空间中读取设备的配置信息 放到pci_dev中
 	if (pci_setup_device(dev)) {
 		kfree(dev);
 		return NULL;
@@ -1047,20 +1105,25 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 	up_write(&pci_bus_sem);
 }
 
+//扫描槽上的某个逻辑设备,如果此槽上此逻辑设备没有被使用则返回0
 struct pci_dev *__ref pci_scan_single_device(struct pci_bus *bus, int devfn)
 {
 	struct pci_dev *dev;
 
+    //检测是否此逻辑设备是否已经加入到总线的设备链表中pci_bus{}.devices
 	dev = pci_get_slot(bus, devfn);
-	if (dev) {
+	if (dev) 
+	{
 		pci_dev_put(dev);
 		return dev;
 	}
 
+	//读取pci配置空间看此功能号的设备是否存在  存在的话申请一个pci_dev并对其进行初始化，成功后返回pci_dev结构指针
 	dev = pci_scan_device(bus, devfn);
-	if (!dev)
+	if (!dev) 
 		return NULL;
 
+    //将逻辑设备加入到总线的设备链表中
 	pci_device_add(dev, bus);
 
 	return dev;
@@ -1078,33 +1141,48 @@ EXPORT_SYMBOL(pci_scan_single_device);
  *
  * Returns the number of new devices found.
  */
+ /*
+此函数扫描 总线下devfn号槽下的所有功能(最多8个),将逻辑设备加入到总线的设备链表中
+返回发现的逻辑设备的个数
+*/
 int pci_scan_slot(struct pci_bus *bus, int devfn)
 {
 	int fn, nr = 0;
 	struct pci_dev *dev;
 
+   //扫描到此槽上的第一个逻辑设备 如果此槽上没有逻辑设备 则返回0
 	dev = pci_scan_single_device(bus, devfn);
-	if (dev && !dev->is_added)	/* new device? */
+	if (dev && !dev->is_added)	/* new device?  如果发现了设备 并且此设备还没有被加入到系统*/
 		nr++;
 
-	if (dev && dev->multifunction) {
-		for (fn = 1; fn < 8; fn++) {
+	//如果逻辑设备找到  并且是多功能物理设备的一个功能
+	if (dev && dev->multifunction) 
+	{
+	    //循环处理其他功能号
+		for (fn = 1; fn < 8; fn++) 
+	    {   
+	        //返回非0 表示fn这个功能号正在使用
 			dev = pci_scan_single_device(bus, devfn + fn);
-			if (dev) {
+			if (dev) 
+			{
 				if (!dev->is_added)
 					nr++;
-				dev->multifunction = 1;
+				dev->multifunction = 1;//将此逻辑设备标记为多功能设备的一部分
 			}
 		}
 	}
+
+    //到此此槽上的所有功能号都扫描完毕 存在并且未加入到系统中功能号个数为nr
+
 
 	/* only one slot has pcie device */
 	if (bus->self && nr)
 		pcie_aspm_init_link_state(bus->self);
 
-	return nr;
+	return nr; //返回逻辑设备的个数
 }
 
+//扫描bus这条总线 返回bus这条总线下最大的总线编号  采用递归 进行深度优先策略进行搜索
 unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 {
 	unsigned int devfn, pass, max = bus->secondary;
@@ -1113,6 +1191,8 @@ unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 	pr_debug("PCI: Scanning bus %04x:%02x\n", pci_domain_nr(bus), bus->number);
 
 	/* Go find them, Rover! */
+	//每条总线最多32个槽 每个槽最多8个功能(32 *8=0x100), 这里的槽是具体的物理设备
+	//此处步数位8,按槽来进行扫描  每次扫描一个槽
 	for (devfn = 0; devfn < 0x100; devfn += 8)
 		pci_scan_slot(bus, devfn);
 
@@ -1131,11 +1211,17 @@ unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 			bus->is_added = 1;
 	}
 
+	//对桥设备的处理分为两轮进行处理
+	/*
+        第一轮扫描的目的是想知道总线编号用到了多大
+        第二轮扫描的目的是这个总线编号上继续分配
+	*/
 	for (pass=0; pass < 2; pass++)
-		list_for_each_entry(dev, &bus->devices, bus_list) {
+		list_for_each_entry(dev, &bus->devices, bus_list) 
+	{
 			if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE ||
 			    dev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
-				max = pci_scan_bridge(bus, dev, max, pass);
+				max = pci_scan_bridge(bus, dev, max, pass); //对这个总线上的桥设备或 cardBus设备  进行扫描
 		}
 
 	/*
@@ -1150,62 +1236,82 @@ unsigned int __devinit pci_scan_child_bus(struct pci_bus *bus)
 	return max;
 }
 
+//创建根pci总线
 struct pci_bus * pci_create_bus(struct device *parent,
-		int bus, struct pci_ops *ops, void *sysdata)
+		                                int bus, struct pci_ops *ops, void *sysdata)
 {
 	int error;
 	struct pci_bus *b;
 	struct device *dev;
 
+    //分配一个pci_bus
 	b = pci_alloc_bus();
 	if (!b)
 		return NULL;
 
+	//为根总线创建也给虚拟的驱动模型设备
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev){
 		kfree(b);
 		return NULL;
 	}
 
-	b->sysdata = sysdata;
-	b->ops = ops;
+	b->sysdata = sysdata;//pci_sysdata{}
+	b->ops = ops;//&pci_root_ops
 
-	if (pci_find_bus(pci_domain_nr(b), bus)) {
+	//因为可能通过另一个不同的桥设备到达了这条总线 如果设这样 就放弃扫描
+	if (pci_find_bus(pci_domain_nr(b), bus)) 
+	{
 		/* If we already got to this bus through a different bridge, ignore it */
 		pr_debug("PCI: Bus %04x:%02x already known\n", pci_domain_nr(b), bus);
 		goto err_out;
 	}
 
-    //创建的总线加入链表 
+    //创建的根总线加入链表 
 	down_write(&pci_bus_sem);
 	list_add_tail(&b->node, &pci_root_buses);
 	up_write(&pci_bus_sem);
 
+    //初始化虚拟设备
 	dev->parent = parent;
 	dev->release = pci_release_bus_bridge_dev;
 	dev_set_name(dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+
+    //注册设备 这个设备被挂到/sys/devices/pcixxxx:xx
 	error = device_register(dev);
 	if (error)
 		goto dev_reg_err;
+	//根总线的bridege指向一个虚拟设备 名字为pcixxxx:xx
 	b->bridge = get_device(dev);
 
 	if (!parent)
 		set_dev_node(b->bridge, pcibus_to_node(b));
 
-	b->dev.class = &pcibus_class;
+    //初始化类设备模型
+	b->dev.class = &pcibus_class;//pcibus_class_init()
 	b->dev.parent = b->bridge;
+	//内嵌类设备描述符的名字为####:## 在文件系统中的位置为/sys/devices/pcixxxx:xx/pci_bus/####:## 
+	//为什么会放到这个目录 看get_device_parent()
+	//由于b->dev.class设置为pcibus_class  下面的设备注册还会在/sys/class/pci_bus/下创建名字为####:##的连接 连接到/sys/devices/pcixxxx:xx/pci_bus/####:## 
 	dev_set_name(&b->dev, "%04x:%02x", pci_domain_nr(b), bus);
 	error = device_register(&b->dev);
 	if (error)
 		goto class_dev_reg_err;
+
+	//创建属性文件cpuaffinity 
 	error = device_create_file(&b->dev, &dev_attr_cpuaffinity);
 	if (error)
 		goto dev_create_file_err;
 
-	/* Create legacy_io and legacy_mem files for this bus */
+	/* Create legacy_io and legacy_mem files for this bus 
+      创建二进制属性文件legacy_io和legacy_mem
+	*/
 	pci_create_legacy_files(b);
 
+    //设置总线编号和次总线编号都设置为bus
 	b->number = b->secondary = bus;
+
+	//为以后的资源分配做准备
 	b->resource[0] = &ioport_resource;
 	b->resource[1] = &iomem_resource;
 
@@ -1230,9 +1336,10 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent,
 {
 	struct pci_bus *b;
 
+	//为这条总线创建也给pci_bus结构
 	b = pci_create_bus(parent, bus, ops, sysdata);
 	if (b)
-		b->subordinate = pci_scan_child_bus(b);
+		b->subordinate = pci_scan_child_bus(b);//对b这个总线进行扫描
 	return b;
 }
 EXPORT_SYMBOL(pci_scan_bus_parented);

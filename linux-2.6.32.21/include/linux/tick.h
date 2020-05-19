@@ -11,8 +11,8 @@
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
 
 enum tick_device_mode {
-	TICKDEV_MODE_PERIODIC,
-	TICKDEV_MODE_ONESHOT,
+	TICKDEV_MODE_PERIODIC,//周期模式
+	TICKDEV_MODE_ONESHOT,//单触发模式
 };
 
 //每一个cpu都有一个tick_device
@@ -22,9 +22,9 @@ struct tick_device {
 };
 
 enum tick_nohz_mode {
-	NOHZ_MODE_INACTIVE,
-	NOHZ_MODE_LOWRES,
-	NOHZ_MODE_HIGHRES,
+	NOHZ_MODE_INACTIVE, //周期时钟处于活动状态
+	NOHZ_MODE_LOWRES, //动态时钟基于低分辨率
+	NOHZ_MODE_HIGHRES,//动态时钟基于高分辨率
 };
 
 /**
@@ -46,25 +46,25 @@ enum tick_nohz_mode {
  * @sleep_length:	Duration of the current idle sleep
  */
 struct tick_sched {
-	struct hrtimer			sched_timer;
-	unsigned long			check_clocks;
-	enum tick_nohz_mode		nohz_mode;
+	struct hrtimer			sched_timer;   //实现时钟的定时器
+	unsigned long			check_clocks;  
+	enum tick_nohz_mode		nohz_mode; //动态时钟模式
 	ktime_t				idle_tick;
 	int				inidle;
-	int				tick_stopped;
-	unsigned long			idle_jiffies;
-	unsigned long			idle_calls;
-	unsigned long			idle_sleeps;
+	int				tick_stopped; //周期时钟已经停用则此值为1
+	unsigned long			idle_jiffies;//禁用周期时钟时候的jiffies
+	unsigned long			idle_calls;//内核试图停用周期时钟的次数
+	unsigned long			idle_sleeps;//实际停用周期时钟成功的次数
 	int				idle_active;
 	ktime_t				idle_entrytime;
 	ktime_t				idle_waketime;
 	ktime_t				idle_exittime;
-	ktime_t				idle_sleeptime;
+	ktime_t				idle_sleeptime;//存储了周期时钟上一次禁用的准确时间
 	ktime_t				idle_lastupdate;
-	ktime_t				sleep_length;
+	ktime_t				sleep_length;//存储了周期时钟将禁用的时间长度
 	unsigned long			last_jiffies;
-	unsigned long			next_jiffies;
-	ktime_t				idle_expires;
+	unsigned long			next_jiffies;//存储了下一个定时器到期时间的jiffies
+	ktime_t				idle_expires;//存储了下一个将到期经典定时器的到期时间
 };
 
 extern void __init tick_init(void);

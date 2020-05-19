@@ -147,7 +147,7 @@ typedef __s64	Elf64_Sxword;
 #define STT_NOTYPE  0//未知类型符号
 #define STT_OBJECT  1//该符号是个数据对象，比如变量、数组等
 #define STT_FUNC    2//该符号是个函数或其他可执行代码
-#define STT_SECTION 3//该符号表示一个段，这种符号必须是STB_LOCAL的
+#define STT_SECTION 3//该符号表示一个段，这种符号必须是STB_LOCAL的 表示下标为ndx的段的段名
 #define STT_FILE    4//该符号表示文件名，一般都是该目标文件所对应的源文件名，它一定是STB_LOCAL类型的，
 					 //并且它的st_shndx一定是SHN_ABS
 #define STT_COMMON  5 //未初始化的全局变量
@@ -180,6 +180,26 @@ typedef struct dynamic{
   } d_un;
 } Elf32_Dyn;
 
+//对应段 .dynamic段 动态链接
+/*
+这个段保存动态连接器所需要的基本信息比如依赖那些共享对象,动态链接符号表的位置 动态链接重定位表的位置
+共享对象初始化代码的位置等 
+*/
+
+/*
+d_tag           d_un
+DT_SYMTAB       d_ptr 表示.dynsym的地址
+DT_STRTAB       d_ptr表示 .dynstr的地址
+DT_STRSZ        d_val动态链接字符串表大小
+DT_HASH         d_ptr动态链接HASH表的地址 .hash
+DT_SONAME       本共享对象的SO name
+DT_RPATH        动态链接共享对象搜索路径
+DT_INIT         初始化代码
+DT_FINIT        结束代码地址
+DT_NEED         依赖的共享对象文件d_ptr 表示所依赖的共享对象文件名
+DT_REL
+DT_RELA         动态链接重定位表地址
+*/
 typedef struct {
   Elf64_Sxword d_tag;		/* entry tag value 控制下面消息的类型*/
   union {
@@ -202,7 +222,14 @@ typedef struct elf32_rel {
 } Elf32_Rel;
 
 typedef struct elf64_rel {
-  Elf64_Addr r_offset;	/* Location at which to apply the action */
+	                    //对可重定位文件 此值为所要修正位置的第一个字节相对于段起始的偏移
+	                    //对于可执行文件或共享对象文件此值为所要修正位置的第一个字节的虚拟地址
+  Elf64_Addr r_offset;	/* Location at which to apply the action 重定位入口的偏移*/
+
+						/*
+                            重定位入口的类型和符号 低8位表示重定位入口的类型 (R_386_32)
+                            高24位表示重定位入口的符号在符号表中的下标
+						*/
   Elf64_Xword r_info;	/* index and type of relocation */
 } Elf64_Rel;
 
@@ -212,9 +239,15 @@ typedef struct elf32_rela{
   Elf32_Sword	r_addend;
 } Elf32_Rela;
 
-//重定位表
+//重定位表 每个被重定位的地方叫重定位入口
+/*objdump -r xx
+RELOCATION RECORDS FOR [.text]:
+OFFSET            TYPE              VALUE 
+0000000000000018  R_X86_64_PC32     shared-0x0000000000000004
+0000000000000029  R_X86_64_PC32     add-0x0000000000000004
+*/
 typedef struct elf64_rela {
-  Elf64_Addr r_offset;	/* Location at which to apply the action */
+  Elf64_Addr r_offset;	/* Location at which to apply the action 相对于段的偏移值*/
   Elf64_Xword r_info;	/* R_X86_64_64 index and type of relocation 该字段指明重定位所作用的符号表索引和重定位的类型*/
   Elf64_Sxword r_addend;	/* Constant addend used to compute value */
 } Elf64_Rela;
@@ -245,7 +278,13 @@ typedef struct elf64_sym {
 							但是如果符号不是定义在本目标文件中，或者对于有些特殊符号，
 							sh_shndx的值有些特殊(SHN_ABS)
   							*/
-  
+
+
+/*
+      对于st_shndx不是SHN_COMMON  则st_value 表示该符号在段中的偏移,即st_shndx指定段 st_value指定在段的偏移
+      对于st_shndx 是SHN_COMMON   则st_value 表示该符号的对齐属性
+      在可执行文件中 st_value表示符号的虚拟地址
+*/							
   Elf64_Addr st_value;		/* Value of the symbol  符号相对应的值。这个值跟符号有关，可能
 							是一个绝对值，也可能是一个地址等，不同的符号，
 							它所对应的值含义不同*/
@@ -261,7 +300,7 @@ typedef struct elf64_sym {
 
 typedef struct elf32_hdr{
   unsigned char	e_ident[EI_NIDENT];         //0
-  Elf32_Half	e_type;                     //16   
+  Elf32_Half	e_type;                     //16   ET_EXEC
   Elf32_Half	e_machine; //EM_NONE          //18
   Elf32_Word	e_version;                  //20 
   Elf32_Addr	e_entry;  /* Entry point */ //24 
@@ -277,10 +316,10 @@ typedef struct elf32_hdr{
 } Elf32_Ehdr;
 
 typedef struct elf64_hdr {
-  unsigned char	e_ident[EI_NIDENT];	/* ELF "magic number" */
-  Elf64_Half e_type;//执行文件 重定位文件(.o) 共享文件(.so)
-  Elf64_Half e_machine;//机器类型 //EM_NONE
-  Elf64_Word e_version;//文件版本 EV_CURRENT
+  unsigned char	e_ident[EI_NIDENT];	   /*ELF "magic number" 看下面的ELFMAG0  0~3:\0x75'E'L''F'  4:文件类型(32位1或者64位2 为0表示非法) 5:数据编码格式(大端还是小端) 6:文件版本(EV_CURRENT) 7:补齐字节起始位置(为0)	16：e_ident数组大小(为0) */
+  Elf64_Half e_type;               //执行文件 重定位文件(.o) 共享文件(.so)
+  Elf64_Half e_machine;            //机器类型 //EM_NONE
+  Elf64_Word e_version;            //文件版本 EV_CURRENT
   Elf64_Addr e_entry;		/* 程序入口虚拟地址 Entry point virtual address */
   Elf64_Off e_phoff;		/* 程序头部表偏移 Program header table file offset */
   Elf64_Off e_shoff;		/* 节区头部表偏移 Section header table file offset */
@@ -313,13 +352,15 @@ typedef struct elf32_phdr{
 
 //段表项
 typedef struct elf64_phdr {
-  Elf64_Word p_type;//类型 具体看PT_LOAD
+  Elf64_Word p_type;//类型 具体看 PT_LOAD
   Elf64_Word p_flags;//PF_R 读 写 执行
   Elf64_Off p_offset;		/* Segment file offset  段相对于文件的索引地址*/
   Elf64_Addr p_vaddr;		/* Segment virtual address 段在内存中的虚拟地址*/
   Elf64_Addr p_paddr;		/* Segment physical address 段的物理地址*/
+
   Elf64_Xword p_filesz;		/* Segment size in file  段在文件中所占的长度*/
   Elf64_Xword p_memsz;		/* Segment size in memory  段在内存中所占的长度*/
+
   Elf64_Xword p_align;		/* Segment alignment, file & memory 字节对其,p_vaddr 和 p_offset 对 p_align 取模后应该相等*/
 } Elf64_Phdr;
 
@@ -344,8 +385,8 @@ typedef struct elf64_phdr {
 
 /* sh_flags */
 #define SHF_WRITE	0x1 //节区包含进程执行过程中将可写的数据
-#define SHF_ALLOC	0x2 //此节区在进程执行过程中占用内存
-#define SHF_EXECINSTR	0x4 //节区包含可执行的机器指令
+#define SHF_ALLOC	0x2 //该段在进程空间中必须分配内存 
+#define SHF_EXECINSTR	0x4 //表示该段在进程空间中可以被执行 一般为代码段
 #define SHF_MASKPROC	0xf0000000//所有包含于此掩码中的四位都用于处理器专用的语义
 
 #if 0 
@@ -365,13 +406,13 @@ typedef struct elf64_phdr {
 #define SHN_LORESERVE	0xff00
 #define SHN_LOPROC	0xff00
 #define SHN_HIPROC	0xff1f
-#define SHN_ABS		0xfff1//表示该符号包含一个绝对的 (absolute) 值 (往往是一个地址)，不受重定位影响
+#define SHN_ABS		0xfff1//表示该符号包含一个绝对的 (absolute) 值 (往往是一个地址)，不受重定位影响  如文件名
 #define SHN_COMMON	0xfff2//表示该符号是一个 common 符号，通常未初始化的全局变量就是该类型的符号
 #define SHN_HIRESERVE	0xffff
  
 typedef struct {
   Elf32_Word	sh_name;
-  Elf32_Word	sh_type;
+  Elf32_Word	sh_type; //类型 SHT_NULL
   Elf32_Word	sh_flags;
   Elf32_Addr	sh_addr;
   Elf32_Off	    sh_offset;
@@ -385,13 +426,27 @@ typedef struct {
 //节表项
 typedef struct elf64_shdr {
   Elf64_Word sh_name;	/* Section name, index in string tbl (段名，位于一个叫“.shstrtab”的字符串表索引)*/
-  Elf64_Word sh_type;	/* Type of section 节的类型 如SHT_PROGBITS*/
+  Elf64_Word sh_type;	/* Type of section 节的类型 如 SHT_PROGBITS*/
   Elf64_Xword sh_flags;		/* Miscellaneous section attributes段的标志位，如SHF_WRITE 指出了该段在进程虚拟空间中的属性 */
   Elf64_Addr sh_addr;		/* Section virtual addr at execution 段在被加载后在进程地址空间中的虚拟地址，当段不能被加载时，它为0*/
   Elf64_Off sh_offset;		/* Section file offset 段在elf文件中的偏移，如果该段不存在于文件中，则它无意义*/
   Elf64_Xword sh_size;		/* Size of section in bytes 段的长度 */
+
+
+  /*
+    sh_type                  sh_link                                   sh_info
+    SHT_DYNAMIC              该段所使用的字符串表在段表中的下标        0
+    SHT_HASH                 该段使用的符号表在段表中的下标            0
+    SHT_REL                  同下                                      同下
+    SHT_RELA                 该段所使用的相应符号表在段表中的下标      该重定位表所作用的段在段表中的下标
+    SHT_SYMTAB               同下                                      同下
+    SHT_DYNSYM               操作系统相关                              操作系统相关
+  */
+  
   Elf64_Word sh_link;		/* Index of another section 段的链接信息*/
   Elf64_Word sh_info;		/* Additional section information 段的链接信息*/
+
+
   Elf64_Xword sh_addralign;	/* Section alignment 	段地址对齐*/
   Elf64_Xword sh_entsize;	/* Entry size if section holds table 项的长度，有的段包含一些固定大小的项，比如符号表，sh_enrsize就是用来指示这些项的大小*/
 } Elf64_Shdr;
@@ -418,6 +473,7 @@ other					SHN_UNDEF								0
 #define	ELFMAG1		'E'
 #define	ELFMAG2		'L'
 #define	ELFMAG3		'F'
+
 #define	ELFMAG		"\177ELF" // '\'后跟的为8进制  也可以\xhh \x后跟16进制  \177 是ASCII中的 DEL
 #define	SELFMAG		4
 

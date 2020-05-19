@@ -55,29 +55,38 @@ extern struct pci_ops pci_root_ops;
 /* pci-irq.c */
 
 struct irq_info {
-	u8 bus, devfn;			/* Bus, device and function */
+	u8 bus,             //总线编号
+	   devfn;			 /* Bus, device and function 中断路由器所在的插槽/功能号*/
 	struct {
-		u8 link;		/* IRQ line ID, chipset dependent,
-					   0 = not routed */
-		u16 bitmap;		/* Available IRQs */
-	} __attribute__((packed)) irq[4];
-	u8 slot;			/* Slot number, 0=onboard */
-	u8 rfu;
+		u8 link;		 /* IRQ line ID, chipset dependent, 链路值 依赖于芯片组 0表示未路由
+					        0 = not routed */
+		u16 bitmap;		 /* Available IRQs 允许使用的irq位图*/
+	} __attribute__((packed)) irq[4]; //每个插槽有INTA#-INTD#四个中断引脚
+	u8 slot;			/* Slot number, 0=onboard 1表示母版上的一个物理插槽  0表示这个插槽是主板上的集成设备*/
+	u8 rfu;        //保留
 } __attribute__((packed));
 
+
+/*中断路由表*/
 struct irq_routing_table {
-	u32 signature;			/* PIRQ_SIGNATURE should be here */
-	u16 version;			/* PIRQ_VERSION */
-	u16 size;			/* Table size in bytes */
-	u8 rtr_bus, rtr_devfn;		/* Where the interrupt router lies */
-	u16 exclusive_irqs;		/* IRQs devoted exclusively to
-					   PCI usage */
-	u16 rtr_vendor, rtr_device;	/* Vendor and device ID of
-					   interrupt router */
-	u32 miniport_data;		/* Crap */
-	u8 rfu[11];
-	u8 checksum;			/* Modulo 256 checksum must give 0 */
-	struct irq_info slots[0];
+	u32 signature;			/* PIRQ_SIGNATURE should be here 签名*/
+	u16 version;			/* PIRQ_VERSION 版本号 必须为1.0*/
+	u16 size;			/* Table size in bytes 以字节为单位的表长度*/
+	u8 rtr_bus,            //中断路由器所在的总线编号 
+	   rtr_devfn;		/* Where the interrupt router lies 
+                          //中断路由器所在的插槽/功能号
+	                      */
+	u16 exclusive_irqs;		/* IRQs devoted exclusively to PCI usage 排他性irq位图
+                               一共16位  每位对应一个irq号(8259a级联 一共16个)  若有个位置1说明 该irq号被专用 不能共享 对应的惩罚量加100(看pirq_penalty)
+                               对应的代码在pcibios_irq_init
+						    
+	u16 rtr_vendor,   //中断路由器的厂商id
+		rtr_device;	/* Vendor and device ID of
+					   interrupt router 中断路由器的设备id*/
+	u32 miniport_data;		/* Crap 没有被用到*/
+	u8 rfu[11];       //保留将来使用
+	u8 checksum;			/* Modulo 256 checksum must give 0  校验和*/
+	struct irq_info slots[0]; //中断路由表项  每个pci插槽占有一项
 } __attribute__((packed));
 
 extern unsigned int pcibios_irq_mask;

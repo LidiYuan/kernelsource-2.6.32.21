@@ -421,6 +421,8 @@ static noinline void __init_refok rest_init(void)
 	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
 
 	numa_default_policy();
+
+	//创建pid 2号的进程  用于创建内核线程
 	pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
 
 	kthreadd_task = find_task_by_pid_ns(pid, &init_pid_ns);
@@ -436,6 +438,7 @@ static noinline void __init_refok rest_init(void)
 	preempt_disable();
 
 	/* Call into cpu_idle with preempt disabled */
+	//0号进程用于进程的调度
 	cpu_idle();
 }
 
@@ -602,6 +605,16 @@ asmlinkage void __init start_kernel(void)
 	pidhash_init();
 	vfs_caches_init_early();
 	sort_main_extable();
+
+	//cpu的程序状态子psw寄存器中保存中断码，中断屏蔽位,在x86中psw寄存器由 EFLAGS和EIP组成
+	/*
+      中断分为:  外中断, 外设发出的(包括 可屏蔽和不可屏蔽) ,需要快速处理  不能被阻塞
+               内中断(异常或同步中断) 来自处理器内部     ,处于进程上下文  可疑被阻塞
+               								有可分fault 
+               								      trap
+      异常中可能会被中断嵌入, 但中断不会被异常打断              
+               
+	*/
 	trap_init();//挂接中断向量和中断处理函数(内部中断) 存在于中断向量表中
 
 	/*
@@ -980,6 +993,7 @@ static int __init kernel_init(void * unused)
 	 * we're essentially up and running. Get rid of the
 	 * initmem segments and start the user-mode stuff..
 	 */
+	//启动一号进程 init
     //释放一些标记为__init的内存
 	init_post();
 	return 0;

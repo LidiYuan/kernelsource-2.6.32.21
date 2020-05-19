@@ -237,7 +237,7 @@ alloc_holder:
 	spin_unlock(&event->lock);
 	mutex_unlock(&group->notification_mutex);
 
-	wake_up(&group->notification_waitq);
+	wake_up(&group->notification_waitq);// ╩╫пя╣х╢Щ╤сап
 	return ret;
 }
 

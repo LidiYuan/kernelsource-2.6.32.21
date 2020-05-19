@@ -34,7 +34,7 @@ struct linux_binprm{
 	struct page *page[MAX_ARG_PAGES];
 #endif
 	struct mm_struct *mm;
-	unsigned long p; /* current top of mem 当前内存页最高地址*/
+	unsigned long p; /* current top of mem 当前内存最高地址*/
 	unsigned int
 		cred_prepared:1,/* true if creds already prepared (multiple
 				 * preps happen for interpreters) */

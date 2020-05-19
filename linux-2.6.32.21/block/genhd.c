@@ -547,6 +547,7 @@ static int exact_lock(dev_t devt, void *data)
  //向系统中添加一个块设备  添加分区信息到内核列表中
 void add_disk(struct gendisk *disk)
 {
+    //用于设备脏数据的刷新
 	struct backing_dev_info *bdi;
 	dev_t devt;
 	int retval;
@@ -586,10 +587,11 @@ void add_disk(struct gendisk *disk)
 	//对disk请求队列进行初始化
 	blk_register_queue(disk);
 
+    //用于以后此设备上脏数据的写入
 	bdi = &disk->queue->backing_dev_info;
-	bdi_register_dev(bdi, disk_devt(disk));
-	retval = sysfs_create_link(&disk_to_dev(disk)->kobj, &bdi->dev->kobj,
-				   "bdi");
+	//将bdi加入到链表bdi_list中
+	bdi_register_dev(bdi, disk_devt(disk));	
+	retval = sysfs_create_link(&disk_to_dev(disk)->kobj, &bdi->dev->kobj,"bdi");
 	WARN_ON(retval);
 }
 

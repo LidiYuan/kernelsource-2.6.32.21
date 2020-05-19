@@ -95,18 +95,24 @@ void pci_update_resource(struct pci_dev *dev, int resno)
 		resno, (unsigned long long)region.start,
 		(unsigned long long)region.end, res->flags);
 }
-
+/*
+dev:指向pci桥设备的指针
+resource：要认领的资源在资源数组中的索引
+认领成功返回0
+所谓认领和保留是一个含义 就是检查BIOS记录的资源窗口是否有效
+*/
 int pci_claim_resource(struct pci_dev *dev, int resource)
 {
 	struct resource *res = &dev->resource[resource];
 	struct resource *root;
 	int err;
 
+    //找到父总线的资源窗口
 	root = pci_find_parent_resource(dev, res);
 
 	err = -EINVAL;
 	if (root != NULL)
-		err = request_resource(root, res);
+		err = request_resource(root, res);//检查请求的资源是否冲突
 
 	if (err) {
 		const char *dtype = resource < PCI_BRIDGE_RESOURCES ? "device" : "bridge";

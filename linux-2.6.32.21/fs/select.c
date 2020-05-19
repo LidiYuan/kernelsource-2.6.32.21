@@ -277,7 +277,9 @@ int poll_select_set_timeout(struct timespec *to, long sec, long nsec)
 	/* Optimize for the zero timeout value here */
 	if (!sec && !nsec) {
 		to->tv_sec = to->tv_nsec = 0;
-	} else {
+	} 
+	else 
+	{
 		ktime_get_ts(to);
 		*to = timespec_add_safe(*to, ts);
 	}
@@ -446,11 +448,13 @@ int do_select(int n, fd_set_bits *fds, struct timespec *end_time)
 				if (!(bit & all_bits))
 					continue;
 				file = fget_light(i, &fput_needed);
-				if (file) {
+				if (file) 
+				{
 					f_op = file->f_op;
 					mask = DEFAULT_POLLMASK;
 					if (f_op && f_op->poll) {
 						wait_key_set(wait, in, out, bit);
+						// 对每个fd进行I/O事件检测  返回fd的状态
 						mask = (*f_op->poll)(file, wait);
 					}
 					fput_light(file, fput_needed);
@@ -594,20 +598,20 @@ out_nofds:
 }
 
 SYSCALL_DEFINE5(select, int, n, fd_set __user *, inp, fd_set __user *, outp,
-		fd_set __user *, exp, struct timeval __user *, tvp)
+		                 fd_set __user *, exp, struct timeval __user *, tvp)
 {
 	struct timespec end_time, *to = NULL;
 	struct timeval tv;
 	int ret;
 
-	if (tvp) {
+	if (tvp) 
+	{
 		if (copy_from_user(&tv, tvp, sizeof(tv)))
 			return -EFAULT;
 
-		to = &end_time;
-		if (poll_select_set_timeout(to,
-				tv.tv_sec + (tv.tv_usec / USEC_PER_SEC),
-				(tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC))
+		to = &end_time;             
+		                               //(to,微妙, 纳秒) 
+		if (poll_select_set_timeout(to,tv.tv_sec + (tv.tv_usec / USEC_PER_SEC),(tv.tv_usec % USEC_PER_SEC) * NSEC_PER_USEC))
 			return -EINVAL;
 	}
 

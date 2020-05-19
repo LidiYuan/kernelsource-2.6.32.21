@@ -26,7 +26,8 @@ enum writeback_sync_modes {
  * always on the stack, and hence need no locking.  They are always initialised
  * in a manner such that unspecified fields are set to zero.
  */
-struct writeback_control {
+struct writeback_control 
+{
 	struct backing_dev_info *bdi;	/* If !NULL, only write back this
 					   queue */
 	struct super_block *sb;		/* if !NULL, only write inodes from

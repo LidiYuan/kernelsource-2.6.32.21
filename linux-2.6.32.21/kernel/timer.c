@@ -1263,7 +1263,7 @@ static void run_timer_softirq(struct softirq_action *h)
 
 	perf_event_do_pending();
 
-    //处理开启高精度hrtimer定时器流程
+    //通过检查是否存在高分辨率事件设备 进行切换高分辨率
 	hrtimer_run_pending();
 
 	if (time_after_eq(jiffies, base->timer_jiffies))
@@ -1275,7 +1275,9 @@ static void run_timer_softirq(struct softirq_action *h)
  */
 void run_local_timers(void)
 {
+    //在低分辨率模式下执行高分辨率定时器
 	hrtimer_run_queues();
+	
 	raise_softirq(TIMER_SOFTIRQ);
 	softlockup_tick();
 }
@@ -1288,7 +1290,7 @@ void run_local_timers(void)
 
 void do_timer(unsigned long ticks)
 {
-	jiffies_64 += ticks;
+	jiffies_64 += ticks;//更新jiffies_64
 	update_wall_time();//更新xtime 即实际的时间
 	calc_global_load();//系统平均负载统计值
 }

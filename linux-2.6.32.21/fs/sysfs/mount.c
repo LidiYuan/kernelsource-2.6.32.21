@@ -32,6 +32,7 @@ static const struct super_operations sysfs_ops = {
 	.delete_inode	= sysfs_delete_inode,
 };
 
+//存放根节点
 struct sysfs_dirent sysfs_root = {
 	.s_name		= "",
 	.s_count	= ATOMIC_INIT(1),
@@ -88,6 +89,8 @@ static struct file_system_type sysfs_fs_type = {
 	.kill_sb	= kill_anon_super,
 };
 
+
+//可以通过 mount -t sysfs systs /sys装载sysfs文件系统
 int __init sysfs_init(void)
 {
 	int err = -ENOMEM;
@@ -99,6 +102,7 @@ int __init sysfs_init(void)
 	if (!sysfs_dir_cachep)
 		goto out;
 
+	//为sysfs文件系统初始化后备设备信息,sysfs不支持预读和 对文件的修改不需要被写回磁盘 所以不需要注册bdi
 	err = sysfs_inode_init();
 	if (err)
 		goto out_err;

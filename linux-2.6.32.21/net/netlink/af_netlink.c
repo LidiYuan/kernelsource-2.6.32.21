@@ -1460,8 +1460,7 @@ static void netlink_data_ready(struct sock *sk, int len)
  *	queueing.
  */
 
-struct sock *
-netlink_kernel_create(struct net *net, //是一个网络名字空间namespace
+struct sock *netlink_kernel_create(struct net *net, //是一个网络名字空间namespace
                                    int unit,        //netlink协议  NETLINK_ROUTE
                                    unsigned int groups,//组播组掩码
 		                           void (*input)(struct sk_buff *skb),//指向回调函数 接收到来自应用层的消息后进入此函数

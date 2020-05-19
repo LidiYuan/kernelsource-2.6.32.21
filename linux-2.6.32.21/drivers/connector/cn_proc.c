@@ -47,6 +47,7 @@ static inline void get_seq(__u32 *ts, int *cpu)
 	put_cpu_var(proc_event_counts);
 }
 
+//do_fork()
 void proc_fork_connector(struct task_struct *task)
 {
 	struct cn_msg *msg;
@@ -75,6 +76,7 @@ void proc_fork_connector(struct task_struct *task)
 	cn_netlink_send(msg, CN_IDX_PROC, GFP_KERNEL);
 }
 
+//search_binary_handler()
 void proc_exec_connector(struct task_struct *task)
 {
 	struct cn_msg *msg;
@@ -100,6 +102,7 @@ void proc_exec_connector(struct task_struct *task)
 	cn_netlink_send(msg, CN_IDX_PROC, GFP_KERNEL);
 }
 
+//当uid gid 等id改变   setuid() setgid()
 void proc_id_connector(struct task_struct *task, int which_id)
 {
 	struct cn_msg *msg;
@@ -139,6 +142,7 @@ void proc_id_connector(struct task_struct *task, int which_id)
 	cn_netlink_send(msg, CN_IDX_PROC, GFP_KERNEL);
 }
 
+//setsid()
 void proc_sid_connector(struct task_struct *task)
 {
 	struct cn_msg *msg;
@@ -163,7 +167,7 @@ void proc_sid_connector(struct task_struct *task)
 	msg->len = sizeof(*ev);
 	cn_netlink_send(msg, CN_IDX_PROC, GFP_KERNEL);
 }
-
+//do_exit()
 void proc_exit_connector(struct task_struct *task)
 {
 	struct cn_msg *msg;
@@ -227,8 +231,7 @@ static void cn_proc_ack(int err, int rcvd_seq, int rcvd_ack)
  * cn_proc_mcast_ctl
  * @data: message sent from userspace via the connector
  */
-static void cn_proc_mcast_ctl(struct cn_msg *msg,
-			      struct netlink_skb_parms *nsp)
+static void cn_proc_mcast_ctl(struct cn_msg *msg,struct netlink_skb_parms *nsp)
 {
 	enum proc_cn_mcast_op *mc_op = NULL;
 	int err = 0;
@@ -237,7 +240,8 @@ static void cn_proc_mcast_ctl(struct cn_msg *msg,
 		return;
 
 	mc_op = (enum proc_cn_mcast_op*)msg->data;
-	switch (*mc_op) {
+	switch (*mc_op) 
+	{
 	case PROC_CN_MCAST_LISTEN:
 		atomic_inc(&proc_event_num_listeners);
 		break;

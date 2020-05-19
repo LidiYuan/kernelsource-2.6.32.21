@@ -74,15 +74,20 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	if (len > end)
 		return -ENOMEM;
 
-	if (addr) {
+    //如果指定了优先搜索地址 
+	if (addr) 
+	{
 		addr = PAGE_ALIGN(addr);
 		vma = find_vma(mm, addr);
-		if (end - len >= addr &&
-		    (!vma || addr + len <= vma->vm_start))
+
+		//vma为空说明没有发生重叠
+		if (end - len >= addr &&(!vma || addr + len <= vma->vm_start))
 			return addr;
 	}
+	
 	if (((flags & MAP_32BIT) || test_thread_flag(TIF_IA32))
-	    && len <= mm->cached_hole_size) {
+	    && len <= mm->cached_hole_size) 
+    {
 		mm->cached_hole_size = 0;
 		mm->free_area_cache = begin;
 	}
@@ -91,10 +96,12 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		addr = begin;
 	start_addr = addr;
 
+	 //内核遍历进程中可用的区域 设法找到一个大小适当的的空闲区域
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
-		if (end - len < addr) {
+		if (end - len < addr) 
+		{
 			/*
 			 * Start a new search - just in case we missed
 			 * some holes.

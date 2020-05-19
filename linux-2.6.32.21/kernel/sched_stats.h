@@ -188,17 +188,19 @@ static inline void sched_info_dequeued(struct task_struct *t)
  * long it was waiting to run.  We also note when it began so that we
  * can keep stats on how long its timeslice is.
  */
+ ///*更新next进程和对应队列的相关变量*
 static void sched_info_arrive(struct task_struct *t)
 {
 	unsigned long long now = task_rq(t)->clock, delta = 0;
 
-	if (t->sched_info.last_queued)
-		delta = now - t->sched_info.last_queued;
-	sched_info_reset_dequeued(t);
-	t->sched_info.run_delay += delta;
-	t->sched_info.last_arrival = now;
-	t->sched_info.pcount++;
+	if (t->sched_info.last_queued)/*如果被切换进来前在运行进程中排队*/  
+		delta = now - t->sched_info.last_queued;/*计算排队等待的时间长度*/  
+	sched_info_reset_dequeued(t);/*因为进程将被切换进来运行，设定last_queued为0*/  
+	t->sched_info.run_delay += delta;;/*更新进程在运行队列里面等待的时间*/  
+	t->sched_info.last_arrival = now;/*更新最后一次运行的时间*/  
+	t->sched_info.pcount++;/*cpu上运行的次数加一*/  
 
+	/*更新rq中rq_sched_info中的对应的变量*/  
 	rq_sched_info_arrive(task_rq(t), delta);
 }
 

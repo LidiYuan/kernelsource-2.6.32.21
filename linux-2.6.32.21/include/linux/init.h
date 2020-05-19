@@ -41,6 +41,7 @@
 /* These are for everybody (although not all archs will actually
    discard it in modules) */
  // __cold 告诉编辑器 调用该函数的的可能性很低
+ //notrace表示不要在这个函数的入口和出口生成用于分析的检测代码
  //free_initmem()负责释放用于初始化的内存区
  //dmesg | grep Freeing 可以看到释放的大小
 #define __init		__section(.init.text) __cold notrace 

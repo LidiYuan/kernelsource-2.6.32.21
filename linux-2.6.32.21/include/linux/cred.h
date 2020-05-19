@@ -122,13 +122,13 @@ struct cred {
 #define CRED_MAGIC	0x43736564
 #define CRED_MAGIC_DEAD	0x44656144
 #endif
-	uid_t		uid;		/* real UID of the task */
+	uid_t		uid;		/* real UID of the task 实际用户ID,指的是进程执行者是谁*/
 	gid_t		gid;		/* real GID of the task */
-	uid_t		suid;		/* saved UID of the task */
+	uid_t		suid;		/* saved UID of the task 保存的有效用户id用于对有效用户id的恢复*/
 	gid_t		sgid;		/* saved GID of the task */
-	uid_t		euid;		/* effective UID of the task */
+	uid_t		euid;		/* effective UID of the task 有效用户ID设置了SUID特殊权限*/
 	gid_t		egid;		/* effective GID of the task */
-	uid_t		fsuid;		/* UID for VFS ops */
+	uid_t		fsuid;		/* UID for VFS ops 用于文件系统访问检查的用户ID 一般等于相应的EUID*/
 	gid_t		fsgid;		/* GID for VFS ops */
 	unsigned	securebits;	/* SUID-less security management */
 	kernel_cap_t	cap_inheritable; /* caps our children can inherit */

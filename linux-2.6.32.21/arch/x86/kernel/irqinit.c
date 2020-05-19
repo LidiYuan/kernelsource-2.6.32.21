@@ -143,7 +143,7 @@ void __init init_ISA_irqs(void)
 
 void __init init_IRQ(void)
 {
-	x86_init.irqs.intr_init();//实际调用的native_init_IRQ
+	x86_init.irqs.intr_init();//实际调用的 native_init_IRQ
 }
 
 static void __init smp_intr_init(void)
@@ -221,7 +221,7 @@ void __init native_init_IRQ(void)
 	int i;
 
 	/* Execute any quirks before the call gates are initialised: */
-	x86_init.irqs.pre_vector_init();//实际调用init_ISA_irqs
+	x86_init.irqs.pre_vector_init();//实际调用 init_ISA_irqs
 
 	apic_intr_init();
 
@@ -232,7 +232,8 @@ void __init native_init_IRQ(void)
 	 */
 	 //在entry_32.s中  搜索ENTRY(interrupt) 会看到interrupt的初始化 
 	 //最终外部中断都会转到->common_interrupt(汇编entry_32.s中)->do_IRQ(c语言实现)
-	for (i = FIRST_EXTERNAL_VECTOR; i < NR_VECTORS; i++) {
+	for (i = FIRST_EXTERNAL_VECTOR; i < NR_VECTORS; i++) 
+	{
 		/* IA32_SYSCALL_VECTOR could be used in trap_init already. */
 		if (!test_bit(i, used_vectors))
 			set_intr_gate(i, interrupt[i-FIRST_EXTERNAL_VECTOR]);

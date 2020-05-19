@@ -144,10 +144,14 @@ static inline void fsnotify_inoderemove(struct inode *inode)
  */
 static inline void fsnotify_create(struct inode *inode, struct dentry *dentry)
 {
-	inotify_inode_queue_event(inode, IN_CREATE, 0, dentry->d_name.name,
-				  dentry->d_inode);
+    //只有在定义了CONFIG_INOTIFY的情况下执行下面的函数
+	inotify_inode_queue_event(inode, IN_CREATE, 0, dentry->d_name.name,dentry->d_inode);
+
+    //为父目录收集新生成文件的inode信息的函数 将这些信息写入进程的审计上下文中
+    //在定义了CONFIG_AUDITSYSCALL才有具体功能
 	audit_inode_child(dentry->d_name.name, dentry, inode);
 
+	//在定义了CONFIG_FSNOTIFY才有具体功能
 	fsnotify(inode, FS_CREATE, dentry->d_inode, FSNOTIFY_EVENT_INODE, dentry->d_name.name, 0);
 }
 

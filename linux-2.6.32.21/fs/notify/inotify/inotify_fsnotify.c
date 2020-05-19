@@ -61,7 +61,8 @@ static int inotify_handle_event(struct fsnotify_group *group, struct fsnotify_ev
 
 	fsn_event_priv->group = group;
 	event_priv->wd = wd;
-
+	
+     // 把事件挂入到group下面的notification_list，并且唤醒group下面的等待队列notification_waitq;
 	ret = fsnotify_add_notify_event(group, event, fsn_event_priv);
 	if (ret) {
 		inotify_free_event_priv(fsn_event_priv);

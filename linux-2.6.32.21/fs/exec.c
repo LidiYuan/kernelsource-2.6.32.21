@@ -563,8 +563,8 @@ static int shift_arg_pages(struct vm_area_struct *vma, unsigned long shift)
  * the stack is optionally relocated, and some extra space is added.
  */
 int setup_arg_pages(struct linux_binprm *bprm,
-		    unsigned long stack_top,
-		    int executable_stack)
+		                      unsigned long stack_top,
+		                      int executable_stack)
 {
 	unsigned long ret;
 	unsigned long stack_shift;
@@ -593,11 +593,18 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	mm->arg_start = bprm->p - stack_shift;
 	bprm->p = vma->vm_end - stack_shift;
 #else
+
+    //进行体系结构 页对齐
 	stack_top = arch_align_stack(stack_top);
 	stack_top = PAGE_ALIGN(stack_top);
+
+	//栈的顶端距离虚拟内存最大值的偏移
 	stack_shift = vma->vm_end - stack_top;
 
+	//计算当前内存顶端地址
 	bprm->p -= stack_shift;
+
+	//参数的开始地址设置为栈顶
 	mm->arg_start = bprm->p;
 #endif
 
@@ -619,8 +626,7 @@ int setup_arg_pages(struct linux_binprm *bprm,
 		vm_flags &= ~VM_EXEC;
 	vm_flags |= mm->def_flags;
 
-	ret = mprotect_fixup(vma, &prev, vma->vm_start, vma->vm_end,
-			vm_flags);
+	ret = mprotect_fixup(vma, &prev, vma->vm_start, vma->vm_end,vm_flags);
 	if (ret)
 		goto out_unlock;
 	BUG_ON(prev != vma);
@@ -981,12 +987,14 @@ out:
 }
 EXPORT_SYMBOL(flush_old_exec);
 
+
 void setup_new_exec(struct linux_binprm * bprm)
 {
 	int i, ch;
 	char * name;
 	char tcomm[sizeof(current->comm)];
 
+	//选择用户空间布局方式(为传统或新布局方式)
 	arch_pick_mmap_layout(current->mm);
 
 	/* This is the point of no return */
@@ -1822,6 +1830,7 @@ void do_coredump(long signr, int exit_code, struct pt_regs *regs)
 	/*
 	 * If another thread got here first, or we are not dumpable, bail out.
 	 */
+	 //get_dumpable从mm->falgs取出低2位 判断是否可以coredump
 	if (mm->core_state || !get_dumpable(mm)) {
 		up_write(&mm->mmap_sem);
 		put_cred(cred);

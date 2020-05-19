@@ -999,8 +999,10 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	//判断异常地址是否发生在内核
 	//(error_code & 4) == 0 表示错误是在内核中发生的
 	//(error_code & 9) == 0 表示错误不是由于页保护异常 而是缺页异常
-	if (unlikely(fault_in_kernel_space(address))) {
-		if (!(error_code & (PF_RSVD | PF_USER | PF_PROT))) {
+	if (unlikely(fault_in_kernel_space(address))) 
+	{
+		if (!(error_code & (PF_RSVD | PF_USER | PF_PROT))) 
+		{
 			if (vmalloc_fault(address) >= 0)//内核中发生的缺页错误 执行此函数
 				return;
 
@@ -1091,7 +1093,8 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	}
 
 	vma = find_vma(mm, address);
-	if (unlikely(!vma)) {
+	if (unlikely(!vma))//不存在对应的vam实例 
+	{
 		bad_area(regs, error_code, address);
 		return;
 	}

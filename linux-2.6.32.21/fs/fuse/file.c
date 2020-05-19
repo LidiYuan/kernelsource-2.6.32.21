@@ -856,8 +856,7 @@ static ssize_t fuse_fill_write_pages(struct fuse_req *req,
 
 		if (!fc->big_writes)
 			break;
-	} while (iov_iter_count(ii) && count < fc->max_write &&
-		 req->num_pages < FUSE_MAX_PAGES_PER_REQ && offset == 0);
+	} while (iov_iter_count(ii) && count < fc->max_write && req->num_pages < FUSE_MAX_PAGES_PER_REQ && offset == 0);
 
 	return count > 0 ? count : err;
 }
@@ -885,9 +884,12 @@ static ssize_t fuse_perform_write(struct file *file,
 		}
 
 		count = fuse_fill_write_pages(req, mapping, ii, pos);
-		if (count <= 0) {
+		if (count <= 0) 
+		{
 			err = count;
-		} else {
+		} 
+		else 
+		{
 			size_t num_written;
 
 			num_written = fuse_send_write_pages(req, file, inode,

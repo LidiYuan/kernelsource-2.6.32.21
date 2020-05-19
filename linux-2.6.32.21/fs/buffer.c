@@ -681,7 +681,8 @@ static void __set_page_dirty(struct page *page,
 		struct address_space *mapping, int warn)
 {
 	spin_lock_irq(&mapping->tree_lock);
-	if (page->mapping) {	/* Race with truncate? */
+	if (page->mapping) 
+	{	/* Race with truncate? */
 		WARN_ON_ONCE(warn && !PageUptodate(page));
 		account_page_dirtied(page, mapping);
 		radix_tree_tag_set(&mapping->page_tree,

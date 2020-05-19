@@ -77,7 +77,8 @@ void clockevents_set_mode(struct clock_event_device *dev,
 		 * A nsec2cyc multiplicator of 0 is invalid and we'd crash
 		 * on it, so fix it up and emit a warning:
 		 */
-		if (mode == CLOCK_EVT_MODE_ONESHOT) {
+		if (mode == CLOCK_EVT_MODE_ONESHOT) 
+		{
 			if (unlikely(!dev->mult)) {
 				dev->mult = 1;
 				WARN_ON(1);
@@ -179,6 +180,7 @@ static void clockevents_notify_released(void)
  * clockevents_register_device - register a clock event device
  * @dev:	device to register
  */
+ //注册一个新的时钟事件设备 将其挂到clockevent_devices链表上
 void clockevents_register_device(struct clock_event_device *dev)
 {
 	unsigned long flags;

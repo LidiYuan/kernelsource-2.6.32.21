@@ -14,16 +14,22 @@ typedef unsigned long kernel_ulong_t;
 
 #define PCI_ANY_ID (~0)
 
-//设备标识符
+//PCI设备类型的标识符
+//这些PCI设备的标准值在include/linux/pci_ids.h头文件中定义
 /*PCI设备通常由一组参数唯一地标识，
 它们被vendorID，deviceID和class nodes所标识，
 即设备厂商，型号等，这些参数保存在pci_device_id结构中*/
-//在/lib/modules/ker_version/modules.xxxmap
+//
+//大多数程序用MODULE_DEVICE_TABLE宏将这个表导出到用户空间 文件为在/lib/modules/ker_version/modules.pcimap
 struct pci_device_id {
-	__u32 vendor, device;		/* Vendor and device ID or PCI_ANY_ID*/
-	__u32 subvendor, subdevice;	/* Subsystem ID's or PCI_ANY_ID */
-	__u32 class, class_mask;	/* (class,subclass,prog-if) triplet */
-	kernel_ulong_t driver_data;	/* Data private to the driver */
+	__u32 vendor,       //厂商id 用于匹配从设备空间中读出的厂商id 
+		  device;		/* Vendor and device ID or PCI_ANY_ID设备id 用于匹配从设备配置空间中读出的设备id*/
+	__u32 subvendor,    //子系统厂商id
+		  subdevice;	/* Subsystem ID's or PCI_ANY_ID 
+	                    子系统设备id*/
+	__u32 class,        //要匹配的设备类 
+		  class_mask;	/* (class,subclass,prog-if) triplet */
+	kernel_ulong_t driver_data;	/* Data private to the driver 驱动私有数据*/
 };
 
 

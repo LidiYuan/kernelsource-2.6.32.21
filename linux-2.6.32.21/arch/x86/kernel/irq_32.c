@@ -147,8 +147,7 @@ void __cpuinit irq_ctx_init(int cpu)
 
 	per_cpu(softirq_ctx, cpu) = irqctx;
 
-	printk(KERN_DEBUG "CPU %u irqstacks, hard=%p soft=%p\n",
-	       cpu, per_cpu(hardirq_ctx, cpu),  per_cpu(softirq_ctx, cpu));
+	printk(KERN_DEBUG "CPU %u irqstacks, hard=%p soft=%p\n",cpu, per_cpu(hardirq_ctx, cpu),  per_cpu(softirq_ctx, cpu));
 }
 
 void irq_ctx_exit(int cpu)
@@ -210,7 +209,7 @@ bool handle_irq(unsigned irq, struct pt_regs *regs)
 		if (unlikely(overflow))
 			print_stack_overflow();
 		desc->handle_irq(irq, desc);
-		//此处是在init_IRQ中->native_init_IRQ->init_ISA_irqs设置desc->handle_irq=handle_level_irq
+		//此处是在init_IRQ中->native_init_IRQ->init_ISA_irqs 设置desc->handle_irq=handle_level_irq
 	}
 
 	return true;

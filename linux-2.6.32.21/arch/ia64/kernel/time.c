@@ -431,11 +431,15 @@ static int __init rtc_init(void)
 }
 module_init(rtc_init);
 
-void __init
-time_init (void)
+
+void __init  time_init (void)
 {
+    //注册中断处理函数 timer_interrupt
 	register_percpu_irq(IA64_TIMER_VECTOR, &timer_irqaction);
+
+    //
 	efi_gettimeofday(&xtime);
+
 	ia64_init_itm();
 
 	/*

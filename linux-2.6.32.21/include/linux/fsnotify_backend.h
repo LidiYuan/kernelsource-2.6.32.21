@@ -93,6 +93,8 @@ struct fsnotify_ops {
  * refcnt on a group is up to the implementor and at any moment if it goes 0
  * everything will be cleaned up.
  */
+ //每新建一个inotify实例，内核都会分配一个fsnotify_group
+ //inotify_init()
 struct fsnotify_group {
 	/*
 	 * global list of all groups receiving events from fsnotify.
@@ -108,7 +110,7 @@ struct fsnotify_group {
 	 * must be called to update the global structures which indicate global
 	 * interest in event types.
 	 */
-	__u32 mask;
+	__u32 mask; //此组中监控的所有事件
 
 	/*
 	 * How the refcnt is used is up to each group.  When the refcnt hits 0
@@ -118,15 +120,15 @@ struct fsnotify_group {
 	 * inotify_init() and the refcnt will hit 0 only when that fd has been
 	 * closed.
 	 */
-	atomic_t refcnt;		/* things with interest in this group */
+	atomic_t refcnt;		/* things with interest in this group */ /* 引用次数 */
 	unsigned int group_num;		/* simply prevents accidental group collision */
 
-	const struct fsnotify_ops *ops;	/* how this group handles things */
+	const struct fsnotify_ops *ops;	/* how this group handles things *//* 操作函数指针结构体 inotify_fsnotify_ops*/
 
 	/* needed to send notification to userspace */
 	struct mutex notification_mutex;	/* protect the notification_list */
-	struct list_head notification_list;	/* list of event_holder this group needs to send to userspace */
-	wait_queue_head_t notification_waitq;	/* read() on the notification file blocks on this waitq */
+	struct list_head notification_list;	/* list of event_holder this group needs to send to userspace *//* 属于这个group的需要发送到用户控件的事件链表 */
+	wait_queue_head_t notification_waitq;	/* read() on the notification file blocks on this waitq */ /* 读事件阻塞时的等待队列头 */
 	unsigned int q_len;			/* events on the queue */
 	unsigned int max_events;		/* maximum events allowed on the list */
 
@@ -237,8 +239,8 @@ struct fsnotify_mark_entry {
 	/* we hold ref for each i_list and g_list.  also one ref for each 'thing'
 	 * in kernel that found and may be using this mark. */
 	atomic_t refcnt;		/* active things looking at this mark */
-	struct inode *inode;		/* inode this entry is associated with */
-	struct fsnotify_group *group;	/* group this mark entry is for */
+	struct inode *inode;		/* inode this entry is associated with 指向此项属于的inode*/
+	struct fsnotify_group *group;	/* group this mark entry is for 指向此项的group*/
 	struct hlist_node i_list;	/* list of mark_entries by inode->i_fsnotify_mark_entries */
 	struct list_head g_list;	/* list of mark_entries by group->i_fsnotify_mark_entries */
 	spinlock_t lock;		/* protect group, inode, and killme */

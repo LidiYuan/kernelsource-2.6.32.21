@@ -1156,6 +1156,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	if (retval)
 		goto bad_fork_cleanup_policy;
 
+	//分配进程审计上下文 在开启 AUDIT_SYSCALL才有用
 	if ((retval = audit_alloc(p)))
 		goto bad_fork_cleanup_policy;
 	/* copy all the process information */
@@ -1332,6 +1333,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	total_forks++;
 	spin_unlock(&current->sighand->siglock);
 	write_unlock_irq(&tasklist_lock);
+
+	//用于NETLIN_CONNECTOR 对进程进行监控
 	proc_fork_connector(p);
 	cgroup_post_fork(p);
 	perf_event_fork(p);

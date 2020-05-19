@@ -142,20 +142,29 @@ __initcall(ioresources_init);
 #endif /* CONFIG_PROC_FS */
 
 /* Return the conflict entry if you can't request it */
+//检查冲突项
 static struct resource * __request_resource(struct resource *root, struct resource *new)
 {
 	resource_size_t start = new->start;
 	resource_size_t end = new->end;
 	struct resource *tmp, **p;
 
+    //请求的资源范围不对
 	if (end < start)
 		return root;
+	
+	//请求的开始地址不在root资源空间内
 	if (start < root->start)
 		return root;
+
+	//请求结束的地址不在root资源空间内
 	if (end > root->end)
 		return root;
+	
 	p = &root->child;
-	for (;;) {
+    //查找是否与root的子节点资源范围有冲突
+	for (;;) 
+	{
 		tmp = *p;
 		if (!tmp || tmp->start > end) {
 			new->sibling = tmp;
@@ -196,6 +205,9 @@ static int __release_resource(struct resource *old)
  *
  * Returns 0 for success, negative error code on error.
  */
+ /*
+root:父总线的有效资源窗口
+*/
 int request_resource(struct resource *root, struct resource *new)
 {
 	struct resource *conflict;

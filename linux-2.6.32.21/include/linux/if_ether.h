@@ -18,11 +18,12 @@
  *		2 of the License, or (at your option) any later version.
  */
  //以太网首部和一些常量定义
-
 #ifndef _LINUX_IF_ETHER_H
 #define _LINUX_IF_ETHER_H
 
 #include <linux/types.h>
+
+
 
 /*
  *	IEEE 802.3 Ethernet magic constants.  The frame sizes omit the preamble
@@ -123,7 +124,7 @@
 struct ethhdr {
 	unsigned char	h_dest[ETH_ALEN];	/* destination eth addr 目的硬件地址	*/
 	unsigned char	h_source[ETH_ALEN];	/* source ether addr	源硬件地址*/
-	__be16		h_proto;		/* 可以存储协议类型或帧的长度
+	__be16		h_proto;		/* 可以存储协议类型或帧的长度   ETH_P_IP
 	                                一个錏thernet帧的最大长度为1500 用大于等于1536(0x600)的值来表示协议
 	                                802.2 和802.3使用此字段存储长度 */
 } __attribute__((packed));

@@ -184,6 +184,7 @@ static cycle_t pit_read(struct clocksource *cs)
 	return (cycle_t)(jifs * LATCH) + count;
 }
 
+//
 static struct clocksource pit_cs = {
 	.name		= "pit",
 	.rating		= 110,

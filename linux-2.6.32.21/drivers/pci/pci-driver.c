@@ -19,8 +19,9 @@
 #include <linux/cpu.h>
 #include "pci.h"
 
+//pci_dynids
 struct pci_dynid {
-	struct list_head node;
+	struct list_head node;//连接到pci_dynids中的链表头中
 	struct pci_device_id id;
 };
 
@@ -1123,6 +1124,7 @@ struct bus_type pci_bus_type = {
 	.pm		= PCI_PM_OPS_PTR,
 };
 
+//对应pci总线类型的驱动 和pci设备的驱动是不同的
 static int __init pci_driver_init(void)
 {
 	return bus_register(&pci_bus_type);

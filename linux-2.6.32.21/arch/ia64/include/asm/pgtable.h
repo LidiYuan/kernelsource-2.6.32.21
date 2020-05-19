@@ -58,8 +58,17 @@
 #define _PAGE_ED		(__IA64_UL(1) << 52)	/* exception deferral */
 #define _PAGE_PROTNONE		(__IA64_UL(1) << 63)
 
+/*
+                          _PAGE_FILE
+ 63                          1  0  
+***********************************
+* *  非线性页偏移量         *  *  * 
+***********************************
+     页表项中表示非线性映射
+*/
+
 /* Valid only for a PTE with the present bit cleared: */
-#define _PAGE_FILE		(1 << 1)		/* see swap & file pte remarks below */
+#define _PAGE_FILE		(1 << 1)		/* see swap & file pte remarks below  表示该表项为非线性映射*/
 
 #define _PFN_MASK		_PAGE_PPN_MASK
 /* Mask of bits which may be changed by pte_modify(); the odd bits are there for _PAGE_PROTNONE */
@@ -526,7 +535,11 @@ extern void paging_init (void);
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
 #define PTE_FILE_MAX_BITS		61
+
+//将页表项编码为文件偏移量
 #define pte_to_pgoff(pte)		((pte_val(pte) << 1) >> 3)
+
+//将文件偏移量编码到页表项
 #define pgoff_to_pte(off)		((pte_t) { ((off) << 2) | _PAGE_FILE })
 
 #define io_remap_pfn_range(vma, vaddr, pfn, size, prot)		\

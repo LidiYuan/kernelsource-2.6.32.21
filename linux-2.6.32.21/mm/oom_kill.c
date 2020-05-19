@@ -70,6 +70,7 @@ static int has_intersects_mems_allowed(struct task_struct *tsk)
  *    of least surprise ... (be careful when you change it)
  */
 
+//根据各种条件进行判断，找到一个最应该杀死的进程
 unsigned long badness(struct task_struct *p, unsigned long uptime)
 {
 	unsigned long points, cpu_time, run_time;
@@ -80,12 +81,14 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	unsigned long utime;
 	unsigned long stime;
 
+     //如果OOM是被禁止的，则直接返回。
 	if (oom_adj == OOM_DISABLE)
 		return 0;
 
 	task_lock(p);
 	mm = p->mm;
-	if (!mm) {
+	if (!mm) 
+	{
 		task_unlock(p);
 		return 0;
 	}
@@ -93,6 +96,7 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	/*
 	 * The memory size of the process is the basis for the badness.
 	 */
+	// 初始值为该进程占用的total_vm
 	points = mm->total_vm;
 
 	/*
@@ -114,7 +118,9 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	 * child is eating the vast majority of memory, adding only half
 	 * to the parents will make the child our kill candidate of choice.
 	 */
-	list_for_each_entry(child, &p->children, sibling) {
+	//如果该进程有子进程，子进程独自占用的total_vm/2加到本进程score 
+	list_for_each_entry(child, &p->children, sibling) 
+    {
 		task_lock(child);
 		if (child->mm != mm && child->mm)
 			points += child->mm->total_vm/2 + 1;
@@ -146,6 +152,7 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	 * Niced processes are most likely less important, so double
 	 * their badness points.
 	 */
+	//nice大于0的进程，score*2 
 	if (task_nice(p) > 0)
 		points *= 2;
 
@@ -233,18 +240,24 @@ static struct task_struct *select_bad_process(unsigned long *ppoints,
 	*ppoints = 0;
 
 	do_posix_clock_monotonic_gettime(&uptime);
-	for_each_process(p) {
+
+    //辨力所有的进程
+	for_each_process(p) 
+	{
 		unsigned long points;
 
 		/*
 		 * skip kernel threads and tasks which have already released
 		 * their mm.
 		 */
+		 //跳过内核线程 
 		if (!p->mm)
 			continue;
-		/* skip the init task */
+
+		/* skip the init task 跳过Init进程*/
 		if (is_global_init(p))
 			continue;
+		
 		if (mem && !task_in_mem_cgroup(p, mem))
 			continue;
 
@@ -278,11 +291,14 @@ static struct task_struct *select_bad_process(unsigned long *ppoints,
 			*ppoints = ULONG_MAX;
 		}
 
+		//也就是/proc/<pid>/oom_adj这个值
 		if (p->signal->oom_adj == OOM_DISABLE)
 			continue;
 
+		//对其它的进程调用badness()函数来计算相应的score，score最高的将被选中
 		points = badness(p, uptime.tv_sec);
-		if (points > *ppoints || !chosen) {
+		if (points > *ppoints || !chosen) 
+		{
 			chosen = p;
 			*ppoints = points;
 		}
@@ -395,7 +411,8 @@ static int oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 {
 	struct task_struct *c;
 
-	if (printk_ratelimit()) {
+	if (printk_ratelimit()) 
+	{
 		printk(KERN_WARNING "%s invoked oom-killer: "
 			"gfp_mask=0x%x, order=%d, oom_adj=%d\n",
 			current->comm, gfp_mask, order,
@@ -538,6 +555,7 @@ retry:
 	 * Rambo mode: Shoot down a process and hope it solves whatever
 	 * issues we may have.
 	 */
+	 //选择一个最优的进程杀掉
 	p = select_bad_process(&points, NULL);
 
 	if (PTR_ERR(p) == -1UL)
@@ -549,6 +567,7 @@ retry:
 		panic("Out of memory and no killable processes...\n");
 	}
 
+	//杀掉最优的进程
 	if (oom_kill_process(p, gfp_mask, order, points, NULL,
 			     "Out of memory"))
 		goto retry;

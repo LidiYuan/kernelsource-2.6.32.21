@@ -86,7 +86,7 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_DENYWRITE	0x00000800	/* ETXTBSY on write attempts..  区域映射一个不可写文件*/
 
 #define VM_EXECUTABLE	0x00001000 //区域映射一个可执行文件
-#define VM_LOCKED	0x00002000 //区域中页面被锁定
+#define VM_LOCKED	0x00002000 //区域中页面被锁定 无法被换出
 #define VM_IO           0x00004000	/* Memory mapped I/O or similar区域映射设备IO空间 */
 
 					/* Used by sys_madvise() */
@@ -1242,7 +1242,7 @@ extern struct vm_area_struct * find_vma_prev(struct mm_struct * mm, unsigned lon
 /* Look up the first VMA which intersects the interval start_addr..end_addr-1,
    NULL if none.  Assume start_addr < end_addr. */
 
-//返回第一个和指定地址空间相交的vma
+//返回一个区间 此区间被给定地址范围给切断
 static inline struct vm_area_struct * find_vma_intersection(struct mm_struct * mm, unsigned long start_addr, unsigned long end_addr)
 {
 	struct vm_area_struct * vma = find_vma(mm,start_addr);

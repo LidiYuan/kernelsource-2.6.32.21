@@ -167,6 +167,7 @@ static void __queue_work(struct cpu_workqueue_struct *cwq,
  * We queue the work to the CPU on which it was submitted, but if the CPU dies
  * it can be processed by another CPU.
  */
+ //使用自己创建的工作队列执行工作项
 int queue_work(struct workqueue_struct *wq, struct work_struct *work)
 {
 	int ret;

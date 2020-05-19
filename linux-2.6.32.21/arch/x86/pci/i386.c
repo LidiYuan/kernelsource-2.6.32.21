@@ -119,16 +119,25 @@ static void __init pcibios_allocate_bus_resources(struct list_head *bus_list)
 	int idx;
 	struct resource *r;
 
-	/* Depth-First Search on bus tree */
-	list_for_each_entry(bus, bus_list, node) {
-		if ((dev = bus->self)) {
-			for (idx = PCI_BRIDGE_RESOURCES;
-			    idx < PCI_NUM_RESOURCES; idx++) {
+	/* Depth-First Search on bus tree 深度优先遍历总线树*/
+	//遍历当前正处理的总线所在链表的一个循环
+	list_for_each_entry(bus, bus_list, node) 
+	{   
+	    //若不是根总线则dev为桥设备 否则为空 
+		if ((dev = bus->self)) 
+		{   
+		    //要验证的空间 在读取配置时候被放在桥设备的resource(从PCI_BRIDGE_RESOURCES开始共PCI_NUM_RESOURCES项)
+			for (idx = PCI_BRIDGE_RESOURCES;idx < PCI_NUM_RESOURCES; idx++) 
+			{
 				r = &dev->resource[idx];
+
+				//是否标志位有效的资源空间  若无效 则不进行下面的验证
 				if (!r->flags)
 					continue;
-				if (!r->start ||
-				    pci_claim_resource(dev, idx) < 0) {
+
+				//pci_claim_resource 让这个设备试图认领它所要求的资源窗口 若认领失败 比如资源窗口冲突 则暂时将有效标志位清零
+				if (!r->start ||pci_claim_resource(dev, idx) < 0) 
+				{
 					dev_info(&dev->dev, "BAR %d: can't allocate resource\n", idx);
 					/*
 					 * Something is wrong with the region.
@@ -140,6 +149,8 @@ static void __init pcibios_allocate_bus_resources(struct list_head *bus_list)
 				}
 			}
 		}
+
+		//递归进入子总线链表 最后处理兄弟节点 即深度优先
 		pcibios_allocate_bus_resources(&bus->children);
 	}
 }
@@ -151,14 +162,19 @@ static void __init pcibios_allocate_resources(int pass)
 	u16 command;
 	struct resource *r;
 
-	for_each_pci_dev(dev) {
+    //遍历所有的pci设备
+	for_each_pci_dev(dev) 
+	{
 		pci_read_config_word(dev, PCI_COMMAND, &command);
-		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
+		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) 
+		{
 			r = &dev->resource[idx];
-			if (r->parent)		/* Already allocated */
+			if (r->parent)		/* Already allocated 资源空间已经分配*/
 				continue;
-			if (!r->start)		/* Address not assigned at all */
+			
+			if (!r->start)		/* Address not assigned at all 起始地址还未设置*/
 				continue;
+			
 			if (r->flags & IORESOURCE_IO)
 				disabled = !(command & PCI_COMMAND_IO);
 			else
@@ -193,6 +209,7 @@ static void __init pcibios_allocate_resources(int pass)
 	}
 }
 
+//为没有分配资源的pci设备分配资源空间
 static int __init pcibios_assign_resources(void)
 {
 	struct pci_dev *dev = NULL;
@@ -223,9 +240,12 @@ static int __init pcibios_assign_resources(void)
 void __init pcibios_resource_survey(void)
 {
 	DBG("PCI: Allocating resources\n");
+	//递归为每条子总线保留资源窗口 若可以保留 则将资源挂到父资源的链表中 否则使资源失效
 	pcibios_allocate_bus_resources(&pci_root_buses);
-	pcibios_allocate_resources(0);
-	pcibios_allocate_resources(1);
+
+	//为所有的pci设备保留资源区间
+	pcibios_allocate_resources(0);//先处理启动的pci设备
+	pcibios_allocate_resources(1);//在处理禁止的pci设置
 
 	e820_reserve_resources_late();
 	/*

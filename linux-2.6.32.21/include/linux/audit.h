@@ -75,7 +75,8 @@
 #define AUDIT_LAST_USER_MSG	1199
 #define AUDIT_FIRST_USER_MSG2	2100	/* More user space messages */
 #define AUDIT_LAST_USER_MSG2	2999
- 
+
+/*涓嬮潰鐨勬殏鏃舵病娌′娇鐢?/
 #define AUDIT_DAEMON_START      1200    /* Daemon startup record */
 #define AUDIT_DAEMON_END        1201    /* Daemon normal stop record */
 #define AUDIT_DAEMON_ABORT      1202    /* Daemon error stop record */
@@ -126,6 +127,7 @@
 #define AUDIT_LAST_KERN_ANOM_MSG    1799
 #define AUDIT_ANOM_PROMISCUOUS      1700 /* Device changed promiscuous mode */
 #define AUDIT_ANOM_ABEND            1701 /* Process ended abnormally */
+
 #define AUDIT_INTEGRITY_DATA	    1800 /* Data integrity verification */
 #define AUDIT_INTEGRITY_METADATA    1801 /* Metadata integrity verification */
 #define AUDIT_INTEGRITY_STATUS	    1802 /* Integrity enable status */
@@ -135,13 +137,14 @@
 
 #define AUDIT_KERNEL		2000	/* Asynchronous audit record. NOT A REQUEST. */
 
+//规则链表的类型  所有的规则放在audit_filter_list数组中
 /* Rule flags */
-#define AUDIT_FILTER_USER	0x00	/* Apply rule to user-generated messages */
-#define AUDIT_FILTER_TASK	0x01	/* Apply rule at task creation (not syscall) */
-#define AUDIT_FILTER_ENTRY	0x02	/* Apply rule at syscall entry */
-#define AUDIT_FILTER_WATCH	0x03	/* Apply rule to file system watches */
-#define AUDIT_FILTER_EXIT	0x04	/* Apply rule at syscall exit */
-#define AUDIT_FILTER_TYPE	0x05	/* Apply rule at audit_log_start */
+#define AUDIT_FILTER_USER	0x00	/* Apply rule to user-generated messages 用于过滤用户产生的审计消息*/
+#define AUDIT_FILTER_TASK	0x01	/* Apply rule at task creation (not syscall)用于任务（进程）创建时的消息过滤 */
+#define AUDIT_FILTER_ENTRY	0x02	/* Apply rule at syscall entry 用于进入系统调用时的消息过滤*/
+#define AUDIT_FILTER_WATCH	0x03	/* Apply rule to file system watches 用于文件系统监视的消息过滤 */
+#define AUDIT_FILTER_EXIT	0x04	/* Apply rule at syscall exit 用于系统调用结束时的消息过滤*/
+#define AUDIT_FILTER_TYPE	0x05	/* Apply rule at audit_log_start 专门用于audit_log_start函数的消息过滤*/
 
 #define AUDIT_NR_FILTERS	6
 
@@ -149,14 +152,15 @@
 
 /* Rule actions */
 #define AUDIT_NEVER    0	/* Do not build context if rule matches */
-#define AUDIT_POSSIBLE 1	/* Build context if rule matches  */
-#define AUDIT_ALWAYS   2	/* Generate audit record if rule matches */
+#define AUDIT_POSSIBLE 1	/* Build context if rule matches  已经不用*/
+#define AUDIT_ALWAYS   2	/* Generate audit record if rule matches 如果规则匹配则生成日志记录*/
 
 /* Rule structure sizes -- if these change, different AUDIT_ADD and
  * AUDIT_LIST commands must be implemented. */
 #define AUDIT_MAX_FIELDS   64
 #define AUDIT_MAX_KEY_LEN  256
 #define AUDIT_BITMASK_SIZE 64
+
 #define AUDIT_WORD(nr) ((__u32)((nr)/32))
 #define AUDIT_BIT(nr)  (1 << ((nr) - AUDIT_WORD(nr)*32))
 
@@ -272,7 +276,7 @@ enum {
 #define AUDIT_STATUS_FAILURE		0x0002
 #define AUDIT_STATUS_PID		0x0004
 #define AUDIT_STATUS_RATE_LIMIT		0x0008
-#define AUDIT_STATUS_BACKLOG_LIMIT	0x0010
+#define AUDIT_STATUS_BACKLOG_LIMIT	0x0010 //audit_status{}
 				/* Failure-to-log actions */
 #define AUDIT_FAIL_SILENT	0
 #define AUDIT_FAIL_PRINTK	1
@@ -309,18 +313,18 @@ enum {
 #define AUDIT_ARCH_SPARC64	(EM_SPARCV9|__AUDIT_ARCH_64BIT)
 #define AUDIT_ARCH_X86_64	(EM_X86_64|__AUDIT_ARCH_64BIT|__AUDIT_ARCH_LE)
 
-#define AUDIT_PERM_EXEC		1
-#define AUDIT_PERM_WRITE	2
-#define AUDIT_PERM_READ		4
-#define AUDIT_PERM_ATTR		8
+#define AUDIT_PERM_EXEC		1  //执行
+#define AUDIT_PERM_WRITE	2  //写
+#define AUDIT_PERM_READ		4  //读
+#define AUDIT_PERM_ATTR		8  //属性	
 
 struct audit_status {
-	__u32		mask;		/* Bit mask for valid entries */
-	__u32		enabled;	/* 1 = enabled, 0 = disabled */
-	__u32		failure;	/* Failure-to-log action */
+	__u32		mask;		/* Bit mask for valid entries AUDIT_STATUS_BACKLOG_LIMIT*/
+	__u32		enabled;	/* 1 = enabled, 0 = disabled  是否启用audit   ,  0  暂时关闭审计功能,   1 开启审计功能    ,2锁定审计配置 即不能对审计配置规则*/  
+	__u32		failure;	/* Failure-to-log action 设置检测到严重错误时执行的操作 0=silent 1=printk 2=panic  audit_failure*/
 	__u32		pid;		/* pid of auditd process */
-	__u32		rate_limit;	/* messages rate limit (per second) */
-	__u32		backlog_limit;	/* waiting messages limit */
+	__u32		rate_limit;	/* messages rate limit (per second) 产生审计日志的频率 audit -r*/
+	__u32		backlog_limit;	/* waiting messages limit 设置审计缓冲区大小 audit_backlog_limit*/
 	__u32		lost;		/* messages lost */
 	__u32		backlog;	/* messages waiting in queue */
 };
@@ -350,7 +354,7 @@ struct audit_rule_data {
  * AUDIT_ADD, AUDIT_DEL and AUDIT_LIST requests.
  */
 struct audit_rule {		/* for AUDIT_LIST, AUDIT_ADD, and AUDIT_DEL */
-	__u32		flags;	/* AUDIT_PER_{TASK,CALL}, AUDIT_PREPEND */
+	__u32		flags;	/* AUDIT_PER_{TASK,CALL}, AUDIT_PREPEND  AUDIT_FILTER_EXIT*/
 	__u32		action;	/* AUDIT_NEVER, AUDIT_POSSIBLE, AUDIT_ALWAYS */
 	__u32		field_count;
 	__u32		mask[AUDIT_BITMASK_SIZE];
@@ -377,29 +381,30 @@ struct mqstat;
 struct audit_watch;
 struct audit_tree;
 
+//表示一条审计规则
 struct audit_krule {
 	int			vers_ops;
 	u32			flags;
-	u32			listnr;
-	u32			action;
-	u32			mask[AUDIT_BITMASK_SIZE];
-	u32			buflen; /* for data alloc on list rules */
-	u32			field_count;
-	char			*filterkey; /* ties events to rules */
-	struct audit_field	*fields;
+	u32			listnr; //规则链表标识,如:AUDIT_FILTER_EXIT  listnr指明是6个规则链表中的哪一个
+	u32			action;//操作域,为 never 或 always,如:AUDIT_ALWAYS action是审计系统对符合该规则的审计消息所采取的动作
+	u32			mask[AUDIT_BITMASK_SIZE]; //系统调用号计算成掩码位,如:open系统调用 
+	u32			buflen; /* for data alloc on list rules 链表规则上分配的缓冲区长度*/
+	u32			field_count;//规则域数组的成员个数
+	char			*filterkey; /* ties events to rules 当 fields->type= AUDIT_FILTERKEY 时的过滤关键字 如果auditctl 指定-k 会设置此值*/
+	struct audit_field	*fields;//*规则域数组,定义规则的事件类型及比较运算符等
 	struct audit_field	*arch_f; /* quick access to arch field */
-	struct audit_field	*inode_f; /* quick access to an inode field */
-	struct audit_watch	*watch;	/* associated watch */
+	struct audit_field	*inode_f; /* quick access to an inode field 对一个 inode 域的快速访问*/
+	struct audit_watch	*watch;	/* associated watch 用于文件系统监视的watch实例 若auditctl -w 添加文件审计*/
 	struct audit_tree	*tree;	/* associated watched tree */
 	struct list_head	rlist;	/* entry in audit_{watch,tree}.rules list */
-	struct list_head	list;	/* for AUDIT_LIST* purposes only */
+	struct list_head	list;	/* for AUDIT_LIST* purposes only 加入到audit_rules_list[]链表*/
 	u64			prio;
 };
 
 struct audit_field {
-	u32				type;
-	u32				val;
-	u32				op;
+	u32				type;/* 域的类型，比如AUDIT_PID*/
+	u32				val; /*用于和审计消息的相关信息比较的值*/
+	u32				op;/*操作符号定义,如:等于  AUDIT_EQUAL*/
 	char				*lsm_str;
 	void				*lsm_rule;
 };
@@ -443,8 +448,9 @@ static inline void audit_inode(const char *name, const struct dentry *dentry) {
 		__audit_inode(name, dentry);
 }
 static inline void audit_inode_child(const char *dname, 
-				     const struct dentry *dentry,
-				     const struct inode *parent) {
+				                               const struct dentry *dentry,
+				                               const struct inode *parent) 
+{
 	if (unlikely(!audit_dummy_context()))
 		__audit_inode_child(dname, dentry, parent);
 }

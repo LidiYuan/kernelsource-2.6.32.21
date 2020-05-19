@@ -145,6 +145,7 @@ struct execute_work {
  * work_pending - Find out whether a work item is currently pending
  * @work: The work item in question
  */
+ //检测work项目是否正在处于挂起状态
 #define work_pending(work) \
 	test_bit(WORK_STRUCT_PENDING, work_data_bits(work))
 

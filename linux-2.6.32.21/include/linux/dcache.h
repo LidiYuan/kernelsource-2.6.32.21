@@ -126,7 +126,7 @@ struct dentry {
 	unsigned long d_time;		/* used by d_revalidate ：重新变为有效的时间！注意只要操作成功这个dentry就是有效的，否则无效*/
 	const struct dentry_operations *d_op;//目录项操作
 	struct super_block *d_sb;	/* The root of the dentry tree 这个目录项所属的文件系统的超级块*/
-	void *d_fsdata;			/* fs-specific data */
+	void *d_fsdata;			/* fs-specific data 特殊数据 如sysfs中 此指向sysfs_dirent*/ 
 
 	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names 目录项名称*/
 };

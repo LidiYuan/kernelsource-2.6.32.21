@@ -195,8 +195,7 @@ static ssize_t type_show(struct firmware_map_entry *entry, char *buf)
 #define to_memmap_attr(_attr) container_of(_attr, struct memmap_attribute, attr)
 #define to_memmap_entry(obj) container_of(obj, struct firmware_map_entry, kobj)
 
-static ssize_t memmap_attr_show(struct kobject *kobj,
-				struct attribute *attr, char *buf)
+static ssize_t memmap_attr_show(struct kobject *kobj,struct attribute *attr, char *buf)
 {
 	struct firmware_map_entry *entry = to_memmap_entry(kobj);
 	struct memmap_attribute *memmap_attr = to_memmap_attr(attr);

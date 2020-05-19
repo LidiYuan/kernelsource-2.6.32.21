@@ -164,23 +164,40 @@ extern u64 timecounter_cyc2time(struct timecounter *tc,
 /sys/devices/system/clocksource/clocksource0/current_clocksource
 */
  //clocksource_hpet{}用于hpet时钟源    pit_cs{}用于pit时钟源
+ /*
+clocksource_tsc={"tsc",300}
+clocksource_sn2={"sn2_rtc",450}
+clocksource_uv={"sgi_rtc",400}
+clocksource clksrc={"tcb_clksrc",200}
+clocksource_hpet={"hpet",250}
+pit_cs={"pit",110}
+clocksource_jiffies={"jiffies",1}  //系统启动期间没有更好的选择 则使用这个
+
+*/
 struct clocksource {
 	/*
 	 * First part of structure is read mostly
 	 */
 	char *name;//时钟的名字
 	struct list_head list; //将所有的时钟连接在全局的clocksource_list中
+
+	            //1-99 表示在万不得已情况下使用此时钟原  100-199表示可用于实际应用,但若有更好的 则不使用此类  300-399表示时钟源快速且准确
+	            //400-499表示完美时钟源
 	int rating; //优先级 值越小 优先级越低，系统使用优先级高的时钟源
 
-	//读取时钟函数指针
+	//读取时钟周期当前计数值
 	cycle_t (*read)(struct clocksource *cs);
+
 	int (*enable)(struct clocksource *cs);
 	void (*disable)(struct clocksource *cs);
 	cycle_t mask;
 	u32 mult;
 	u32 shift;
 	u64 max_idle_ns;
-	unsigned long flags;
+
+	
+	unsigned long flags;//如CLOCK_SOURCE_IS_CONTINUOUS
+
 	cycle_t (*vread)(void);
 	void (*resume)(void);
 #ifdef CONFIG_IA64
@@ -208,6 +225,7 @@ struct clocksource {
 /*
  * Clock source flags bits::
  */
+ //表示还时钟是自由震荡的 不能跳跃,如果时钟源用于高分辨率 则应该设置此标志
 #define CLOCK_SOURCE_IS_CONTINUOUS		0x01
 #define CLOCK_SOURCE_MUST_VERIFY		0x02
 
@@ -216,6 +234,7 @@ struct clocksource {
 #define CLOCK_SOURCE_UNSTABLE			0x40
 
 /* simplify initialization of mask field */
+//根据给定的比特位构建适当的掩码
 #define CLOCKSOURCE_MASK(bits) (cycle_t)((bits) < 64 ? ((1ULL<<(bits))-1) : -1)
 
 /**

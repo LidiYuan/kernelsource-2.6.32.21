@@ -563,8 +563,10 @@ static void klist_children_put(struct klist_node *n)
  //对设备进行初始化
 void device_initialize(struct device *dev)
 {   
-	dev->kobj.kset = devices_kset;
-	kobject_init(&dev->kobj, &device_ktype);
+	dev->kobj.kset = devices_kset;//devices_kset 在内核初始化过程device_init中生成 /sys/devices
+	                              //devices_kset uevent表为device_event_ops
+	                              
+	kobject_init(&dev->kobj, &device_ktype);//device_ktype定义了公共属性操作表
 	INIT_LIST_HEAD(&dev->dma_pools);
 	init_MUTEX(&dev->sem);
 	spin_lock_init(&dev->devres_lock);
@@ -628,7 +630,7 @@ static struct kobject *get_device_parent(struct device *dev,
 		else if (parent->class)//dev->class存在 dev->parent->class也存在
 			return &parent->kobj;//返回父设备的kobj
 
-		else//父设备parent存在，parent->class不存在,获取父设备对象，接下来后面会创建类
+		else//父设备parent存在，parent->class不存在,获取父设备对象，后面会在parent_kobj的目录下创建和类名相同的目录 然后把dev放到这个目录下面
 			parent_kobj = &parent->kobj;
 
 		mutex_lock(&gdp_mutex);
@@ -658,8 +660,10 @@ static struct kobject *get_device_parent(struct device *dev,
 			return NULL;
 		}
 		k->kset = &dev->class->p->class_dirs;
+		
 		retval = kobject_add(k, parent_kobj, "%s", dev->class->name);
-		if (retval < 0) {
+		if (retval < 0) 
+		{
 			mutex_unlock(&gdp_mutex);
 			kobject_put(k);
 			return NULL;
@@ -918,6 +922,7 @@ int device_add(struct device *dev)
 	if (!dev)
 		goto done;
 
+    //检查设备的私有数据是否进行了分配
 	if (!dev->p) 
 	{
 		error = device_private_init(dev);
@@ -1307,6 +1312,7 @@ struct device *device_find_child(struct device *parent, void *data,
 //生成 /sys/devices /sys/dev  /sys/dev/block  /sys/dev/char
 int __init devices_init(void)
 {
+    //在/sys下创建devices
 	devices_kset = kset_create_and_add("devices", &device_uevent_ops, NULL);
 	if (!devices_kset)
 		return -ENOMEM;

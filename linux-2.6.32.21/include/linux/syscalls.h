@@ -457,9 +457,11 @@ asmlinkage long sys_sync(void);
 asmlinkage long sys_fsync(unsigned int fd);
 asmlinkage long sys_fdatasync(unsigned int fd);
 asmlinkage long sys_bdflush(int func, long data);
-asmlinkage long sys_mount(char __user *dev_name, char __user *dir_name,
-				char __user *type, unsigned long flags,
-				void __user *data);
+asmlinkage long sys_mount(char __user *dev_name, 
+	                           char __user *dir_name,
+				               char __user *type, 
+				               unsigned long flags,
+				               void __user *data);
 asmlinkage long sys_umount(char __user *name, int flags);
 asmlinkage long sys_oldumount(char __user *name);
 asmlinkage long sys_truncate(const char __user *path, long length);
@@ -522,9 +524,12 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len,
 asmlinkage long sys_mremap(unsigned long addr,
 			   unsigned long old_len, unsigned long new_len,
 			   unsigned long flags, unsigned long new_addr);
-asmlinkage long sys_remap_file_pages(unsigned long start, unsigned long size,
-			unsigned long prot, unsigned long pgoff,
-			unsigned long flags);
+
+asmlinkage long sys_remap_file_pages(unsigned long start, 
+	                                             unsigned long size,
+			                                     unsigned long prot, 
+			                                     unsigned long pgoff,
+			                                     unsigned long flags);
 asmlinkage long sys_msync(unsigned long start, size_t len, int flags);
 asmlinkage long sys_fadvise64(int fd, loff_t offset, size_t len, int advice);
 asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice);
@@ -583,8 +588,7 @@ asmlinkage long sys_sendfile64(int out_fd, int in_fd,
 asmlinkage long sys_readlink(const char __user *path,
 				char __user *buf, int bufsiz);
 asmlinkage long sys_creat(const char __user *pathname, int mode);
-asmlinkage long sys_open(const char __user *filename,
-				              int flags, int mode);
+asmlinkage long sys_open(const char __user *filename,int flags, int mode);
 asmlinkage long sys_close(unsigned int fd);
 asmlinkage long sys_access(const char __user *filename, int mode);
 asmlinkage long sys_vhangup(void);
@@ -630,9 +634,7 @@ asmlinkage long sys_llseek(unsigned int fd, unsigned long offset_high,
 			unsigned int origin);
 asmlinkage long sys_read(unsigned int fd, char __user *buf, size_t count);
 asmlinkage long sys_readahead(int fd, loff_t offset, size_t count);
-asmlinkage long sys_readv(unsigned long fd,
-			  const struct iovec __user *vec,
-			  unsigned long vlen);
+asmlinkage long sys_readv(unsigned long fd,const struct iovec __user *vec,unsigned long vlen);
 asmlinkage long sys_write(unsigned int fd, const char __user *buf,
 			  size_t count);
 asmlinkage long sys_writev(unsigned long fd,

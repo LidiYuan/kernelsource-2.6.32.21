@@ -564,8 +564,7 @@ EXPORT_SYMBOL(jiffies_to_timespec);
  * Instruction wise, this should cost only an additional add with carry
  * instruction above the way it was done above.
  */
-unsigned long
-timeval_to_jiffies(const struct timeval *value)
+unsigned long timeval_to_jiffies(const struct timeval *value)
 {
 	unsigned long sec = value->tv_sec;
 	long usec = value->tv_usec;

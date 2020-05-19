@@ -753,7 +753,8 @@ static void do_table(void *symval, unsigned long size,
 	size -= id_size;
 
 	for (i = 0; i < size; i += id_size) {
-		if (do_entry(mod->name, symval+i, alias)) {
+		if (do_entry(mod->name, symval+i, alias))
+		{
 			buf_printf(&mod->dev_table_buf,
 				   "MODULE_ALIAS(\"%s\");\n", alias);
 		}
@@ -784,9 +785,7 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
 	}
 
 	if (sym_is(symname, "__mod_pci_device_table"))
-		do_table(symval, sym->st_size,
-			 sizeof(struct pci_device_id), "pci",
-			 do_pci_entry, mod);
+		do_table(symval, sym->st_size,sizeof(struct pci_device_id), "pci",do_pci_entry, mod);
 	else if (sym_is(symname, "__mod_usb_device_table"))
 		/* special case to handle bcdDevice ranges */
 		do_usb_table(symval, sym->st_size, mod);

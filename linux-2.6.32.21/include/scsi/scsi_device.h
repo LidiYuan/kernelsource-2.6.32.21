@@ -64,7 +64,7 @@ struct scsi_event {
 	 * here
 	 */
 };
-
+//逻辑单元
 struct scsi_device {
 	struct Scsi_Host *host;
 	struct request_queue *request_queue;
@@ -78,7 +78,7 @@ struct scsi_device {
 					 * low-level. protected by queue_lock. */
 	spinlock_t list_lock;
 	struct list_head cmd_list;	/* queue of in use SCSI Command structures */
-	struct list_head starved_entry;
+	struct list_head starved_entry;//连接主机适配器的Scsi_Host{}.starved_list
 	struct scsi_cmnd *current_cmnd;	/* currently active command */
 	unsigned short queue_depth;	/* How deep of a queue we want */
 	unsigned short last_queue_full_depth; /* These two are used by */
@@ -225,6 +225,7 @@ enum scsi_target_state {
  * used for single_lun devices. If no one has active IO to the target,
  * starget_sdev_user is NULL, else it points to the active sdev.
  */
+ //目标节点
 struct scsi_target {
 	struct scsi_device	*starget_sdev_user;
 	struct list_head	siblings;

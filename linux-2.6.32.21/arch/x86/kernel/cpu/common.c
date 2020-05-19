@@ -1026,7 +1026,7 @@ void syscall_init(void)
 	 * set CS/DS but only a 32bit target. LSTAR sets the 64bit rip.
 	 */
 	wrmsrl(MSR_STAR,  ((u64)__USER32_CS)<<48  | ((u64)__KERNEL_CS)<<32);
-	wrmsrl(MSR_LSTAR, system_call);
+	wrmsrl(MSR_LSTAR, system_call);//64位系统将 系统调用地址放入MSR_LSTAR寄存器中  在执行syscall指令时候执行此寄存器中的函数
 	wrmsrl(MSR_CSTAR, ignore_sysret);
 
 #ifdef CONFIG_IA32_EMULATION

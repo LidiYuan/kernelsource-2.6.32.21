@@ -966,6 +966,12 @@ int pci_enable_device_mem(struct pci_dev *dev)
  *  Note we don't actually enable the device many times if we call
  *  this function repeatedly (we just increment the count).
  */
+ //在访问任何pci设备寄存器前 驱动需要启用pci设备 
+ /*
+如果设备处于挂起状态  则唤醒
+为设备分配io和内存空间  如果BISO没有分配的话
+分配一个IRQ 如果BISO没有分配
+*/
 int pci_enable_device(struct pci_dev *dev)
 {
 	return __pci_enable_device_flags(dev, IORESOURCE_MEM | IORESOURCE_IO);
@@ -1686,6 +1692,10 @@ err_out:
  *	Returns 0 on success, or %EBUSY on error.  A warning
  *	message is also printed on failure.
  */
+ //设备来验证是否别人在使用相同的地址空间
+ //pci_release_region()
+ //bar: BAR寄存器索引
+ //res_name:资源名
 int pci_request_region(struct pci_dev *pdev, int bar, const char *res_name)
 {
 	return __pci_request_region(pdev, bar, res_name, 0);
@@ -1847,6 +1857,7 @@ static void __pci_set_master(struct pci_dev *dev, bool enable)
  * Enables bus-mastering on the device and calls pcibios_set_master()
  * to do the needed arch specific settings.
  */
+ 
 void pci_set_master(struct pci_dev *dev)
 {
 	__pci_set_master(dev, true);

@@ -20,9 +20,9 @@ struct vfsmount;
 struct dentry;
 struct mnt_namespace;
 
-#define MNT_NOSUID	0x01 //绂佹璇ユ枃浠剁郴缁熺殑鏂囦欢璁剧疆setuid
-#define MNT_NODEV	0x02 //绂佹璁块棶璇ユ枃浠剁郴缁熺殑璁惧鏂囦欢
-#define MNT_NOEXEC	0x04 //绂佹鎵ц璇ユ枃浠剁郴缁熶笂鐨勫彲鎵ц鏂囦欢
+#define MNT_NOSUID	0x01 //在已安装文件系统中禁止setuid和setgid标志
+#define MNT_NODEV	0x02 //在已安装文件系统中禁止访问设备文件
+#define MNT_NOEXEC	0x04 //在已安装文件系统中不允许程序执行
 #define MNT_NOATIME	0x08
 #define MNT_NODIRATIME	0x10
 #define MNT_RELATIME	0x20

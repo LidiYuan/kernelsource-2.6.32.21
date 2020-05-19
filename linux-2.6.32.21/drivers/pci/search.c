@@ -135,7 +135,9 @@ struct pci_dev * pci_get_slot(struct pci_bus *bus, unsigned int devfn)
 	WARN_ON(in_interrupt());
 	down_read(&pci_bus_sem);
 
-	list_for_each(tmp, &bus->devices) {
+    //遍历总线的设备链表 判断某个逻辑设备是否存在
+	list_for_each(tmp, &bus->devices) 
+	{
 		dev = pci_dev_b(tmp);
 		if (dev->devfn == devfn)
 			goto out;

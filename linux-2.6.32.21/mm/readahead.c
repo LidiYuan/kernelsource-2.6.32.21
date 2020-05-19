@@ -86,15 +86,15 @@ int read_cache_pages(struct address_space *mapping, struct list_head *pages,
 	while (!list_empty(pages)) {
 		page = list_to_page(pages);
 		list_del(&page->lru);
-		if (add_to_page_cache_lru(page, mapping,
-					page->index, GFP_KERNEL)) {
+		if (add_to_page_cache_lru(page, mapping,page->index, GFP_KERNEL)) {
 			read_cache_pages_invalidate_page(mapping, page);
 			continue;
 		}
 		page_cache_release(page);
 
 		ret = filler(data, page);
-		if (unlikely(ret)) {
+		if (unlikely(ret)) 
+		{
 			read_cache_pages_invalidate_pages(mapping, pages);
 			break;
 		}
@@ -112,7 +112,7 @@ static int read_pages(struct address_space *mapping, struct file *filp,
 	int ret;
 
 	if (mapping->a_ops->readpages) {
-		ret = mapping->a_ops->readpages(filp, mapping, pages, nr_pages);
+		ret = mapping->a_ops->readpages(filp, mapping, pages, nr_pages);//调用个文件系统的readpages方法 如ext3_readpages
 		/* Clean up the remaining pages */
 		put_pages_list(pages);
 		goto out;
@@ -246,8 +246,7 @@ unsigned long ra_submit(struct file_ra_state *ra,
 {
 	int actual;
 
-	actual = __do_page_cache_readahead(mapping, filp,
-					ra->start, ra->size, ra->async_size);
+	actual = __do_page_cache_readahead(mapping, filp,ra->start, ra->size, ra->async_size);
 
 	return actual;
 }
@@ -398,13 +397,13 @@ ondemand_readahead(struct address_space *mapping,
 	/*
 	 * start of file
 	 */
-	if (!offset)
+	if (!offset)//首先判断如果是从文件头开始读取的，则认为是顺序读  跳到initial_readahead 初始化预读信息
 		goto initial_readahead;
 
 	/*
 	 * It's the expected callback offset, assume sequential access.
 	 * Ramp up sizes, and push forward the readahead window.
-	 */
+	 *///如果不是从文件头开始读，则判断是否是连续的读取请求，如果是，则扩大预读数量，一般等于上次预读数量 ×2。
 	if ((offset == (ra->start + ra->size - ra->async_size) ||
 	     offset == (ra->start + ra->size))) {
 		ra->start += ra->size;
@@ -463,7 +462,7 @@ ondemand_readahead(struct address_space *mapping,
 	return __do_page_cache_readahead(mapping, filp, offset, req_size, 0);
 
 initial_readahead:
-	ra->start = offset;
+	ra->start = offset;//开始读取的位置
 	ra->size = get_init_ra_size(req_size, max);
 	ra->async_size = ra->size > req_size ? ra->size - req_size : ra->size;
 
@@ -478,6 +477,7 @@ readit:
 		ra->size += ra->async_size;
 	}
 
+	// ra_submit() 提交读请求。
 	return ra_submit(ra, mapping, filp);
 }
 
@@ -503,7 +503,7 @@ void page_cache_sync_readahead(struct address_space *mapping,
 			                                  unsigned long req_size)
 {
 	/* no read-ahead */
-	if (!ra->ra_pages)
+	if (!ra->ra_pages)//若预读的最大页数为 0 ，则没有预读
 		return;
 
 	/* be dumb */

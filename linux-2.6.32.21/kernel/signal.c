@@ -1941,9 +1941,10 @@ relock:
 		 */
 		current->flags |= PF_SIGNALED;
 
-		if (sig_kernel_coredump(signr)) {
-			if (print_fatal_signals)
-				print_fatal_signal(regs, info->si_signo);
+		if (sig_kernel_coredump(signr)) 
+		{
+			if (print_fatal_signals)//以通过kernel.print-fatal-signals = 1进行设置，对应的节点是/proc/sys/kernel/print-fatal-signals
+				print_fatal_signal(regs, info->si_signo);//打印当前信号及当前场景的栈信息
 			/*
 			 * If it was able to dump core, this kills all
 			 * other threads in the group and synchronizes with

@@ -369,7 +369,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 	permitted = ptrace_may_access(task, PTRACE_MODE_READ);
 	mm = get_task_mm(task);
 	if (mm) {
-		vsize = task_vsize(mm);
+		vsize = task_vsize(mm);//进程地址空间大小
 		if (permitted) {
 			eip = KSTK_EIP(task);
 			esp = KSTK_ESP(task);

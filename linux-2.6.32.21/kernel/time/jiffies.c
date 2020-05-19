@@ -55,6 +55,7 @@ static cycle_t jiffies_read(struct clocksource *cs)
 	return (cycle_t) jiffies;
 }
 
+//在启动期间  计算机没有提供更好的选择 使用下面的时钟源
 struct clocksource clocksource_jiffies = {
 	.name		= "jiffies",
 	.rating		= 1, /* lowest valid rating 低优先级 在没有其他时钟的情况下使用*/

@@ -942,27 +942,32 @@ void __init trap_init(void)
 	/* Reserve all the builtin and the syscall vector: */
 	for (i = 0; i < FIRST_EXTERNAL_VECTOR; i++)
 		set_bit(i, used_vectors);
+	
 //以上为0~31  intel CPU保留的中断向量号	也就是异常处理函数
 /*************************************************************/		
 
+//若此项开启 则允许64字节内核运行32字节的程序
 #ifdef CONFIG_IA32_EMULATION
 	set_system_intr_gate(IA32_SYSCALL_VECTOR, ia32_syscall);
 	set_bit(IA32_SYSCALL_VECTOR, used_vectors);
 #endif
 
 #ifdef CONFIG_X86_32
-	if (cpu_has_fxsr) {
+	if (cpu_has_fxsr) 
+	{
 		printk(KERN_INFO "Enabling fast FPU save and restore... ");
 		set_in_cr4(X86_CR4_OSFXSR);
 		printk("done.\n");
 	}
-	if (cpu_has_xmm) {
+	if (cpu_has_xmm) 
+	{
 		printk(KERN_INFO
 			"Enabling unmasked SIMD FPU exception support... ");
 		set_in_cr4(X86_CR4_OSXMMEXCPT);
 		printk("done.\n");
 	}
 
+	//对于32位将int 0x80中断设置为system_call函数
 	set_system_trap_gate(SYSCALL_VECTOR, &system_call);
 	set_bit(SYSCALL_VECTOR, used_vectors);
 #endif
@@ -970,7 +975,8 @@ void __init trap_init(void)
 	/*
 	 * Should be a barrier for any external CPU state:
 	 */
-	cpu_init();
+	//如果是64位在这里面会对系统调用初始化 
+	cpu_init(); //这两个在x86中有两个 一个32位实现 一个64位实现
 
 	x86_init.irqs.trap_init();
 }

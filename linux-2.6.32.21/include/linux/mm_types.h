@@ -55,6 +55,10 @@ struct page {
 					 * to show when page is mapped
 					 * & limit reverse map searches.
 					 */
+					 /*
+                         初始值为-1 在该页被插入到逆向映射数据结构 计数器加1
+                         逆向映射是给定一个page能找到所有使用该页的进程
+					  */
 					 /*被页表映射的次数，也就是说该page同时被多少个进程共享。初始值为-1，如果只被一个进程的页表映射了，该值为0 。如果该page处于伙伴系统中，该值为PAGE_BUDDY_MAPCOUNT_VALUE（-128），内核通过判断该值是否为PAGE_BUDDY_MAPCOUNT_VALUE来确定该page是否属于伙伴系统。*/
 
 		struct 	
@@ -79,7 +83,7 @@ struct page {
 			    如果最低位置位，则为匿名映射，该指针指向anon_vma对象
 				anon_vma = (struct anon_vma *)(mapping - PAGE_MAPPING_ANON)
 			*/
-			struct address_space *mapping;
+			struct address_space *mapping;//看page_lock_anon_vma()
 	    };
 		
 #if USE_SPLIT_PTLOCKS
@@ -174,7 +178,7 @@ struct vm_area_struct {
 	/* linked list of VM areas per task, sorted by address */
 	struct vm_area_struct *vm_next, *vm_prev;  //双向链表 连接所有的虚拟内存区间
 
-	pgprot_t vm_page_prot;		/* Access permissions of this VMA. 和体系结构相关的区间属性*/
+	pgprot_t vm_page_prot;		/* Access permissions of this VMA. 该虚拟内存区域的访问权限*/
 	unsigned long vm_flags;		/* Flags, VM_READ  see mm.h. 和体系机构无关的区间属性 低4位可用也页表项的低四位*/
 
 	struct rb_node vm_rb; //红黑树连接点  为了快速定位地址属于哪个区间 所以采用红黑树
@@ -185,14 +189,15 @@ struct vm_area_struct {
 	 * linkage to the list of like vmas hanging off its node, or
 	 * linkage of vma in the address_space->i_mmap_nonlinear list.
 	 */
+	/* shared联合体用于和address space关联 */
 	union {
 		struct {
-			struct list_head list;
+			struct list_head list;/* 用于链入非线性映射的链表 */
 			void *parent;	/* aligns with prio_tree_node parent */
 			struct vm_area_struct *head;
 		} vm_set;
 
-		struct raw_prio_tree_node prio_tree_node;
+		struct raw_prio_tree_node prio_tree_node;/*线性映射则链入i_mmap优先树*/
 	} shared;
 
 	/*
@@ -201,6 +206,7 @@ struct vm_area_struct {
 	 * can only be in the i_mmap tree.  An anonymous MAP_PRIVATE, stack
 	 * or brk vma (with NULL file) can only be in an anon_vma list.
 	 */
+	//用于管理源自匿名映射的共享页  指向相同页的映射都保存在一个双链表上anon_vma_node充当链表元素
 	struct list_head anon_vma_node;	/* Serialized by anon_vma->lock */
 	struct anon_vma *anon_vma;	/* Serialized by page_table_lock 匿名vma对象*/
 
@@ -208,9 +214,10 @@ struct vm_area_struct {
 	const struct vm_operations_struct *vm_ops; //将文件系统file操作集放到此处
 
 	/* Information about our backing store: */
+	//文件映射的偏移量,该值只用于映射了文件的部分内容(整个文件映射的话此值为0)
 	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
 					   units, *not* PAGE_CACHE_SIZE 在文件中的偏移*/
-					   	
+				   	
 	struct file * vm_file;		/* File we map to (can be NULL).  被映射的文件*/
 	void * vm_private_data;		/* was vm_pte (shared mem) 私有数据*/
 	unsigned long vm_truncate_count;/* truncate_count or restart_addr */
@@ -241,7 +248,7 @@ struct mm_struct {
 											//用cat /proc/PID/maps 可以看到不同的虚拟内存空间
 											
 	struct rb_root mm_rb;////指向虚拟内存区间的红黑树
-	struct vm_area_struct * mmap_cache;	/* 最近使用的内存区域 */
+	struct vm_area_struct * mmap_cache;	/* 上一次find_vma的结果*/
 
 	//用来在进程地址空间中搜索有效的进程地址空间的函数
 	unsigned long (*get_unmapped_area) (struct file *filp,
@@ -301,7 +308,10 @@ struct mm_struct {
 
 	 //进程地址空间的大小，锁住无法换页的个数，共享文件内存映射的页数，可执行内存映射中的页数
 	unsigned long total_vm, locked_vm, shared_vm, exec_vm;
-	unsigned long stack_vm, reserved_vm, def_flags, nr_ptes;
+	unsigned long stack_vm, 
+		          reserved_vm, 
+		          def_flags, //为0或VM_LOCKED  VM_LOCKED标志映射的页无法被换出 此标志需要来mlockall系统调用来设置VM_LOCKED
+		          nr_ptes;
 
 	              //维护code段
 	unsigned long start_code,
@@ -342,7 +352,7 @@ struct mm_struct {
 	unsigned int token_priority;
 	unsigned int last_interval;
 
-	unsigned long flags; /* 状态标志 */
+	unsigned long flags; /* 状态标志  低两位表示是否可以coredump MMF_DUMPABLE_MASK SUID_DUMP_USER*/
 
 	struct core_state *core_state; /* coredumping support 核心转储的支持*/
 #ifdef CONFIG_AIO

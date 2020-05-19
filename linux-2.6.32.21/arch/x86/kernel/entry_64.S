@@ -452,11 +452,23 @@ END(ret_from_fork)
  * with them due to bugs in both AMD and Intel CPUs.
  */
 
+/*
+https://sourceware.org/binutils/docs/as/CFI-directives.html
+Call Frame infromation
+
+#define CFI_STARTPROC	.cfi_startproc
+#define CFI_ENDPROC	    .cfi_endproc
+#define CFI_DEF_CFA	    .cfi_def_cfa
+#define CFI_REGISTER	.cfi_register  register1, register2   将register1中的值保存到register2中
+#define CFI_REL_OFFSET	.cfi_rel_offset
+#define CFI_UNDEFINED	.cfi_undefined
+*/
+
 ENTRY(system_call)
-	CFI_STARTPROC	simple
+	CFI_STARTPROC	simple    //    #define CFI_STARTPROC .cfi_startproc  用在每个函数的开始，用于初始化一些内部数据结构
 	CFI_SIGNAL_FRAME
-	CFI_DEF_CFA	rsp,KERNEL_STACK_OFFSET
-	CFI_REGISTER	rip,rcx
+	CFI_DEF_CFA	rsp,KERNEL_STACK_OFFSET  ////定义计算CFA的规则
+	CFI_REGISTER	rip,rcx   //#define CFI_REGISTER .cfi_register
 	/*CFI_REGISTER	rflags,r11*/
 	SWAPGS_UNSAFE_STACK
 	/*
@@ -464,35 +476,42 @@ ENTRY(system_call)
 	 * after the swapgs, so that it can do the swapgs
 	 * for the guest and jump here on syscall.
 	 */
+	 //上面的几行代码执行了swapgs指令。修改gs寄存器从用户态切换到内核态，其实就是修改运行级别
 ENTRY(system_call_after_swapgs)
 
-	movq	%rsp,PER_CPU_VAR(old_rsp)
-	movq	PER_CPU_VAR(kernel_stack),%rsp
+	movq	%rsp,PER_CPU_VAR(old_rsp)//保存原来的rsp
+	movq	PER_CPU_VAR(kernel_stack),%rsp //切换到内核堆栈
 	/*
 	 * No need to follow this irqs off/on section - it's straight
 	 * and short:
 	 */
-	ENABLE_INTERRUPTS(CLBR_NONE)
+	ENABLE_INTERRUPTS(CLBR_NONE)  //开中断
 	SAVE_ARGS 8,1
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp)
 	movq  %rcx,RIP-ARGOFFSET(%rsp)
 	CFI_REL_OFFSET rip,RIP-ARGOFFSET
-	GET_THREAD_INFO(%rcx)
-	testl $_TIF_WORK_SYSCALL_ENTRY,TI_flags(%rcx)
-	jnz tracesys
+	GET_THREAD_INFO(%rcx)  //此处获得thread_info地址
+	testl $_TIF_WORK_SYSCALL_ENTRY, TI_flags(%rcx) //这里检查 此系统调用是否正在被跟踪 TI_flags()是获得thread_info{}->flags
+	jnz tracesys   //做一些系统调用追踪的事情   
+
+	//进行快速系统调用
 system_call_fastpath:
-	cmpq $__NR_syscall_max,%rax
-	ja badsys
-	movq %r10,%rcx
-	call *sys_call_table(,%rax,8)  # XXX:	 rip relative
-	movq %rax,RAX-ARGOFFSET(%rsp)
+	cmpq $__NR_syscall_max,%rax   #比较系统调用号
+	ja badsys                     #大于最大系统调用号 则跳到badsys
+
+	movq %r10,%rcx                 
+	call *sys_call_table(,%rax,8)  # XXX:	 rip relative  //此处调用系统调用的处理例程 系统调用表8字节对齐
+	movq %rax,RAX-ARGOFFSET(%rsp)  #存储返回的值
+
 /*
  * Syscall return path ending with SYSRET (fast path)
  * Has incomplete stack frame and undefined top of stack.
  */
+#从系统调用返回
 ret_from_sys_call:
 	movl $_TIF_ALLWORK_MASK,%edi
 	/* edi:	flagmask */
+
 sysret_check:
 	LOCKDEP_SYS_EXIT
 	GET_THREAD_INFO(%rcx)
@@ -516,6 +535,7 @@ sysret_check:
 	CFI_RESTORE_STATE
 	/* Handle reschedules */
 	/* edx:	work, edi: workmask */
+	
 sysret_careful:
 	bt $TIF_NEED_RESCHED,%edx
 	jnc sysret_signal
@@ -544,16 +564,19 @@ sysret_signal:
 	FIXUP_TOP_OF_STACK %r11, -ARGOFFSET
 	jmp int_check_syscall_exit_work
 
+#系统调用号不对
 badsys:
 	movq $-ENOSYS,RAX-ARGOFFSET(%rsp)
 	jmp ret_from_sys_call
 
+#开启了审计特性
 #ifdef CONFIG_AUDITSYSCALL
 	/*
 	 * Fast path for syscall audit without full syscall trace.
 	 * We just call audit_syscall_entry() directly, and then
 	 * jump back to the normal fast path.
 	 */
+#对系统调用进行审计	 
 auditsys:
 	movq %r10,%r9			/* 6th arg: 4th syscall arg */
 	movq %rdx,%r8			/* 5th arg: 3rd syscall arg */
@@ -582,7 +605,7 @@ sysret_audit:
 #endif	/* CONFIG_AUDITSYSCALL */
 
 	/* Do syscall tracing */
-tracesys:
+tracesys:  //系统调用追踪的事情
 #ifdef CONFIG_AUDITSYSCALL
 	testl $(_TIF_WORK_SYSCALL_ENTRY & ~_TIF_SYSCALL_AUDIT),TI_flags(%rcx)
 	jz auditsys
@@ -673,8 +696,11 @@ int_restore_rest:
 	DISABLE_INTERRUPTS(CLBR_NONE)
 	TRACE_IRQS_OFF
 	jmp int_with_check
-	CFI_ENDPROC
-END(system_call)
+	CFI_ENDPROC   //#define CFI_ENDPROC .cfi_endproc   //在函数结束的时候使用与.cfi_startproc相配套使用
+
+
+END(system_call)  
+##########################################################################系统调用结束******#######################################
 
 /*
  * Certain special system calls that need to save a complete full stack frame.

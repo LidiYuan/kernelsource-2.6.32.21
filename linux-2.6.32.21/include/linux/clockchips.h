@@ -74,10 +74,10 @@ enum clock_event_nofitiers {
  * @mode:		operating mode assigned by the management code
  * @next_event:		local storage for the next event in oneshot mode
  */
- //  /proc/timer_list查看系统中的时钟事件对象
 struct clock_event_device {
-	const char		*name; //时钟事件对象名
+	const char		*name; //时钟事件对象名 显示在 /proc/timer_list
 	unsigned int		features;//功能(周期性或一次性触发)CLOCK_EVT_MODE_PERIODIC或CLOCK_EVT_MODE_ONESHOT(单次触发  动态时钟依赖此模式)
+
 	unsigned long		max_delta_ns;//最大中断周期
 	unsigned long		min_delta_ns;//最小中断周期
 
@@ -96,7 +96,8 @@ struct clock_event_device {
 	void			(*set_mode)(enum clock_event_mode mode,
 					    struct clock_event_device *);
 
-	//中断处理函数hrtimer_interrupt()或   tick_handle_oneshot_broadcast()
+    //将时钟事件传递到通用时间子系统
+	// tick_handle_oneshot_broadcast()
 	void			(*event_handler)(struct clock_event_device *);
 
 	
@@ -106,7 +107,7 @@ struct clock_event_device {
 	//当前的工作模式
 	enum clock_event_mode	mode;
 
-	ktime_t			next_event;
+	ktime_t			next_event;//存储了下一个事件的绝对时间	
 };
 
 /*

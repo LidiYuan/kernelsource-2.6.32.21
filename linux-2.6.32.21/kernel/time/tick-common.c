@@ -59,7 +59,8 @@ int tick_is_oneshot_available(void)
  */
  //周期性触发 时钟中断处理程序
 static void tick_periodic(int cpu)
-{
+{   
+    //该cpu负责负责全局时钟
 	if (tick_do_timer_cpu == cpu) 
 	{
 		write_seqlock(&xtime_lock);
@@ -81,15 +82,16 @@ static void tick_periodic(int cpu)
 /*
  * Event handler for periodic ticks
  */
- //时钟中断触发处理函数
+ //时钟中断触发处理函数 (周期性时钟)
 void tick_handle_periodic(struct clock_event_device *dev)
 {
 	int cpu = smp_processor_id();
 	ktime_t next;
 
+    //周期处理的任务在下面函数中执行  如更新jiffies 进程统计信息
 	tick_periodic(cpu);
 
-   //触发模式不是单次触发 	
+   //如果触发模式是周期性的 则下面的就不用在执行 	
 	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
 		return;
 	/*
@@ -98,7 +100,10 @@ void tick_handle_periodic(struct clock_event_device *dev)
 	 */
 	//计算下一次中断时机
 	next = ktime_add(dev->next_event, tick_period);
-	for (;;) {
+	for (;;) 
+	{
+	   //返回失败说明下一个时钟事件的时间已经过去 需要在下面手动调用tick_periodic()
+	   //并尝试再次变成设置该事件 直到成功
 		if (!clockevents_program_event(dev, next, ktime_get()))
 			return;
 		/*
@@ -112,12 +117,16 @@ void tick_handle_periodic(struct clock_event_device *dev)
 		 */
 		if (timekeeping_valid_for_hres())
 			tick_periodic(cpu);
+
+		//下一个事件时间
 		next = ktime_add(next, tick_period);
 	}
 }
 
 /*
  * Setup the device for a periodic tick
+ *
+   安装周期时钟设备
  */
 void tick_setup_periodic(struct clock_event_device *dev, int broadcast)
 {
@@ -127,10 +136,14 @@ void tick_setup_periodic(struct clock_event_device *dev, int broadcast)
 	if (!tick_device_is_functional(dev))
 		return;
 
-	if ((dev->features & CLOCK_EVT_FEAT_PERIODIC) &&
-	    !tick_broadcast_oneshot_active()) {
+	if ((dev->features & CLOCK_EVT_FEAT_PERIODIC) &&  //此设备是否支持周期性
+	    !tick_broadcast_oneshot_active()) 
+	{
+	    //将模式设置为周期性
 		clockevents_set_mode(dev, CLOCK_EVT_MODE_PERIODIC);
-	} else {
+	} 
+	else 
+	{
 		unsigned long seq;
 		ktime_t next;
 
@@ -139,9 +152,12 @@ void tick_setup_periodic(struct clock_event_device *dev, int broadcast)
 			next = tick_next_period;
 		} while (read_seqretry(&xtime_lock, seq));
 
+		//设置为单触发模式
 		clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT);
 
-		for (;;) {
+		for (;;) 
+		{
+		    //编程设置下一个时钟事件
 			if (!clockevents_program_event(dev, next, ktime_get()))
 				return;
 			next = ktime_add(next, tick_period);
@@ -151,10 +167,12 @@ void tick_setup_periodic(struct clock_event_device *dev, int broadcast)
 
 /*
  * Setup the tick device
+ * 安装一个时钟设备
  */
 static void tick_setup_device(struct tick_device *td,
-			      struct clock_event_device *newdev, int cpu,
-			      const struct cpumask *cpumask)
+                                        struct clock_event_device *newdev, 
+                                        int cpu,
+			                            const struct cpumask *cpumask)
 {
 	ktime_t next_event;
 	void (*handler)(struct clock_event_device *) = NULL;
@@ -162,7 +180,8 @@ static void tick_setup_device(struct tick_device *td,
 	/*
 	 * First device setup ?  //是否为第一次安装设备
 	 */
-	if (!td->evtdev) {
+	if (!td->evtdev) 
+	{
 		/*
 		 * If no cpu took the do_timer update, assign it to
 		 * this cpu:
@@ -291,6 +310,7 @@ static int tick_check_new_device(struct clock_event_device *newdev)
 
 	//根据不同情况设置clock_event_device{}->handler指针
 	tick_setup_device(td, newdev, cpu, cpumask_of(cpu));
+
 	if (newdev->features & CLOCK_EVT_FEAT_ONESHOT)
 		tick_oneshot_notify();
 

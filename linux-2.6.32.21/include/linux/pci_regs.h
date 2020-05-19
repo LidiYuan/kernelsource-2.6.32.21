@@ -26,9 +26,23 @@
  * Under PCI, each device has 256 bytes of configuration address space,
  * of which the first 64 bytes are standardized as follows:
  */
-#define PCI_VENDOR_ID		0x00	/* 16 bits */
-#define PCI_DEVICE_ID		0x02	/* 16 bits */
-#define PCI_COMMAND		0x04	/* 16 bits */
+/*下面16个字节是各种类型的pci配置空间所共有的*/ 
+/********************************************************
+
+31                  16   15                       0
+---------------------------------------------------
+设备id                 |      厂商id
+---------------------------------------------------
+状态寄存器             |    命令寄存器
+---------------------------------------------------
+类编码                              |  修正号id   
+---------------------------------------------------
+BIST      | 头类型     | 延时定时器 |  缓存线长度
+---------------------------------------------------
+*/
+#define PCI_VENDOR_ID		0x00	/* 16 bits 厂商id 表示了设备的制造商 厂商标识符由pci特定兴趣小组pci-sig统一分配 0xffff是一个无效值*/
+#define PCI_DEVICE_ID		0x02	/* 16 bits 设备id 表示了特定的设备 这个由厂商自己指定*/
+#define PCI_COMMAND		0x04	/* 16 bits 命令寄存器 包含了各种特性的位掩码*/
 #define  PCI_COMMAND_IO		0x1	/* Enable response in I/O space */
 #define  PCI_COMMAND_MEMORY	0x2	/* Enable response in Memory space */
 #define  PCI_COMMAND_MASTER	0x4	/* Enable bus mastering */
@@ -41,7 +55,7 @@
 #define  PCI_COMMAND_FAST_BACK	0x200	/* Enable back-to-back writes */
 #define  PCI_COMMAND_INTX_DISABLE 0x400 /* INTx Emulation Disable */
 
-#define PCI_STATUS		0x06	/* 16 bits */
+#define PCI_STATUS		0x06	/* 16 bits 状态寄存器 被用来报告支持哪写特性 以及是否出现了某种错误*/
 #define  PCI_STATUS_INTERRUPT	0x08	/* Interrupt status */
 #define  PCI_STATUS_CAP_LIST	0x10	/* Support Capability List */
 #define  PCI_STATUS_66MHZ	0x20	/* Support 66 Mhz PCI 2.1 bus */
@@ -58,17 +72,17 @@
 #define  PCI_STATUS_SIG_SYSTEM_ERROR	0x4000 /* Set when we drive SERR */
 #define  PCI_STATUS_DETECTED_PARITY	0x8000 /* Set on parity error */
 
-#define PCI_CLASS_REVISION	0x08	/* High 24 bits are class, low 8 revision */
-#define PCI_REVISION_ID		0x08	/* Revision ID */
+#define PCI_CLASS_REVISION	0x08	/* High 24 bits are class, low 8 revision 高24位位类编码  低8位为修正号id*/
+#define PCI_REVISION_ID		0x08	/* Revision ID 修正号id 指定了设备的修正号 这个标识由厂商指定 0也有效 这个可以看作设备id的扩充*/
 #define PCI_CLASS_PROG		0x09	/* Reg. Level Programming Interface */
 #define PCI_CLASS_DEVICE	0x0a	/* Device class */
 
-#define PCI_CACHE_LINE_SIZE	0x0c	/* 8 bits */
-#define PCI_LATENCY_TIMER	0x0d	/* 8 bits */
-#define PCI_HEADER_TYPE		0x0e	/* 8 bits */
-#define  PCI_HEADER_TYPE_NORMAL		0
-#define  PCI_HEADER_TYPE_BRIDGE		1
-#define  PCI_HEADER_TYPE_CARDBUS	2
+#define PCI_CACHE_LINE_SIZE	0x0c	/* 8 bits 缓存线长度*/
+#define PCI_LATENCY_TIMER	0x0d	/* 8 bits 延时定时器*/
+#define PCI_HEADER_TYPE		0x0e	/* 8 bits 头类型*/
+#define  PCI_HEADER_TYPE_NORMAL		0 //pci普通设备
+#define  PCI_HEADER_TYPE_BRIDGE		1 //pic桥设备
+#define  PCI_HEADER_TYPE_CARDBUS	2 //cardBus桥
 
 #define PCI_BIST		0x0f	/* 8 bits */
 #define  PCI_BIST_CODE_MASK	0x0f	/* Return result */
@@ -81,71 +95,85 @@
  * 0xffffffff to the register, and reading it back.  Only
  * 1 bits are decoded.
  */
+
+//对于类型0不同寄存器如下
+/*
+
+
+*/
+
+ //类型为0的pci设备 从0x10开始是 6个32位的基地址寄存器
 #define PCI_BASE_ADDRESS_0	0x10	/* 32 bits */
 #define PCI_BASE_ADDRESS_1	0x14	/* 32 bits [htype 0,1 only] */
 #define PCI_BASE_ADDRESS_2	0x18	/* 32 bits [htype 0 only] */
 #define PCI_BASE_ADDRESS_3	0x1c	/* 32 bits */
 #define PCI_BASE_ADDRESS_4	0x20	/* 32 bits */
 #define PCI_BASE_ADDRESS_5	0x24	/* 32 bits */
-#define  PCI_BASE_ADDRESS_SPACE		0x01	/* 0 = memory, 1 = I/O */
-#define  PCI_BASE_ADDRESS_SPACE_IO	0x01
-#define  PCI_BASE_ADDRESS_SPACE_MEMORY	0x00
-#define  PCI_BASE_ADDRESS_MEM_TYPE_MASK	0x06
-#define  PCI_BASE_ADDRESS_MEM_TYPE_32	0x00	/* 32 bit address */
-#define  PCI_BASE_ADDRESS_MEM_TYPE_1M	0x02	/* Below 1M [obsolete] */
-#define  PCI_BASE_ADDRESS_MEM_TYPE_64	0x04	/* 64 bit address */
-#define  PCI_BASE_ADDRESS_MEM_PREFETCH	0x08	/* prefetchable? */
+#define  PCI_BASE_ADDRESS_SPACE		0x01	/* 0 = memory, 1 = I/O  被用来寄存器映射到内存空间或者io空间*/
+#define  PCI_BASE_ADDRESS_SPACE_IO	0x01   //映射到io空间
+#define  PCI_BASE_ADDRESS_SPACE_MEMORY	0x00  //映射到内存空间
+
+#define  PCI_BASE_ADDRESS_MEM_TYPE_MASK	0x06 //类型掩码
+ #define  PCI_BASE_ADDRESS_MEM_TYPE_32	0x00	/* 32 bit address 定位32位地址空间*/
+ #define  PCI_BASE_ADDRESS_MEM_TYPE_1M	0x02	/* Below 1M [obsolete] 预留*/
+ #define  PCI_BASE_ADDRESS_MEM_TYPE_64	0x04	/* 64 bit address 定位64位地址空间*/
+ #define  PCI_BASE_ADDRESS_MEM_PREFETCH	0x08	/* prefetchable? */
 #define  PCI_BASE_ADDRESS_MEM_MASK	(~0x0fUL)
 #define  PCI_BASE_ADDRESS_IO_MASK	(~0x03UL)
 /* bit 1 is reserved if address_space = 1 */
 
 /* Header type 0 (normal devices) */
-#define PCI_CARDBUS_CIS		0x28
-#define PCI_SUBSYSTEM_VENDOR_ID	0x2c
-#define PCI_SUBSYSTEM_ID	0x2e
-#define PCI_ROM_ADDRESS		0x30	/* Bits 31..11 are address, 10..1 reserved */
+#define PCI_CARDBUS_CIS		0x28 //cardbus cis指针
+
+//下面两个进一步标识设备
+#define PCI_SUBSYSTEM_VENDOR_ID	0x2c//子系统厂商id 
+#define PCI_SUBSYSTEM_ID	0x2e //子系统设备id   
+
+#define PCI_ROM_ADDRESS		0x30	/* Bits 31..11 are address, 10..1 reserved 扩展rom基地址*/
 #define  PCI_ROM_ADDRESS_ENABLE	0x01
 #define PCI_ROM_ADDRESS_MASK	(~0x7ffUL)
 
 #define PCI_CAPABILITY_LIST	0x34	/* Offset of first capability list entry */
 
 /* 0x35-0x3b are reserved */
-#define PCI_INTERRUPT_LINE	0x3c	/* 8 bits */
-#define PCI_INTERRUPT_PIN	0x3d	/* 8 bits */
+#define PCI_INTERRUPT_LINE	0x3c	/* 8 bits 中断线 给出了ISA IRQ编号*/
+#define PCI_INTERRUPT_PIN	0x3d	/* 8 bits 中断引脚寄存器报告设备使用哪个中断引脚 值1对应INT# 值2对应INTB# 值3对应INTC# 值4对应INTD#
+                                               如果不使用中断引脚  则该域应该清0*/
 #define PCI_MIN_GNT		0x3e	/* 8 bits */
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
 /* Header type 1 (PCI-to-PCI bridges) */
-#define PCI_PRIMARY_BUS		0x18	/* Primary bus number */
-#define PCI_SECONDARY_BUS	0x19	/* Secondary bus number */
-#define PCI_SUBORDINATE_BUS	0x1a	/* Highest bus number behind the bridge */
-#define PCI_SEC_LATENCY_TIMER	0x1b	/* Latency timer for secondary interface */
-#define PCI_IO_BASE		0x1c	/* I/O range behind the bridge */
-#define PCI_IO_LIMIT		0x1d
+#define PCI_PRIMARY_BUS		0x18	/* Primary bus number 主总线编号 用来记录桥的主接口所连接的pci总线的编号*/
+#define PCI_SECONDARY_BUS	0x19	/* Secondary bus number 次总线编号* 记录次接口所连接的pci总线的编号*/
+#define PCI_SUBORDINATE_BUS	0x1a	/* Highest bus number behind the bridge 附属总线编号 记录这个桥段下游最大的pci总线编号 对于每个pci桥
+                                      位于它下游的pci总编号都必须在它的次总线编号和附属总线编号之间*/
+#define PCI_SEC_LATENCY_TIMER	0x1b	/* Latency timer for secondary interface 辅助延时定时器*/
+#define PCI_IO_BASE		0x1c	/* I/O range behind the bridge io基地址*/
+#define PCI_IO_LIMIT		0x1d//io限制
 #define  PCI_IO_RANGE_TYPE_MASK	0x0fUL	/* I/O bridging type */
 #define  PCI_IO_RANGE_TYPE_16	0x00
 #define  PCI_IO_RANGE_TYPE_32	0x01
 #define  PCI_IO_RANGE_MASK	(~0x0fUL)
-#define PCI_SEC_STATUS		0x1e	/* Secondary status register, only bit 14 used */
-#define PCI_MEMORY_BASE		0x20	/* Memory range behind */
-#define PCI_MEMORY_LIMIT	0x22
+#define PCI_SEC_STATUS		0x1e	/* Secondary status register, only bit 14 used 次总线状态*/
+#define PCI_MEMORY_BASE		0x20	/* Memory range behind 内存基地址*/
+#define PCI_MEMORY_LIMIT	0x22     //内存限制
 #define  PCI_MEMORY_RANGE_TYPE_MASK 0x0fUL
 #define  PCI_MEMORY_RANGE_MASK	(~0x0fUL)
-#define PCI_PREF_MEMORY_BASE	0x24	/* Prefetchable memory range behind */
-#define PCI_PREF_MEMORY_LIMIT	0x26
+#define PCI_PREF_MEMORY_BASE	0x24	/* Prefetchable memory range behind 可预取内存基地址高32位*/
+#define PCI_PREF_MEMORY_LIMIT	0x26    //可预取内存限制高32位
 #define  PCI_PREF_RANGE_TYPE_MASK 0x0fUL
 #define  PCI_PREF_RANGE_TYPE_32	0x00
 #define  PCI_PREF_RANGE_TYPE_64	0x01
 #define  PCI_PREF_RANGE_MASK	(~0x0fUL)
 #define PCI_PREF_BASE_UPPER32	0x28	/* Upper half of prefetchable memory range */
 #define PCI_PREF_LIMIT_UPPER32	0x2c
-#define PCI_IO_BASE_UPPER16	0x30	/* Upper half of I/O addresses */
+#define PCI_IO_BASE_UPPER16	0x30	/* Upper half of I/O addresses io限制高16位*/
 #define PCI_IO_LIMIT_UPPER16	0x32
 /* 0x34 same as for htype 0 */
 /* 0x35-0x3b is reserved */
-#define PCI_ROM_ADDRESS1	0x38	/* Same as PCI_ROM_ADDRESS, but for htype 1 */
-/* 0x3c-0x3d are same as for htype 0 */
-#define PCI_BRIDGE_CONTROL	0x3e
+#define PCI_ROM_ADDRESS1	0x38	/* Same as PCI_ROM_ADDRESS, but for htype 1 扩展rom基地址*/
+/* 0x3c-0x3d are same as for htype 0 */ //3c~3d和type0是一样的
+#define PCI_BRIDGE_CONTROL	0x3e  //控制桥
 #define  PCI_BRIDGE_CTL_PARITY	0x01	/* Enable parity detection on secondary interface */
 #define  PCI_BRIDGE_CTL_SERR	0x02	/* The same for SERR forwarding */
 #define  PCI_BRIDGE_CTL_ISA	0x04	/* Enable ISA mode */

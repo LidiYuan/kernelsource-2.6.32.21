@@ -35,9 +35,10 @@ static void __devinit pcibios_fixup_peer_bridges(void)
 	}
 }
 
-//pci传统扫描模式
+//pci总线扫描
 static int __init pci_legacy_init(void)
 {
+    //是否设置了 pci配置空间的访问方式 在pci_arch_init()进行初始化
 	if (!raw_pci_ops) { //pci_conf1_read  pci_conf1_write
 		printk("PCI: System does not support PCI\n");
 		return 0;
@@ -50,8 +51,7 @@ static int __init pci_legacy_init(void)
 	printk("PCI: Probing PCI hardware\n");
 	pci_root_bus = pcibios_scan_root(0);  //首先扫描0号总线
 	if (pci_root_bus)
-		//将0号pci总线上扫描到的设备添加到系统中
-		pci_bus_add_devices(pci_root_bus);
+		pci_bus_add_devices(pci_root_bus);//将设备添加到sysfs中
 
 	return 0;
 }
@@ -61,15 +61,19 @@ int __init pci_subsys_init(void)
 #ifdef CONFIG_X86_NUMAQ
 	pci_numaq_init();
 #endif
+
+//APCI是高级配置与电源接口的缩写
 #ifdef CONFIG_ACPI
-	pci_acpi_init();
+	pci_acpi_init();//用来初始化acpi模块
 #endif
+
 #ifdef CONFIG_X86_VISWS
 	pci_visws_init();
 #endif
-	pci_legacy_init();
+
+	pci_legacy_init();//负责pci总线扫描 扫描过程会对pci配置空间进行访问
 	pcibios_fixup_peer_bridges();
-	pcibios_irq_init();
+	pcibios_irq_init();//建立中断路由  即建立中断引脚和操作系统irq之间的关系
 	pcibios_init();
 
 	return 0;

@@ -768,17 +768,19 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 
+	//进程没有禁止地址空间随机化 并且/proc/sys/kernel/randomize_va_space不为0
 	if (!(current->personality & ADDR_NO_RANDOMIZE) && randomize_va_space)
 		current->flags |= PF_RANDOMIZE;
-
+    
 	setup_new_exec(bprm);
 
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
 	current->mm->free_area_cache = current->mm->mmap_base;
 	current->mm->cached_hole_size = 0;
-	retval = setup_arg_pages(bprm, randomize_stack_top(STACK_TOP),
-				 executable_stack);
+
+	//在适当的位置创建栈
+	retval = setup_arg_pages(bprm, randomize_stack_top(STACK_TOP),executable_stack);
 	if (retval < 0) {
 		send_sig(SIGKILL, current, 0);
 		goto out_free_dentry;

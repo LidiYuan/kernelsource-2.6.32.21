@@ -230,11 +230,14 @@ static inline struct audit_entry *audit_to_entry_common(struct audit_rule *rule)
 
 	err = -EINVAL;
 	listnr = rule->flags & ~AUDIT_FILTER_PREPEND;
-	switch(listnr) {
+    //对事件类型做检测 支持5个日志类型链表
+	switch(listnr) 
+	{
 	default:
 		goto exit_err;
 	case AUDIT_FILTER_USER:
 	case AUDIT_FILTER_TYPE:
+		
 #ifdef CONFIG_AUDITSYSCALL
 	case AUDIT_FILTER_ENTRY:
 	case AUDIT_FILTER_EXIT:
@@ -242,16 +245,21 @@ static inline struct audit_entry *audit_to_entry_common(struct audit_rule *rule)
 #endif
 		;
 	}
-	if (unlikely(rule->action == AUDIT_POSSIBLE)) {
+	if (unlikely(rule->action == AUDIT_POSSIBLE)) 
+	{
 		printk(KERN_ERR "AUDIT_POSSIBLE is deprecated\n");
 		goto exit_err;
 	}
+	
+    //对产生日志的行为做检测
 	if (rule->action != AUDIT_NEVER && rule->action != AUDIT_ALWAYS)
 		goto exit_err;
+
 	if (rule->field_count > AUDIT_MAX_FIELDS)
 		goto exit_err;
 
 	err = -ENOMEM;
+	
 	entry = audit_init_entry(rule->field_count);
 	if (!entry)
 		goto exit_err;
@@ -264,7 +272,8 @@ static inline struct audit_entry *audit_to_entry_common(struct audit_rule *rule)
 	for (i = 0; i < AUDIT_BITMASK_SIZE; i++)
 		entry->rule.mask[i] = rule->mask[i];
 
-	for (i = 0; i < AUDIT_SYSCALL_CLASSES; i++) {
+	for (i = 0; i < AUDIT_SYSCALL_CLASSES; i++) 
+	{
 		int bit = AUDIT_BITMASK_SIZE * 32 - i - 1;
 		__u32 *p = &entry->rule.mask[AUDIT_WORD(bit)];
 		__u32 *class;
@@ -288,14 +297,14 @@ exit_err:
 
 static u32 audit_ops[] =
 {
-	[Audit_equal] = AUDIT_EQUAL,
-	[Audit_not_equal] = AUDIT_NOT_EQUAL,
+	[Audit_equal] = AUDIT_EQUAL,   //=
+	[Audit_not_equal] = AUDIT_NOT_EQUAL,//!=
 	[Audit_bitmask] = AUDIT_BIT_MASK,
 	[Audit_bittest] = AUDIT_BIT_TEST,
-	[Audit_lt] = AUDIT_LESS_THAN,
-	[Audit_gt] = AUDIT_GREATER_THAN,
-	[Audit_le] = AUDIT_LESS_THAN_OR_EQUAL,
-	[Audit_ge] = AUDIT_GREATER_THAN_OR_EQUAL,
+	[Audit_lt] = AUDIT_LESS_THAN,  //<
+	[Audit_gt] = AUDIT_GREATER_THAN,//>
+	[Audit_le] = AUDIT_LESS_THAN_OR_EQUAL, //<=
+	[Audit_ge] = AUDIT_GREATER_THAN_OR_EQUAL,// >=
 };
 
 static u32 audit_to_op(u32 op)
@@ -416,26 +425,30 @@ static struct audit_entry *audit_data_to_entry(struct audit_rule_data *data,
 	int i;
 	char *str;
 
+	//根据用户传入的audit_rule_data 对audit_entry进行初始化
 	entry = audit_to_entry_common((struct audit_rule *)data);
 	if (IS_ERR(entry))
 		goto exit_nofree;
 
 	bufp = data->buf;
 	entry->rule.vers_ops = 2;
-	for (i = 0; i < data->field_count; i++) {
+	
+	for (i = 0; i < data->field_count; i++) 
+	{
 		struct audit_field *f = &entry->rule.fields[i];
 
 		err = -EINVAL;
 
-		f->op = audit_to_op(data->fieldflags[i]);
+		f->op = audit_to_op(data->fieldflags[i]);//AUDIT_EQUAL
 		if (f->op == Audit_bad)
 			goto exit_free;
 
-		f->type = data->fields[i];
-		f->val = data->values[i];
+		f->type = data->fields[i];//AUDIT_WATCH
+		f->val = data->values[i];//如果是AUDIT_WATCH此处是长度
 		f->lsm_str = NULL;
 		f->lsm_rule = NULL;
-		switch(f->type) {
+		switch(f->type) 
+		{
 		case AUDIT_PID:
 		case AUDIT_UID:
 		case AUDIT_EUID:
@@ -492,6 +505,7 @@ static struct audit_entry *audit_data_to_entry(struct audit_rule_data *data,
 				f->lsm_str = str;
 			break;
 		case AUDIT_WATCH:
+		    //将文件名解析出来
 			str = audit_unpack_string(&bufp, &remain, f->val);
 			if (IS_ERR(str))
 				goto exit_free;
@@ -504,6 +518,7 @@ static struct audit_entry *audit_data_to_entry(struct audit_rule_data *data,
 			}
 			break;
 		case AUDIT_DIR:
+			//将文件目录解析出来
 			str = audit_unpack_string(&bufp, &remain, f->val);
 			if (IS_ERR(str))
 				goto exit_free;
@@ -664,12 +679,13 @@ static int audit_compare_rule(struct audit_krule *a, struct audit_krule *b)
 	    a->field_count != b->field_count)
 		return 1;
 
-	for (i = 0; i < a->field_count; i++) {
-		if (a->fields[i].type != b->fields[i].type ||
-		    a->fields[i].op != b->fields[i].op)
+	for (i = 0; i < a->field_count; i++) 
+	{
+		if (a->fields[i].type != b->fields[i].type ||  a->fields[i].op != b->fields[i].op)
 			return 1;
 
-		switch(a->fields[i].type) {
+		switch(a->fields[i].type) 
+		{
 		case AUDIT_SUBJ_USER:
 		case AUDIT_SUBJ_ROLE:
 		case AUDIT_SUBJ_TYPE:
@@ -827,26 +843,35 @@ static struct audit_entry *audit_find_rule(struct audit_entry *entry,
 	struct list_head *list;
 	int h;
 
-	if (entry->rule.inode_f) {
+	if (entry->rule.inode_f) 
+	{
 		h = audit_hash_ino(entry->rule.inode_f->val);
 		*p = list = &audit_inode_hash[h];
-	} else if (entry->rule.watch) {
+	} 
+	else if (entry->rule.watch) 
+	{   
+	    //查找是否对某个路径做过相同的规则 
 		/* we don't know the inode number, so must walk entire hash */
-		for (h = 0; h < AUDIT_INODE_BUCKETS; h++) {
+		for (h = 0; h < AUDIT_INODE_BUCKETS; h++) 
+		{
 			list = &audit_inode_hash[h];
 			list_for_each_entry(e, list, list)
-				if (!audit_compare_rule(&entry->rule, &e->rule)) {
+				if (!audit_compare_rule(&entry->rule, &e->rule)) 
+				{
 					found = e;
 					goto out;
 				}
 		}
 		goto out;
-	} else {
+	} 
+	else 
+	{
 		*p = list = &audit_filter_list[entry->rule.listnr];
 	}
 
 	list_for_each_entry(e, list, list)
-		if (!audit_compare_rule(&entry->rule, &e->rule)) {
+		if (!audit_compare_rule(&entry->rule, &e->rule)) 
+		{
 			found = e;
 			goto out;
 		}
@@ -866,6 +891,7 @@ static inline int audit_add_rule(struct audit_entry *entry)
 	struct audit_tree *tree = entry->rule.tree;
 	struct list_head *list;
 	int h, err;
+	
 #ifdef CONFIG_AUDITSYSCALL
 	int dont_count = 0;
 
@@ -877,7 +903,8 @@ static inline int audit_add_rule(struct audit_entry *entry)
 
 	mutex_lock(&audit_filter_mutex);
 	e = audit_find_rule(entry, &list);
-	if (e) {
+	if (e) //此规则存在
+	{
 		mutex_unlock(&audit_filter_mutex);
 		err = -EEXIST;
 		/* normally audit_add_tree_rule() will free it on failure */
@@ -886,7 +913,8 @@ static inline int audit_add_rule(struct audit_entry *entry)
 		goto error;
 	}
 
-	if (watch) {
+	if (watch) 
+	{
 		/* audit_filter_mutex is dropped and re-taken during this call */
 		err = audit_add_watch(&entry->rule);
 		if (err) {
@@ -898,7 +926,8 @@ static inline int audit_add_rule(struct audit_entry *entry)
 		h = audit_hash_ino((u32)audit_watch_inode(watch));
 		list = &audit_inode_hash[h];
 	}
-	if (tree) {
+	if (tree) 
+	{
 		err = audit_add_tree_rule(&entry->rule);
 		if (err) {
 			mutex_unlock(&audit_filter_mutex);
@@ -914,14 +943,15 @@ static inline int audit_add_rule(struct audit_entry *entry)
 			entry->rule.prio = --prio_low;
 	}
 
-	if (entry->rule.flags & AUDIT_FILTER_PREPEND) {
-		list_add(&entry->rule.list,
-			 &audit_rules_list[entry->rule.listnr]);
+	if (entry->rule.flags & AUDIT_FILTER_PREPEND) 
+	{
+		list_add(&entry->rule.list,&audit_rules_list[entry->rule.listnr]);
 		list_add_rcu(&entry->list, list);
 		entry->rule.flags &= ~AUDIT_FILTER_PREPEND;
-	} else {
-		list_add_tail(&entry->rule.list,
-			      &audit_rules_list[entry->rule.listnr]);
+	} 
+	else 
+	{
+		list_add_tail(&entry->rule.list,&audit_rules_list[entry->rule.listnr]);
 		list_add_tail_rcu(&entry->list, list);
 	}
 #ifdef CONFIG_AUDITSYSCALL
@@ -1106,7 +1136,8 @@ int audit_receive_filter(int type, int pid, int uid, int seq, void *data,
 	int err = 0;
 	struct audit_entry *entry;
 
-	switch (type) {
+	switch (type) 
+	{
 	case AUDIT_LIST:
 	case AUDIT_LIST_RULES:
 		/* We can't just spew out the rules here because we might fill
@@ -1140,6 +1171,7 @@ int audit_receive_filter(int type, int pid, int uid, int seq, void *data,
 		if (type == AUDIT_ADD)
 			entry = audit_rule_to_entry(data);
 		else
+			//将用户传入的数据转化为内核的entry
 			entry = audit_data_to_entry(data, datasz);
 		if (IS_ERR(entry))
 			return PTR_ERR(entry);
@@ -1175,7 +1207,8 @@ int audit_receive_filter(int type, int pid, int uid, int seq, void *data,
 
 int audit_comparator(u32 left, u32 op, u32 right)
 {
-	switch (op) {
+	switch (op) 
+	{
 	case Audit_equal:
 		return (left == right);
 	case Audit_not_equal:
@@ -1242,7 +1275,8 @@ static int audit_filter_user_rules(struct netlink_skb_parms *cb,
 {
 	int i;
 
-	for (i = 0; i < rule->field_count; i++) {
+	for (i = 0; i < rule->field_count; i++) 
+	{
 		struct audit_field *f = &rule->fields[i];
 		int result = 0;
 
@@ -1279,7 +1313,8 @@ int audit_filter_user(struct netlink_skb_parms *cb)
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_USER], list) {
-		if (audit_filter_user_rules(cb, &e->rule, &state)) {
+		if (audit_filter_user_rules(cb, &e->rule, &state)) 
+		{
 			if (state == AUDIT_DISABLED)
 				ret = 0;
 			break;
@@ -1299,12 +1334,14 @@ int audit_filter_type(int type)
 	if (list_empty(&audit_filter_list[AUDIT_FILTER_TYPE]))
 		goto unlock_and_return;
 
-	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_TYPE],
-				list) {
+	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_TYPE],list) 
+	{
 		int i;
-		for (i = 0; i < e->rule.field_count; i++) {
+		for (i = 0; i < e->rule.field_count; i++) 
+		{
 			struct audit_field *f = &e->rule.fields[i];
-			if (f->type == AUDIT_MSGTYPE) {
+			if (f->type == AUDIT_MSGTYPE) 
+			{
 				result = audit_comparator(type, f->op, f->val);
 				if (!result)
 					break;

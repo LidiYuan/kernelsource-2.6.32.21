@@ -86,8 +86,10 @@ struct cn_queue_dev {
 	unsigned char name[CN_CBQ_NAMELEN];
 
 	struct workqueue_struct *cn_queue;
+
 	/* Sent to kevent to create cn_queue only when needed */
 	struct work_struct wq_creation;
+
 	/* Tell if the wq_creation job is pending/completed */
 	atomic_t wq_requested;
 	/* Wait for cn_queue to be created */
@@ -126,9 +128,14 @@ struct cn_dev {
 	struct cb_id id;
 
 	u32 seq, groups;
+
+	//netlink sock
 	struct sock *nls;
+
+	//消息接收回调函数
 	void (*input) (struct sk_buff *skb);
 
+	
 	struct cn_queue_dev *cbdev;
 };
 

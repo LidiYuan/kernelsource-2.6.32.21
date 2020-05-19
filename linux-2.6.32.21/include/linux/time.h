@@ -270,8 +270,8 @@ struct itimerval {
 /*
  * The IDs of the various system clocks (for POSIX.1b interval timers):
  */
-#define CLOCK_REALTIME			0
-#define CLOCK_MONOTONIC			1
+#define CLOCK_REALTIME			0  //，实际上就是指的是现实的时间，这是由变量xtime来记录的
+#define CLOCK_MONOTONIC			1   //单调时间 实际上它指的是系统启动以后流逝的时间，这是由变量jiffies来记录的
 #define CLOCK_PROCESS_CPUTIME_ID	2
 #define CLOCK_THREAD_CPUTIME_ID		3
 #define CLOCK_MONOTONIC_RAW		4

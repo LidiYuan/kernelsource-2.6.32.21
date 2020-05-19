@@ -285,6 +285,7 @@ static struct device *next_device(struct klist_iter *i)
  * to retain this data, it should do so, and increment the reference
  * count in the supplied callback.
  */
+ //遍历总线下的设备
 int bus_for_each_dev(struct bus_type *bus, struct device *start,
 		                       void *data, int (*fn)(struct device *, void *))
 {
@@ -395,6 +396,7 @@ static struct device_driver *next_driver(struct klist_iter *i)
  * in the callback. It must also be sure to increment the refcount
  * so it doesn't disappear before returning to the caller.
  */
+ //遍历总线下的驱动
 int bus_for_each_drv(struct bus_type *bus, struct device_driver *start,
 		                       void *data, int (*fn)(struct device_driver *, void *))
 {
@@ -405,10 +407,10 @@ int bus_for_each_drv(struct bus_type *bus, struct device_driver *start,
 	if (!bus)
 		return -EINVAL;
 
-	klist_iter_init_node(&bus->p->klist_drivers, &i,
-			     start ? &start->p->knode_bus : NULL);
+	klist_iter_init_node(&bus->p->klist_drivers, &i,start ? &start->p->knode_bus : NULL);
 	while ((drv = next_driver(&i)) && !error)
 		error = fn(drv, data);
+	
 	klist_iter_exit(&i);
 	return error;
 }
@@ -895,13 +897,16 @@ int bus_register(struct bus_type *bus)
 	int retval;
 	struct bus_type_private *priv;
 
+   //申请一个设备私有数据结构
 	priv = kzalloc(sizeof(struct bus_type_private), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
 
+	//将bus_type喝bus_type_private进行相互关联
 	priv->bus = bus;
 	bus->p = priv;
 
+    //初始化通知链
 	BLOCKING_INIT_NOTIFIER_HEAD(&priv->bus_notifier);
 
 	//给kobject赋值名字.此名字将显示在/sys/bus/下面
@@ -909,8 +914,7 @@ int bus_register(struct bus_type *bus)
 	if (retval)
 		goto out;
 
-    //在buses_init()中对bus_kset进行创建初始化 在/sys/下创建了/sys/bus目录
-	priv->subsys.kobj.kset = bus_kset;//指定上层kset为bus_kset
+	priv->subsys.kobj.kset = bus_kset;//指定上层kset为bus_kset  在buses_init()中对bus_kset进行创建初始化 在/sys/下创建了/sys/bus目录
 	priv->subsys.kobj.ktype = &bus_ktype;//指定kobj的属性类型为bus_ktype
 	priv->drivers_autoprobe = 1;//进行驱动设备自动绑定
 
@@ -919,34 +923,34 @@ int bus_register(struct bus_type *bus)
 	if (retval)
 		goto out;
 
-	//生成bus的属性文件
 	//对于bus_attr_uevent 看BUS_ATTR()宏  此变量是宏生成的
-	//生成的文件名为uevent 即/sys/bus/xxx/uevent
+	//生成的文件名为uevent 即/sys/bus/xxx/uevent  这是个只写的属性  用于手动触发热插拔
 	retval = bus_create_file(bus, &bus_attr_uevent);
 	if (retval)
 		goto bus_uevent_fail;
 
 	//为当前bus生成容纳设备的kset容器
-	//生成目录 /sys/bus/xxx/devices/
-	priv->devices_kset = kset_create_and_add("devices", NULL,
-						 &priv->subsys.kobj);
+	//生成目录 /sys/bus/xxx/devices/  以便将来在该总线类型下发现设备的时候 向对应的子目录添加设备的符号连接
+	priv->devices_kset = kset_create_and_add("devices", NULL,&priv->subsys.kobj);
 	if (!priv->devices_kset) {
 		retval = -ENOMEM;
 		goto bus_devices_fail;
 	}
 
    //为当前bus生成容纳驱动的容器
-   //生成目录 /sys/bus/xxx/drivers/
-	priv->drivers_kset = kset_create_and_add("drivers", NULL,
-						 &priv->subsys.kobj);
+   //生成目录 /sys/bus/xxx/drivers/ 将来在该总线类型下加载驱动的时候 向对应的子目录添加驱动的子目录
+	priv->drivers_kset = kset_create_and_add("drivers", NULL,&priv->subsys.kobj);
 	if (!priv->drivers_kset) {
 		retval = -ENOMEM;
 		goto bus_drivers_fail;
 	}
 
+    //初始化设备链表和驱动链表
 	klist_init(&priv->klist_devices, klist_devices_get, klist_devices_put);
 	klist_init(&priv->klist_drivers, NULL, NULL);
 
+    //在总线类型的子目录下 添加driver_probe 和drivers_autoprobe两个文件 即/sys/bus/xxx/drivers_probe 和 /sys/bus/xxx/drivers_autoprobe
+    //后者用来显示和修改总线类型的drivers_autoprobe域  前者是一个只写的属性文件  向其中写入任何值都会触发总线类型对它设备的重新扫描
 	retval = add_probe_files(bus);
 	if (retval)
 		goto bus_probe_files_fail;
@@ -985,12 +989,12 @@ EXPORT_SYMBOL_GPL(bus_register);
 void bus_unregister(struct bus_type *bus)
 {
 	pr_debug("bus: '%s': unregistering\n", bus->name);
-	bus_remove_attrs(bus);
-	remove_probe_files(bus);
-	kset_unregister(bus->p->drivers_kset);
-	kset_unregister(bus->p->devices_kset);
-	bus_remove_file(bus, &bus_attr_uevent);
-	kset_unregister(&bus->p->subsys);
+	bus_remove_attrs(bus);//为总线类型删除共有属性文件  这些属性由bus_typ的bus_attrs指定
+	remove_probe_files(bus);//从总线类型下删除probe和autoprobe两个属性文件
+	kset_unregister(bus->p->drivers_kset);//从子树中删除drivers子目录
+	kset_unregister(bus->p->devices_kset);//从总线中删除devices子目录
+	bus_remove_file(bus, &bus_attr_uevent);//从总线中删除uevent属性文件
+	kset_unregister(&bus->p->subsys);//注销总线的kset
 	kfree(bus->p);
 	bus->p = NULL;
 }

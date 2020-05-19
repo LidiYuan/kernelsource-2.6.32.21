@@ -633,20 +633,21 @@ struct address_space {
 	struct inode		*host;		/*若关联对象是一个文件则此处为文件节点 
                                       若和swapper对象关联 则此处为NULL
                                      */
-
+									
 	//用于find_get_page()  快速的查找数据是否在页高速缓存中
 	struct radix_tree_root	page_tree;	/*包含全部页面的radix数*///文件内容的缓存页保存在此radix树中
 	
 	spinlock_t		tree_lock;	/* 保护page_tree的自旋锁 */
 	
 	unsigned int		i_mmap_writable;/* VM_SHARED的计数 */
-
-    //是一个优先搜索树 包含了所有的共享的和私有的映射页面,用于高效找到关联的被缓存的文件	
-	struct prio_tree_root	i_mmap;
-	spinlock_t		i_mmap_lock;	/* 保护i_mmap的自旋锁 */
 	
+    //是一个优先搜索树 包含了所有的共享的和私有的映射页面,用于高效找到关联的被缓存的文件	
+    //优先搜索树包含了所有相关的vm_area_struct实例
+	struct prio_tree_root	i_mmap;
+	spinlock_t		i_mmap_lock;	/* 保护i_mmap的自旋锁 */	
 	struct list_head	i_mmap_nonlinear;/*VM_NONLINEAR链表*/
 	
+		
 	unsigned int		truncate_count;	/* 截断计数 */
 	
 	unsigned long		nrpages;	/* 页总数 */
@@ -657,7 +658,7 @@ struct address_space {
 	
 	unsigned long		flags;		/* gfp mask掩码与错误标志 */
 	
-	struct backing_dev_info *backing_dev_info; /* 预读信息 */
+	struct backing_dev_info *backing_dev_info; /* 预读信息 脏数据写入机制 */
 	
 	spinlock_t		private_lock;	/* 私有address_space锁 */
 	
@@ -816,9 +817,10 @@ struct inode {
 
 	__u32			i_generation;
 
+//每新建一个inotify实例内核都会分配一个fsnotify_group 
 #ifdef CONFIG_FSNOTIFY
 	__u32			i_fsnotify_mask; /* all events this inode cares about */
-	struct hlist_head	i_fsnotify_mark_entries; /* fsnotify mark entries */
+	struct hlist_head	i_fsnotify_mark_entries; /* fsnotify mark entries 对于每个监控的都有一个fsnotify_mark_entry*/
 #endif
 
 
@@ -1008,6 +1010,8 @@ struct file {
 	struct list_head	f_ep_links;
 
 #endif /* #ifdef CONFIG_EPOLL */
+
+    //优先查找树的基础(一个文件区域与该区域映射到的所有虚拟地址空间之间的关联) 
 	struct address_space	*f_mapping;//文件读写缓存页面
 #ifdef CONFIG_DEBUG_WRITECOUNT
 	unsigned long f_mnt_write_state;
@@ -1993,11 +1997,7 @@ static inline int locks_verify_truncate(struct inode *inode,
 				    loff_t size)
 {
 	if (inode->i_flock && mandatory_lock(inode))
-		return locks_mandatory_area(
-			FLOCK_VERIFY_WRITE, inode, filp,
-			size < inode->i_size ? size : inode->i_size,
-			(size < inode->i_size ? inode->i_size - size
-			 : size - inode->i_size)
+		return locks_mandatory_area(FLOCK_VERIFY_WRITE, inode, filp,size < inode->i_size ? size : inode->i_size,(size < inode->i_size ? inode->i_size - size: size - inode->i_size)
 		);
 	return 0;
 }

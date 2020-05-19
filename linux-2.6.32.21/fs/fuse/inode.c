@@ -1128,10 +1128,12 @@ static int __init fuse_fs_init(void)
 {
 	int err;
 
+    //注册fuse文件系统
 	err = register_filesystem(&fuse_fs_type);
 	if (err)
 		goto out;
 
+	//注册fuseblk文件系统
 	err = register_fuseblk();
 	if (err)
 		goto out_unreg;
@@ -1202,17 +1204,21 @@ static int __init fuse_init(void)
 	       FUSE_KERNEL_VERSION, FUSE_KERNEL_MINOR_VERSION);
 
 	INIT_LIST_HEAD(&fuse_conn_list);
+	//初始化文件系统
 	res = fuse_fs_init();
 	if (res)
 		goto err;
 
+	//初始化虚拟设备
 	res = fuse_dev_init();
 	if (res)
 		goto err_fs_cleanup;
 
+   //在sysfs/fs下建立表项
 	res = fuse_sysfs_init();
 	if (res)
 		goto err_dev_cleanup;
+
 
 	res = fuse_ctl_init();
 	if (res)

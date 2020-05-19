@@ -65,10 +65,12 @@ int queue_cn_work(struct cn_callback_entry *cbq, struct work_struct *work)
 		return queue_work(pdev->cn_queue, work);
 
 	/* Don't create the connector workqueue twice */
+	//不要两次创建connector 工作队列
 	if (atomic_inc_return(&pdev->wq_requested) == 1)
 		schedule_work(&pdev->wq_creation);
 	else
 		atomic_dec(&pdev->wq_requested);
+
 
 	return schedule_work(work);
 }
@@ -105,6 +107,7 @@ cn_queue_alloc_callback_entry(char *name, struct cb_id *id,
 	memcpy(&cbq->id.id, id, sizeof(struct cb_id));
 	cbq->data.callback = callback;
 
+    //在工作者项的回调cn_queue_wrapper会调用callback函数
 	INIT_WORK(&cbq->work, &cn_queue_wrapper);
 	return cbq;
 }
@@ -138,17 +141,22 @@ int cn_queue_add_callback(struct cn_queue_dev *dev, char *name, struct cb_id *id
 	cbq->pdev = dev;
 
 	spin_lock_bh(&dev->queue_lock);
+
+	//查看此回调是否已经加入到链表中
 	list_for_each_entry(__cbq, &dev->queue_list, callback_entry) {
 		if (cn_cb_equal(&__cbq->id.id, id)) {
 			found = 1;
 			break;
 		}
 	}
+
+	//没有加入过  将其加入链表
 	if (!found)
 		list_add_tail(&cbq->callback_entry, &dev->queue_list);
 	spin_unlock_bh(&dev->queue_lock);
 
-	if (found) {
+	if (found) 
+	{
 		cn_queue_free_callback(cbq);
 		atomic_dec(&dev->refcnt);
 		return -EINVAL;
@@ -193,10 +201,14 @@ struct cn_queue_dev *cn_queue_alloc_dev(char *name, struct sock *nls)
 	atomic_set(&dev->refcnt, 0);
 	INIT_LIST_HEAD(&dev->queue_list);
 	spin_lock_init(&dev->queue_lock);
+
+	//初始话等待队列
 	init_waitqueue_head(&dev->wq_created);
 
 	dev->nls = nls;
 
+     //初始化工作者 ，默认是注册在kevent工作线程中
+     //若有事件发生 则调用cn_queue_create 创建自己的工作线程
 	INIT_WORK(&dev->wq_creation, cn_queue_create);
 
 	return dev;

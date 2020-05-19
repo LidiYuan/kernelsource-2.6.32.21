@@ -86,7 +86,21 @@ out:
  * Returns 0 if kobject_uevent() is completed with success or the
  * corresponding error when it fails.
  */
- //发送事件给应用层 
+ /*内核用环境数据的形式向用户空间报告内核对象的变化 环境数据包含多个环境变量/值对,每一对都是 key=value
+   各对之间用'\0'字符分割 如添加USB的
+   ACTION=add
+   DEVPATH=/devices/pcixxx:xx/xxxx/usb1/xx
+   SUBSYSTEM=usb
+   MAJOR=
+   MINOR=
+   DEVTYPE=use_device
+   DEVICE=/proc/bus/usb/xx
+   PRODUCT=
+   TYPE=
+   BUSNUM=
+   DEVNUM=
+   SEQNUM=
+ */
 int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 		       char *envp_ext[])
 {
@@ -149,6 +163,7 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 		subsystem = uevent_ops->name(kset, kobj);
 	else
 		subsystem = kobject_name(&kset->kobj);
+
 	if (!subsystem) {
 		pr_debug("kobject: '%s' (%p): %s: unset subsystem caused the "
 			 "event to drop!\n", kobject_name(kobj), kobj,
@@ -302,7 +317,8 @@ EXPORT_SYMBOL_GPL(kobject_uevent_env);
  */
  //通知用户空间事件 
  //action:是个枚举 如KOBJ_ADD
-int kobject_uevent(struct kobject *kobj, enum kobject_action action)
+int kobject_uevent(struct kobject *kobj, //发生事件的内核对象
+                            enum kobject_action action)//发生的什么事件
 {
 	return kobject_uevent_env(kobj, action, NULL);
 }

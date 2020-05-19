@@ -568,11 +568,14 @@ static void tick_nohz_switch_to_nohz(void)
 		return;
 
 	local_irq_disable();
+
+	//设置为单触发模式 安装一个适当的中断处理函数
 	if (tick_switch_to_oneshot(tick_nohz_handler)) {
 		local_irq_enable();
 		return;
 	}
 
+	//设置低分辨率模式
 	ts->nohz_mode = NOHZ_MODE_LOWRES;
 
 	/*
@@ -626,6 +629,7 @@ static void tick_nohz_kick_tick(int cpu, ktime_t now)
 #endif
 }
 
+//检测动态时钟
 static inline void tick_check_nohz(int cpu)
 {
 	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
@@ -676,6 +680,7 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 	ktime_t now = ktime_get();
 	int cpu = smp_processor_id();
 
+//动态时钟
 #ifdef CONFIG_NO_HZ
 	/*
 	 * Check if the do_timer duty was dropped. We don't care about
@@ -690,7 +695,7 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 
 	/* Check, if the jiffies need an update */
 	if (tick_do_timer_cpu == cpu)
-		tick_do_update_jiffies64(now);
+		tick_do_update_jiffies64(now);//更新jiffies
 
 	/*
 	 * Do not call, when we are not in irq context and have
@@ -750,6 +755,7 @@ void tick_setup_sched_timer(void)
 		now = ktime_get();
 	}
 
+//启用动态时钟
 #ifdef CONFIG_NO_HZ
 	if (tick_nohz_enabled)
 		ts->nohz_mode = NOHZ_MODE_HIGHRES;
@@ -816,6 +822,7 @@ int tick_check_oneshot_change(int allow_nohz)
 	if (!allow_nohz)
 		return 1;
 
+	//切换到动态时钟模式
 	tick_nohz_switch_to_nohz();
 	return 0;
 }

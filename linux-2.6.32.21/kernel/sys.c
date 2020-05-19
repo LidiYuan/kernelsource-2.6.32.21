@@ -681,14 +681,16 @@ SYSCALL_DEFINE1(setuid, uid_t, uid)
 		goto error;
 
 	retval = -EPERM;
-	if (capable(CAP_SETUID)) {
+	if (capable(CAP_SETUID)) 
+	{
 		new->suid = new->uid = uid;
 		if (uid != old->uid) {
 			retval = set_user(new);
 			if (retval < 0)
 				goto error;
 		}
-	} else if (uid != old->uid && uid != new->suid) {
+	} 
+	else if (uid != old->uid && uid != new->suid) {
 		goto error;
 	}
 

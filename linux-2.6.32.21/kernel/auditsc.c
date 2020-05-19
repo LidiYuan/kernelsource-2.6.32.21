@@ -166,11 +166,11 @@ struct audit_tree_refs {
 struct audit_context {
 	int		    dummy;	/* must be the first element */
 	int		    in_syscall;	/* 1 if task is in a syscall 如果任务在一个系统调用中，设置为1*/
-	enum audit_state    state, //审计状态 AUDIT_DISABLED
+	enum audit_state    state, //AUDIT_DISABLED 当前audit的状态，通过这个标志进行过滤、audit的记录何时生成
 		                current_state;
 	unsigned int	    serial;     /* serial number for record 记录的序列号*/
 	int		    major;      /* syscall number系统调用号 */
-	struct timespec	    ctime;      /* time of syscall entry 系统调用入口的时间*/
+	struct timespec	    ctime;      /* time of syscall entry 生成记录的时间 在audit_syscall_entry()中设置为xtime 系统时钟时间*/
 	unsigned long	    argv[4];    /* syscall arguments系统调用参数 */
 	long		    return_code;/* syscall return code 系统调用返回代码*/
 	u64		    prio;
@@ -680,7 +680,8 @@ static enum audit_state audit_filter_task(struct task_struct *tsk, char **key)
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_TASK], list) {
-		if (audit_filter_rules(tsk, &e->rule, NULL, NULL, &state)) {
+		if (audit_filter_rules(tsk, &e->rule, NULL, NULL, &state)) 
+		{
 			if (state == AUDIT_RECORD_CONTEXT)
 				*key = kstrdup(e->rule.filterkey, GFP_ATOMIC);
 			rcu_read_unlock();
@@ -712,9 +713,8 @@ static enum audit_state audit_filter_syscall(struct task_struct *tsk,
 		int bit  = AUDIT_BIT(ctx->major);
 
 		list_for_each_entry_rcu(e, list, list) {
-			if ((e->rule.mask[word] & bit) == bit &&
-			    audit_filter_rules(tsk, &e->rule, ctx, NULL,
-					       &state)) {
+			if ((e->rule.mask[word] & bit) == bit &&audit_filter_rules(tsk, &e->rule, ctx, NULL,&state)) 
+			 {
 				rcu_read_unlock();
 				ctx->current_state = state;
 				return state;
@@ -740,7 +740,8 @@ void audit_filter_inodes(struct task_struct *tsk, struct audit_context *ctx)
 		return;
 
 	rcu_read_lock();
-	for (i = 0; i < ctx->name_count; i++) {
+	for (i = 0; i < ctx->name_count; i++) 
+	{
 		int word = AUDIT_WORD(ctx->major);
 		int bit  = AUDIT_BIT(ctx->major);
 		struct audit_names *n = &ctx->names[i];
@@ -770,7 +771,8 @@ static inline struct audit_context *audit_get_context(struct task_struct *tsk,
 
 	if (likely(!context))
 		return NULL;
-	context->return_valid = return_valid;
+	
+	context->return_valid = return_valid;//成功 失败标志
 
 	/*
 	 * we need to fix up the return code in the audit logs if the actual
@@ -786,11 +788,12 @@ static inline struct audit_context *audit_get_context(struct task_struct *tsk,
 	if (unlikely(return_code <= -ERESTARTSYS) &&
 	    (return_code >= -ERESTART_RESTARTBLOCK) &&
 	    (return_code != -ENOIOCTLCMD))
-		context->return_code = -EINTR;
+		context->return_code = -EINTR;  //设置错误码 被中断
 	else
 		context->return_code  = return_code;
 
-	if (context->in_syscall && !context->dummy) {
+	if (context->in_syscall && !context->dummy) 
+	{
 		audit_filter_syscall(tsk, context, &audit_filter_list[AUDIT_FILTER_EXIT]);
 		audit_filter_inodes(tsk, context);
 	}
@@ -891,7 +894,8 @@ int audit_alloc(struct task_struct *tsk)
 	if (likely(state == AUDIT_DISABLED))
 		return 0;
 
-	if (!(context = audit_alloc_context(state))) {
+	if (!(context = audit_alloc_context(state))) 
+	{
 		kfree(key);
 		audit_log_lost("out of memory in audit_alloc");
 		return -ENOMEM;
@@ -971,7 +975,9 @@ static void audit_log_task_info(struct audit_buffer *ab, struct task_struct *tsk
 	audit_log_format(ab, " comm=");
 	audit_log_untrustedstring(ab, name);
 
-	if (mm) {
+	//mm有值说明不是内核线程
+	if (mm) 
+	{
 		down_read(&mm->mmap_sem);
 		vma = mm->mmap;
 		while (vma) {
@@ -1348,14 +1354,11 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 	ab = audit_log_start(context, GFP_KERNEL, AUDIT_SYSCALL);
 	if (!ab)
 		return;		/* audit_panic has been called */
-	audit_log_format(ab, "arch=%x syscall=%d",
-			 context->arch, context->major);
+	audit_log_format(ab, "arch=%x syscall=%d",context->arch, context->major);
 	if (context->personality != PER_LINUX)
 		audit_log_format(ab, " per=%lx", context->personality);
 	if (context->return_valid)
-		audit_log_format(ab, " success=%s exit=%ld",
-				 (context->return_valid==AUDITSC_SUCCESS)?"yes":"no",
-				 context->return_code);
+		audit_log_format(ab, " success=%s exit=%ld",(context->return_valid==AUDITSC_SUCCESS)?"yes":"no",context->return_code);
 
 	spin_lock_irq(&tsk->sighand->siglock);
 	if (tsk->signal && tsk->signal->tty && tsk->signal->tty->name)
@@ -1431,12 +1434,13 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 		}
 	}
 
-	if (context->sockaddr_len) {
+	if (context->sockaddr_len) 
+	{
 		ab = audit_log_start(context, GFP_KERNEL, AUDIT_SOCKADDR);
-		if (ab) {
+		if (ab) 
+		{
 			audit_log_format(ab, "saddr=");
-			audit_log_n_hex(ab, (void *)context->sockaddr,
-					context->sockaddr_len);
+			audit_log_n_hex(ab, (void *)context->sockaddr,context->sockaddr_len);
 			audit_log_end(ab);
 		}
 	}
@@ -1581,9 +1585,9 @@ void audit_free(struct task_struct *tsk)
  * will only be written if another part of the kernel requests that it
  * be written).
  */
-void audit_syscall_entry(int arch, int major,
-			 unsigned long a1, unsigned long a2,
-			 unsigned long a3, unsigned long a4)
+ //系统调用进入 时候会调用此函数
+void audit_syscall_entry(int arch, int major,unsigned long a1, 
+                                     unsigned long a2,unsigned long a3, unsigned long a4)
 {
 	struct task_struct *tsk = current;
 	struct audit_context *context = tsk->audit_context;
@@ -1606,7 +1610,8 @@ void audit_syscall_entry(int arch, int major,
 	 * This also happens with vm86 emulation in a non-nested manner
 	 * (entries without exits), so this case must be caught.
 	 */
-	if (context->in_syscall) {
+	if (context->in_syscall) 
+	{
 		struct audit_context *newctx;
 
 #if AUDIT_DEBUG
@@ -1692,6 +1697,7 @@ void audit_syscall_exit(int valid, long return_code)
 	struct task_struct *tsk = current;
 	struct audit_context *context;
 
+    //获得审计上下文
 	context = audit_get_context(tsk, valid, return_code);
 
 	if (likely(!context))
@@ -2106,8 +2112,7 @@ EXPORT_SYMBOL_GPL(__audit_inode_child);
  *
  * Also sets the context as auditable.
  */
-int auditsc_get_stamp(struct audit_context *ctx,
-		       struct timespec *t, unsigned int *serial)
+int auditsc_get_stamp(struct audit_context *ctx,struct timespec *t, unsigned int *serial)
 {
 	if (!ctx->in_syscall)
 		return 0;
@@ -2116,7 +2121,8 @@ int auditsc_get_stamp(struct audit_context *ctx,
 	t->tv_sec  = ctx->ctime.tv_sec;
 	t->tv_nsec = ctx->ctime.tv_nsec;
 	*serial    = ctx->serial;
-	if (!ctx->prio) {
+	if (!ctx->prio) 
+	{
 		ctx->prio = 1;
 		ctx->current_state = AUDIT_RECORD_CONTEXT;
 	}
@@ -2140,17 +2146,16 @@ int audit_set_loginuid(struct task_struct *task, uid_t loginuid)
 	unsigned int sessionid = atomic_inc_return(&session_id);
 	struct audit_context *context = task->audit_context;
 
-	if (context && context->in_syscall) {
+	if (context && context->in_syscall) 
+	{
 		struct audit_buffer *ab;
 
 		ab = audit_log_start(NULL, GFP_KERNEL, AUDIT_LOGIN);
 		if (ab) {
-			audit_log_format(ab, "login pid=%d uid=%u "
-				"old auid=%u new auid=%u"
-				" old ses=%u new ses=%u",
-				task->pid, task_uid(task),
-				task->loginuid, loginuid,
-				task->sessionid, sessionid);
+			audit_log_format(ab, "login pid=%d uid=%u ""old auid=%u new auid=%u"" old ses=%u new ses=%u",
+				             task->pid, task_uid(task),
+				             task->loginuid, loginuid,
+				             task->sessionid, sessionid);
 			audit_log_end(ab);
 		}
 	}
@@ -2383,8 +2388,11 @@ int __audit_signal_info(int sig, struct task_struct *t)
 	struct audit_context *ctx = tsk->audit_context;
 	uid_t uid = current_uid(), t_uid = task_uid(t);
 
-	if (audit_pid && t->tgid == audit_pid) {
-		if (sig == SIGTERM || sig == SIGHUP || sig == SIGUSR1 || sig == SIGUSR2) {
+    //璇存槑淇″彿鍙戦�佺粰鐨勬槸鍚︿负 auditd
+	if (audit_pid && t->tgid == audit_pid) 
+	{
+		if (sig == SIGTERM || sig == SIGHUP || sig == SIGUSR1 || sig == SIGUSR2) 
+		{
 			audit_sig_pid = tsk->pid;
 			if (tsk->loginuid != -1)
 				audit_sig_uid = tsk->loginuid;
@@ -2398,7 +2406,8 @@ int __audit_signal_info(int sig, struct task_struct *t)
 
 	/* optimize the common case by putting first signal recipient directly
 	 * in audit_context */
-	if (!ctx->target_pid) {
+	if (!ctx->target_pid) 
+	{
 		ctx->target_pid = t->tgid;
 		ctx->target_auid = audit_get_loginuid(t);
 		ctx->target_uid = t_uid;

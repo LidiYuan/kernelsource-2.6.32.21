@@ -84,6 +84,7 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	{0,}
 };
 
+//将e1000_pci_tbl导出到用户空间
 MODULE_DEVICE_TABLE(pci, e1000_pci_tbl);
 
 int e1000_up(struct e1000_adapter *adapter);

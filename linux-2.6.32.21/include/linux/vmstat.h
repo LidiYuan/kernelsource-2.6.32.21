@@ -138,8 +138,7 @@ static inline void vm_events_fold_cpu(int cpu)
  */
 extern atomic_long_t vm_stat[NR_VM_ZONE_STAT_ITEMS];
 
-static inline void zone_page_state_add(long x, struct zone *zone,
-				 enum zone_stat_item item)
+static inline void zone_page_state_add(long x, struct zone *zone,enum zone_stat_item item)
 {
 	atomic_long_add(x, &zone->vm_stat[item]);
 	atomic_long_add(x, &vm_stat[item]);

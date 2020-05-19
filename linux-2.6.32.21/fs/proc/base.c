@@ -1587,7 +1587,8 @@ static int proc_fill_cache(struct file *filp, void *dirent, filldir_t filldir,
 	if (!child) {
 		struct dentry *new;
 		new = d_alloc(dir, &qname);
-		if (new) {
+		if (new) 
+		{
 			child = instantiate(dir->d_inode, new, task, ptr);
 			if (child)
 				dput(new);
@@ -1798,8 +1799,10 @@ out_no_task:
 	return result;
 }
 
-static int proc_readfd_common(struct file * filp, void * dirent,
-			      filldir_t filldir, instantiate_t instantiate)
+static int proc_readfd_common(struct file * filp, 
+	                                     void * dirent,
+			                             filldir_t filldir, 
+			                             instantiate_t instantiate)
 {
 	struct dentry *dentry = filp->f_path.dentry;
 	struct inode *inode = dentry->d_inode;

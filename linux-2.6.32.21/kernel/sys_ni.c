@@ -11,6 +11,7 @@ asmlinkage long sys_ni_syscall(void);
 /*
  * Non-implemented system calls get redirected here.
  */
+ //没有实现的系统调用将掉用这个 防止出现调用没有实现的系统调用出现错误
 asmlinkage long sys_ni_syscall(void)
 {
 	return -ENOSYS;

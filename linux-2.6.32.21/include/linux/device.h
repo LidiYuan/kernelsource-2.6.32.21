@@ -55,27 +55,40 @@ extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
 在最底层，Linux系统中的每一个设备都用device结构的一个实例来表示。
 而驱动则是使总线上的设备能够完成它应该完成的功能*/
 //总线描述符 用来表示每一种总线 如scsi pci i2c platform
-struct bus_type {
+//每个总线注册后会在 /sys/bus/下建一个目录 在这个子目录下有两个目录device喝drivers
+struct bus_type 
+{
 	const char		*name;//总线的名称
-	struct bus_attribute	*bus_attrs;//总线的属性 包括操作这些属性的一组函数
-	struct device_attribute	*dev_attrs;//设备属性  
-	struct driver_attribute	*drv_attrs;//驱动属性
+	struct bus_attribute	*bus_attrs;//该总线下的属性 及其操作方法
+	struct device_attribute	*dev_attrs;//在该总线下发现的设备的公共属性及其操作方法
+	struct driver_attribute	*drv_attrs;//在该总线下加载的驱动的公共属性及其方法
 
     //用于设备和驱动的匹配操作
     //当一个总线上新设备或新驱动被添加时 会一次或多次调用这个函数
 	int (*match)(struct device *dev, struct device_driver *drv);
-	
+
+	//将内核对象变化以事件的形式发送到用户空间  调用此函数可以添加总线类型特定的环境变量
 	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
+
+	//如果设别可以被绑定到驱动 此函数对设备进行初始化
 	int (*probe)(struct device *dev);
+
+	//在设备从驱动松绑时 调用此函数
 	int (*remove)(struct device *dev);
+
+	//当设备断电 关机 调用此函数
 	void (*shutdown)(struct device *dev);
 
+   // 在设备进入节能状态  调用此函数
 	int (*suspend)(struct device *dev, pm_message_t state);
+
+   //当设别恢复到正常状态调用此函数
 	int (*resume)(struct device *dev);
 
 	//对总线上设备进行电源管理
 	const struct dev_pm_ops *pm;
 
+     //指向总线类型私有数据
 	struct bus_type_private *p;
 };
 
@@ -197,6 +210,10 @@ struct device *driver_find_device(struct device_driver *drv,
 /*
  * device classes
  */
+ /***
+一个设备只能绑定一个驱动,这样有点严苛, 比如SCSI磁盘,它作为一个磁盘设备 被唯一绑定到SCSI磁盘磁盘驱动,
+但是 我们希望把它作为一个普通的SCSI设备,向他发送INQUIRY等SCSI命令 linux驱动模型的解决方案 是引入类和接口
+ ***/
 struct class {
 	const char		*name;//类名称 会在“/sys/class/”目录下体现
 	struct module		*owner;//该类模块的指针
@@ -393,50 +410,52 @@ struct device_dma_parameters {
 struct device 
 {
 	struct device		*parent;//当前设备的父设备 该设备所属的设备(通常为总线或宿主控制器),若为NULL则说明这是顶层设备
-	struct device_private *p;
+	struct device_private *p;//执行设备私有数据
 
 	struct kobject kobj; //代表设备的内核对象(通常与&device->parent->kobj相同)
 	const char		*init_name; /* 设备对象的名称 内核会把此值设置为kobj成员的名称 */
-	struct device_type	*type;
+	struct device_type	*type;//包含该类型设备的公共方法和成员
 
 	struct semaphore	sem;	/* semaphore to synchronize calls to
-					 * its driver.
+					 * its driver. 对设备驱动进行访问时 用于同步的信号量
 					 */
 
 	struct bus_type	*bus;		/* 设备所在的总线对象指针*/
 	struct device_driver *driver;	/* 对应的设备驱动*/
 					   	
-	void		*platform_data;	/* Platform specific data, device
-					   core doesn't touch it */
-	struct dev_pm_info	power;
+	void		*platform_data;	/* 指向平台专有数据结构  驱动模型核心代码不适用它 Platform specific data, device core doesn't touch it */
+	
+	struct dev_pm_info	power;//设备电源管理信息
 
 #ifdef CONFIG_NUMA
-	int		numa_node;	/* NUMA node this device is close to */
+	int		numa_node;	/* NUMA node this device is close to 这个设备亲近的numa节点*/
 #endif
-	u64		*dma_mask;	/* dma mask (if dma'able device) */
+
+	u64		*dma_mask;	/* dma mask (if dma'able device) DMA掩码指针(如果设备可以工作在DMA模式下) 对于PCI设备 它指向pci_dev描述符中的dma_mask*/
 	u64		coherent_dma_mask;/* Like dma_mask, but for
 					     alloc_coherent mappings as
 					     not all hardware supports
 					     64 bit addresses for consistent
 					     allocations such descriptors. */
 
-	struct device_dma_parameters *dma_parms;
+	struct device_dma_parameters *dma_parms;//设备的DMA参数
 
 	struct list_head	dma_pools;	/* dma pools (if dma'ble) */
 
-	struct dma_coherent_mem	*dma_mem; /* internal for coherent mem
+	struct dma_coherent_mem	*dma_mem; /* internal for coherent mem //用于内存覆写
 					     override */
 	/* arch specific additions */
-	struct dev_archdata	archdata;
+	struct dev_archdata	archdata;//架构特定的数据
 
-	dev_t			devt;	/* 设备编号 dev_t, creates the sysfs "dev" */
+	dev_t			devt;	/* 设备编号 dev_t, creates the sysfs "dev" 设备的设备编号*/
 
-	spinlock_t		devres_lock;
-	struct list_head	devres_head;
+	spinlock_t		devres_lock;//用于保护设备资源链表的自旋锁
+	
+	struct list_head	devres_head;//本设备的设备资源链表的表头
 
-	struct klist_node	knode_class;//用于加入到class->p->class_devices   
-	struct class		*class;
-	const struct attribute_group **groups;	/* optional groups */
+	struct klist_node	knode_class;//用于加入到class->p->class_devices   连入所属类的设备链表的连接件
+	struct class		*class; //指向所属于的类   class和class_private 描述的是类
+	const struct attribute_group **groups;	/* optional groups 这个设备独有的属性组*/
 
                                             //device_create_release()
 	void	(*release)(struct device *dev);//当设备最后一个引用删除时 内核调用此方法 将从内嵌的kobject->release中调用

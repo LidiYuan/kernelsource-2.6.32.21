@@ -76,7 +76,7 @@ static int mmap_is_legacy(void)
 	if (current->signal->rlim[RLIMIT_STACK].rlim_cur == RLIM_INFINITY)
 		return 1;
 
-	return sysctl_legacy_va_layout;//布局方式由sysctl_legacy_va_layout参数来控制
+	return sysctl_legacy_va_layout;//布局方式由sysctl_legacy_va_layout参数来控制 /proc/sys/
 }
 
 static unsigned long mmap_rnd(void)
@@ -125,13 +125,18 @@ static unsigned long mmap_legacy_base(void)
  * This function, called very early during the creation of a new
  * process VM image, sets up which VM layout function to use:
  */
+ //选择用户空间内存布局
 void arch_pick_mmap_layout(struct mm_struct *mm)
-{
-	if (mmap_is_legacy()) {
+{   
+    //是否为传统布局
+	if (mmap_is_legacy()) 
+	{//传统布局中mmap映射是往上增长
 		mm->mmap_base = mmap_legacy_base();
 		mm->get_unmapped_area = arch_get_unmapped_area;
 		mm->unmap_area = arch_unmap_area;
-	} else {
+	} 
+	else 
+	{//新布局中mmap映射是往下增长
 		mm->mmap_base = mmap_base();
 		mm->get_unmapped_area = arch_get_unmapped_area_topdown;
 		mm->unmap_area = arch_unmap_area_topdown;

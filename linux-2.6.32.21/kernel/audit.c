@@ -75,6 +75,7 @@ int		audit_enabled;
 int		audit_ever_enabled;
 
 /* Default state when kernel boots without any parameters. */
+//看audit_enable()
 static int	audit_default;
 
 /* If auditing cannot proceed, audit_failure selects what happens. */
@@ -94,7 +95,7 @@ static int	audit_nlk_pid;
 static int	audit_rate_limit;
 
 /* Number of outstanding audit_buffers allowed. */
-static int	audit_backlog_limit = 64;
+static int	audit_backlog_limit = 64; //通过auditctl -b设置 现有审计缓冲区大小
 static int	audit_backlog_wait_time = 60 * HZ;
 static int	audit_backlog_wait_overflow = 0;
 
@@ -149,11 +150,20 @@ DEFINE_MUTEX(audit_cmd_mutex);
  * buffer, and locks briefly to send the buffer to the netlink layer or
  * to place it on a transmit queue.  Multiple audit_buffers can be in
  * use simultaneously. */
+
+//当审计发生的时候通过
+/*
+audit_log_start() 为该条日志分配audit_buffer结构的缓冲区
+audit_log_vformat() 将审计事件发生时要显示的数据以格式化字符串的形式写入缓冲区内
+audit_log_end()将缓冲区（审计缓冲区audit_buffer）加入缓冲区(审计套接字缓冲区sk_buffer)链表audit_skb_queue中。链表audit_skb_queue中的缓冲区由内核线程kauditd发送至用户态auditd进程
+*/
+
+//表示一个审计日志缓冲区
 struct audit_buffer {
-	struct list_head     list;
-	struct sk_buff       *skb;	/* formatted skb ready to send */
-	struct audit_context *ctx;	/* NULL or associated context */
-	gfp_t		     gfp_mask;
+	struct list_head     list; //所有的审计日志缓冲区通过链表连接
+	struct sk_buff       *skb;	/* formatted skb ready to send skb为套接字缓冲区*/
+	struct audit_context *ctx;	/* 当审计系统进行进程监控时，ctx将保存进程的相关信息*/
+	gfp_t		     gfp_mask;//是内核申请内存时的标志；表示为audit_buffer在哪片内存区申请内存
 };
 
 struct audit_reply {
@@ -298,9 +308,9 @@ static int audit_do_config_change(char *function_name, int *to_change,
 	else
 		allow_changes = 1;
 
-	if (audit_enabled != AUDIT_OFF) {
-		rc = audit_log_config_change(function_name, new, old, loginuid,
-					     sessionid, sid, allow_changes);
+	if (audit_enabled != AUDIT_OFF) 
+	{
+		rc = audit_log_config_change(function_name, new, old, loginuid,sessionid, sid, allow_changes);
 		if (rc)
 			allow_changes = 0;
 	}
@@ -334,8 +344,7 @@ static int audit_set_enabled(int state, uid_t loginuid, u32 sessionid, u32 sid)
 	if (state < AUDIT_OFF || state > AUDIT_LOCKED)
 		return -EINVAL;
 
-	rc =  audit_do_config_change("audit_enabled", &audit_enabled, state,
-				     loginuid, sessionid, sid);
+	rc =  audit_do_config_change("audit_enabled", &audit_enabled, state,loginuid, sessionid, sid);
 
 	if (!rc)
 		audit_ever_enabled |= !!state;
@@ -365,8 +374,7 @@ static int audit_set_failure(int state, uid_t loginuid, u32 sessionid, u32 sid)
  */
 static void audit_hold_skb(struct sk_buff *skb)
 {
-	if (audit_default &&
-	    skb_queue_len(&audit_skb_hold_queue) < audit_backlog_limit)
+	if (audit_default && skb_queue_len(&audit_skb_hold_queue) < audit_backlog_limit)
 		skb_queue_tail(&audit_skb_hold_queue, skb);
 	else
 		kfree_skb(skb);
@@ -381,7 +389,8 @@ static void audit_printk_skb(struct sk_buff *skb)
 	struct nlmsghdr *nlh = nlmsg_hdr(skb);
 	char *data = NLMSG_DATA(nlh);
 
-	if (nlh->nlmsg_type != AUDIT_EOE) {
+	if (nlh->nlmsg_type != AUDIT_EOE) 
+	{
 		if (printk_ratelimit())
 			printk(KERN_NOTICE "type=%d %s\n", nlh->nlmsg_type, data);
 		else
@@ -442,12 +451,15 @@ static int kauditd_thread(void *dummy)
 
 		skb = skb_dequeue(&audit_skb_queue);
 		wake_up(&audit_backlog_wait);
-		if (skb) {
+		if (skb) 
+		{
 			if (audit_pid)
 				kauditd_send_skb(skb);
 			else
 				audit_printk_skb(skb);
-		} else {
+		} 
+		else 
+		{
 			DECLARE_WAITQUEUE(wait, current);
 			set_current_state(TASK_INTERRUPTIBLE);
 			add_wait_queue(&kauditd_wait, &wait);
@@ -656,6 +668,8 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	void			*data;
 	struct audit_status	*status_get, status_set;
 	int			err;
+
+	//
 	struct audit_buffer	*ab;
 	u16			msg_type = nlh->nlmsg_type;
 	uid_t			loginuid; /* loginuid of sender */
@@ -664,12 +678,15 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	char			*ctx = NULL;
 	u32			len;
 
+    //进行lsm机制检测
 	err = audit_netlink_ok(skb, msg_type);
 	if (err)
 		return err;
 
 	/* As soon as there's any sign of userspace auditd,
 	 * start kauditd to talk to it */
+	//检查kauditd内核线程是否已启动 如果没有启动则通过kthread_run()启动该线程
+	//kauditd线程用于将内核中的审计日志发送到用户态中
 	if (!kauditd_task)
 		kauditd_task = kthread_run(kauditd_thread, NULL, "kauditd");
 	if (IS_ERR(kauditd_task)) {
@@ -678,6 +695,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		return err;
 	}
 
+    //根据当前的套接字缓冲区skb和当前进程current获取审计所需的数据
 	pid  = NETLINK_CREDS(skb)->pid;
 	uid  = NETLINK_CREDS(skb)->uid;
 	loginuid = NETLINK_CB(skb).loginuid;
@@ -686,35 +704,41 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	seq  = nlh->nlmsg_seq;
 	data = NLMSG_DATA(nlh);
 
-	switch (msg_type) {
+	switch (msg_type) 
+	{
 	case AUDIT_GET:
 		status_set.enabled	 = audit_enabled;
-		status_set.failure	 = audit_failure;
+		status_set.failure	 = audit_failure;//审计不能处理的时候怎么对待
 		status_set.pid		 = audit_pid;
 		status_set.rate_limit	 = audit_rate_limit;
 		status_set.backlog_limit = audit_backlog_limit;
 		status_set.lost		 = atomic_read(&audit_lost);
 		status_set.backlog	 = skb_queue_len(&audit_skb_queue);
-		audit_send_reply(NETLINK_CB(skb).pid, seq, AUDIT_GET, 0, 0,
-				 &status_set, sizeof(status_set));
+		audit_send_reply(NETLINK_CB(skb).pid, seq, AUDIT_GET, 0, 0,&status_set, sizeof(status_set));
 		break;
 	case AUDIT_SET:
 		if (nlh->nlmsg_len < sizeof(struct audit_status))
 			return -EINVAL;
 		status_get   = (struct audit_status *)data;
-		if (status_get->mask & AUDIT_STATUS_ENABLED) {
-			err = audit_set_enabled(status_get->enabled,
-						loginuid, sessionid, sid);
+        //通过auditctl -e  设置audit临时的启动禁止
+		if (status_get->mask & AUDIT_STATUS_ENABLED) 
+		{
+			err = audit_set_enabled(status_get->enabled,loginuid, sessionid, sid);
 			if (err < 0)
 				return err;
 		}
+
+		//audit -f设置
 		if (status_get->mask & AUDIT_STATUS_FAILURE) {
 			err = audit_set_failure(status_get->failure,
 						loginuid, sessionid, sid);
 			if (err < 0)
 				return err;
 		}
-		if (status_get->mask & AUDIT_STATUS_PID) {
+
+		//设置守护进程的pid 在auditd会设置
+		if (status_get->mask & AUDIT_STATUS_PID) 
+		{
 			int new_pid = status_get->pid;
 
 			if (audit_enabled != AUDIT_OFF)
@@ -725,12 +749,15 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 			audit_pid = new_pid;
 			audit_nlk_pid = NETLINK_CB(skb).pid;
 		}
+
+		//通过auditctl -r 可以设置包的频率
 		if (status_get->mask & AUDIT_STATUS_RATE_LIMIT) {
 			err = audit_set_rate_limit(status_get->rate_limit,
 						   loginuid, sessionid, sid);
 			if (err < 0)
 				return err;
 		}
+		//audit -b 设置audit缓冲大小(默认为64).若缓冲占满了,则kernel会发出一个失败标记.
 		if (status_get->mask & AUDIT_STATUS_BACKLOG_LIMIT)
 			err = audit_set_backlog_limit(status_get->backlog_limit,
 						      loginuid, sessionid, sid);
@@ -742,11 +769,11 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 			return 0;
 
 		err = audit_filter_user(&NETLINK_CB(skb));
-		if (err == 1) {
+		if (err == 1) 
+		{
 			err = 0;
 			if (msg_type == AUDIT_USER_TTY) {
-				err = audit_prepare_user_tty(pid, loginuid,
-							     sessionid);
+				err = audit_prepare_user_tty(pid, loginuid,sessionid);
 				if (err)
 					break;
 			}
@@ -754,8 +781,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 						  loginuid, sessionid, sid);
 
 			if (msg_type != AUDIT_USER_TTY)
-				audit_log_format(ab, " msg='%.1024s'",
-						 (char *)data);
+				audit_log_format(ab, " msg='%.1024s'",(char *)data);
 			else {
 				int size;
 
@@ -774,6 +800,8 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	case AUDIT_DEL:
 		if (nlmsg_len(nlh) < sizeof(struct audit_rule))
 			return -EINVAL;
+
+		//针对本次审计规则的操作进行审计日志缓冲区的分配和部分字段的记录
 		if (audit_enabled == AUDIT_LOCKED) {
 			audit_log_common_recv_msg(&ab, AUDIT_CONFIG_CHANGE, pid,
 						  uid, loginuid, sessionid, sid);
@@ -793,7 +821,10 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	case AUDIT_DEL_RULE:
 		if (nlmsg_len(nlh) < sizeof(struct audit_rule_data))
 			return -EINVAL;
-		if (audit_enabled == AUDIT_LOCKED) {
+
+		//如果更新规则被锁定  则不让其更新
+		if (audit_enabled == AUDIT_LOCKED) 
+		{
 			audit_log_common_recv_msg(&ab, AUDIT_CONFIG_CHANGE, pid,
 						  uid, loginuid, sessionid, sid);
 
@@ -805,8 +836,8 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		/* fallthrough */
 	case AUDIT_LIST_RULES:
 		err = audit_receive_filter(msg_type, NETLINK_CB(skb).pid,
-					   uid, seq, data, nlmsg_len(nlh),
-					   loginuid, sessionid, sid);
+					               uid, seq, data, nlmsg_len(nlh),
+					               loginuid, sessionid, sid);
 		break;
 	case AUDIT_TRIM:
 		audit_trim_trees();
@@ -858,20 +889,23 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	}
 	case AUDIT_SIGNAL_INFO:
 		len = 0;
-		if (audit_sig_sid) {
+		if (audit_sig_sid) 
+		{
 			err = security_secid_to_secctx(audit_sig_sid, &ctx, &len);
 			if (err)
 				return err;
 		}
 		sig_data = kmalloc(sizeof(*sig_data) + len, GFP_KERNEL);
-		if (!sig_data) {
+		if (!sig_data) 
+		{
 			if (audit_sig_sid)
 				security_release_secctx(ctx, len);
 			return -ENOMEM;
 		}
 		sig_data->uid = audit_sig_uid;
 		sig_data->pid = audit_sig_pid;
-		if (audit_sig_sid) {
+		if (audit_sig_sid) 
+		{
 			memcpy(sig_data->ctx, ctx, len);
 			security_release_secctx(ctx, len);
 		}
@@ -943,7 +977,9 @@ static void audit_receive_skb(struct sk_buff *skb)
 	nlh = nlmsg_hdr(skb);
 	len = skb->len;
 
-	while (NLMSG_OK(nlh, len)) {
+	//数据报文格式为nlmsghdr结构的包头+指定格式的净荷数据
+	while (NLMSG_OK(nlh, len)) 
+	{
 		err = audit_receive_msg(skb, nlh);
 		/* if err or if this message says it wants a response */
 		if (err || (nlh->nlmsg_flags & NLM_F_ACK))
@@ -954,6 +990,7 @@ static void audit_receive_skb(struct sk_buff *skb)
 }
 
 /* Receive messages from netlink socket. */
+//接收来自应用层的消息
 static void audit_receive(struct sk_buff  *skb)
 {
 	mutex_lock(&audit_cmd_mutex);
@@ -966,28 +1003,31 @@ static int __init audit_init(void)
 {
 	int i;
 
+	//内核启动参数设置是否允许审计audit_enable()
 	if (audit_initialized == AUDIT_DISABLED)
 		return 0;
 
-	printk(KERN_INFO "audit: initializing netlink socket (%s)\n",
-	       audit_default ? "enabled" : "disabled");
-	audit_sock = netlink_kernel_create(&init_net, NETLINK_AUDIT, 0,
-					   audit_receive, NULL, THIS_MODULE);
+	printk(KERN_INFO "audit: initializing netlink socket (%s)\n",audit_default ? "enabled" : "disabled");
+
+	//创建审计netlink
+	audit_sock = netlink_kernel_create(&init_net, NETLINK_AUDIT, 0,audit_receive, NULL, THIS_MODULE);
 	if (!audit_sock)
 		audit_panic("cannot initialize netlink socket");
 	else
 		audit_sock->sk_sndtimeo = MAX_SCHEDULE_TIMEOUT;
 
-	skb_queue_head_init(&audit_skb_queue);
+	skb_queue_head_init(&audit_skb_queue);//保存审计套接字缓冲区
 	skb_queue_head_init(&audit_skb_hold_queue);
+
+	//标识审计已经初始化
 	audit_initialized = AUDIT_INITIALIZED;
 	audit_enabled = audit_default;
 	audit_ever_enabled |= !!audit_default;
 
-	audit_log(NULL, GFP_KERNEL, AUDIT_KERNEL, "initialized");
-
+	audit_log(NULL, GFP_KERNEL, AUDIT_KERNEL, "initialized");//通过audit_log()生成本次初始化对应的审计日志
+    
 	for (i = 0; i < AUDIT_INODE_BUCKETS; i++)
-		INIT_LIST_HEAD(&audit_inode_hash[i]);
+		INIT_LIST_HEAD(&audit_inode_hash[i]);//初始化基于inode的审计规则所对应的哈希链表；
 
 	return 0;
 }
@@ -997,6 +1037,9 @@ __initcall(audit_init);
 static int __init audit_enable(char *str)
 {
 	audit_default = !!simple_strtol(str, NULL, 0);
+
+
+	//不允许内核产生审计
 	if (!audit_default)
 		audit_initialized = AUDIT_DISABLED;
 
@@ -1015,6 +1058,7 @@ static int __init audit_enable(char *str)
 	return 1;
 }
 
+//对内核参数进行解析
 __setup("audit=", audit_enable);
 
 static void audit_buffer_free(struct audit_buffer *ab)
@@ -1045,7 +1089,10 @@ static struct audit_buffer * audit_buffer_alloc(struct audit_context *ctx,
 	struct nlmsghdr *nlh;
 
 	spin_lock_irqsave(&audit_freelist_lock, flags);
-	if (!list_empty(&audit_freelist)) {
+	
+    /* 检查audit_freelist链表，是否有未使用的audit_buffer，有则使用，更新统计计数，否则，创建该实例，如果内存不够，往audit.log中写入内存不足的日志*/
+	if (!list_empty(&audit_freelist)) 
+	{
 		ab = list_entry(audit_freelist.next,
 				struct audit_buffer, list);
 		list_del(&ab->list);
@@ -1053,7 +1100,9 @@ static struct audit_buffer * audit_buffer_alloc(struct audit_context *ctx,
 	}
 	spin_unlock_irqrestore(&audit_freelist_lock, flags);
 
-	if (!ab) {
+	if (!ab) 
+	{
+	    //audit_freelist链表中没有空闲的  则分配一个
 		ab = kmalloc(sizeof(*ab), gfp_mask);
 		if (!ab)
 			goto err;
@@ -1143,8 +1192,8 @@ static inline void audit_get_stamp(struct audit_context *ctx,
  * will be written at syscall exit.  If there is no associated task, then
  * task context (ctx) should be NULL.
  */
-struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
-				     int type)
+ //开始审计记录过程
+struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,int type)
 {
 	struct audit_buffer	*ab	= NULL;
 	struct timespec		t;
@@ -1152,9 +1201,11 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 	int reserve;
 	unsigned long timeout_start = jiffies;
 
+    /* audit未初始化，直接返回 */
 	if (audit_initialized != AUDIT_INITIALIZED)
 		return NULL;
 
+	//检查当前日志类型是否被指定为过滤
 	if (unlikely(audit_filter_type(type)))
 		return NULL;
 
@@ -1164,18 +1215,19 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 		reserve = 5; /* Allow atomic callers to go up to five
 				entries over the normal backlog limit */
 
-	while (audit_backlog_limit
-	       && skb_queue_len(&audit_skb_queue) > audit_backlog_limit + reserve) {
-		if (gfp_mask & __GFP_WAIT && audit_backlog_wait_time
-		    && time_before(jiffies, timeout_start + audit_backlog_wait_time)) {
+	//如果当前缓冲区列表audit_skb_queue中存在的节点数目大于指定的audit_backlog_limit大小，则当前的进程将会被阻塞；即创建等待队列实例，改变当前进程的状态为TASK_UNINTERRUPTIBLE，并且将其加入到等待队列audit_backlog_wait中；此时，再次检查缓冲区列表中的数据是否大于所指定的audit_backlog_limit，如果是，则主动发起重新调度；否则，将删除刚才创建的等待队列实例，并且恢复进程的状态			
+   //
+	while (audit_backlog_limit&& skb_queue_len(&audit_skb_queue) > audit_backlog_limit + reserve) 
+	{
+		if (gfp_mask & __GFP_WAIT && audit_backlog_wait_time && time_before(jiffies, timeout_start + audit_backlog_wait_time)) 
+		{
 
 			/* Wait for auditd to drain the queue a little */
 			DECLARE_WAITQUEUE(wait, current);
 			set_current_state(TASK_INTERRUPTIBLE);
 			add_wait_queue(&audit_backlog_wait, &wait);
 
-			if (audit_backlog_limit &&
-			    skb_queue_len(&audit_skb_queue) > audit_backlog_limit)
+			if (audit_backlog_limit && skb_queue_len(&audit_skb_queue) > audit_backlog_limit) 
 				schedule_timeout(timeout_start + audit_backlog_wait_time - jiffies);
 
 			__set_current_state(TASK_RUNNING);
@@ -1194,16 +1246,19 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 		return NULL;
 	}
 
+    //创建审计缓冲区，并且在该缓冲区中写入审计序列号和时间戳等信息；
 	ab = audit_buffer_alloc(ctx, gfp_mask, type);
-	if (!ab) {
+	if (!ab) 
+	{
 		audit_log_lost("out of memory in audit_log_start");
 		return NULL;
 	}
 
+	///* 获取当前时间戳和序列号 */
 	audit_get_stamp(ab->ctx, &t, &serial);
 
-	audit_log_format(ab, "audit(%lu.%03lu:%u): ",
-			 t.tv_sec, t.tv_nsec/1000000, serial);
+    /* 设置 audit log 记录头信息*/
+	audit_log_format(ab, "audit(%lu.%03lu:%u): ",t.tv_sec, t.tv_nsec/1000000, serial);
 	return ab;
 }
 
@@ -1237,6 +1292,9 @@ static inline int audit_expand(struct audit_buffer *ab, int extra)
  * will be called a second time.  Currently, we assume that a printk
  * can't format message larger than 1024 bytes, so we don't either.
  */
+ /*
+审计数据不是一次全部产生，因此audit_log_vformat(）可能被调用多次，在需要记录信息的地方调用该函数即可；所有的数据将以格式化字符串的形式进行记录
+*/
 static void audit_log_vformat(struct audit_buffer *ab, const char *fmt,
 			      va_list args)
 {
@@ -1282,6 +1340,7 @@ out:
  *
  * All the work is done in audit_log_vformat.
  */
+ //用于向一个给定的审计缓冲区(ab)写入一条记录消息
 void audit_log_format(struct audit_buffer *ab, const char *fmt, ...)
 {
 	va_list args;
@@ -1465,16 +1524,23 @@ void audit_log_end(struct audit_buffer *ab)
 {
 	if (!ab)
 		return;
-	if (!audit_rate_check()) {
+	
+	//通过audit_rate_check()检查当前审计日志发送的频率是否超过了设定的限制
+	if (!audit_rate_check()) 
+	{
 		audit_log_lost("rate limit exceeded");
-	} else {
+	} 
+	else 
+	{
 		struct nlmsghdr *nlh = nlmsg_hdr(ab->skb);
 		nlh->nlmsg_len = ab->skb->len - NLMSG_SPACE(0);
 
 		if (audit_pid) {
 			skb_queue_tail(&audit_skb_queue, ab->skb);
 			wake_up_interruptible(&kauditd_wait);
-		} else {
+		} 
+		else 
+		{
 			audit_printk_skb(ab->skb);
 		}
 		ab->skb = NULL;
