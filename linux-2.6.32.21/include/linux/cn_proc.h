@@ -24,6 +24,7 @@
  * Userspace sends this enum to register with the kernel that it is listening
  * for events on the connector.
  */
+//对应于打开和关闭进程事件报告
 enum proc_cn_mcast_op {
 	PROC_CN_MCAST_LISTEN = 1,
 	PROC_CN_MCAST_IGNORE = 2

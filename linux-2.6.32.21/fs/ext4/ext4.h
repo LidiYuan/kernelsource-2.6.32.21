@@ -198,26 +198,31 @@ typedef struct ext4_io_end {
 
 /*
  * Structure of a blocks group descriptor
+
+ 数据块位图跟踪块组中数据块使用情况。Inode位图跟踪块组中Inode使用情况
+ 每个位图一个数据块，每一位用0或1表示一个块组中数据块或inode表中inode的使用情况
+ 如果一个数据块大小是4KB的话，那一个位图块可以表示4*1024*8个数据块的使用情况，这也是单个块组具有的最大数据块个数,这样可以算出一个块组大小是128MB
+
  */
 struct ext4_group_desc
 {
-	__le32	bg_block_bitmap_lo;	/* Blocks bitmap block */
-	__le32	bg_inode_bitmap_lo;	/* Inodes bitmap block */
-	__le32	bg_inode_table_lo;	/* Inodes table block */
-	__le16	bg_free_blocks_count_lo;/* Free blocks count */
-	__le16	bg_free_inodes_count_lo;/* Free inodes count */
-	__le16	bg_used_dirs_count_lo;	/* Directories count */
+	__le32	bg_block_bitmap_lo;	/* Blocks bitmap block 数据块位图*/
+	__le32	bg_inode_bitmap_lo;	/* Inodes bitmap block inode位图*/
+	__le32	bg_inode_table_lo;	/* Inodes table block 该块组中第一个inode表的数据块号码*/
+	__le16	bg_free_blocks_count_lo;/* Free blocks count 块组中空闲数据块的个数*/
+	__le16	bg_free_inodes_count_lo;/* Free inodes count 块组中空闲inode的个数*/
+	__le16	bg_used_dirs_count_lo;	/* Directories count 块组中目录的个数*/
 	__le16	bg_flags;		/* EXT4_BG_flags (INODE_UNINIT, etc) */
 	__u32	bg_reserved[2];		/* Likely block/inode bitmap checksum */
-	__le16  bg_itable_unused_lo;	/* Unused inodes count */
-	__le16  bg_checksum;		/* crc16(sb_uuid+group+desc) */
-	__le32	bg_block_bitmap_hi;	/* Blocks bitmap block MSB */
-	__le32	bg_inode_bitmap_hi;	/* Inodes bitmap block MSB */
-	__le32	bg_inode_table_hi;	/* Inodes table block MSB */
-	__le16	bg_free_blocks_count_hi;/* Free blocks count MSB */
-	__le16	bg_free_inodes_count_hi;/* Free inodes count MSB */
-	__le16	bg_used_dirs_count_hi;	/* Directories count MSB */
-	__le16  bg_itable_unused_hi;    /* Unused inodes count MSB */
+	__le16  bg_itable_unused_lo;	/* Unused inodes count 未使用的inode的个数*/
+	__le16  bg_checksum;		/* crc16(sb_uuid+group+desc) crc16校验和*/
+	__le32	bg_block_bitmap_hi;	/* Blocks bitmap block MSB 数据块位图*/
+	__le32	bg_inode_bitmap_hi;	/* Inodes bitmap block MSB inode位图*/
+	__le32	bg_inode_table_hi;	/* Inodes table block MSB 块组中第一个inode表的数据块号码*/
+	__le16	bg_free_blocks_count_hi;/* Free blocks count MSB 块组中空闲数据块的个数*/
+	__le16	bg_free_inodes_count_hi;/* Free inodes count MSB 快组中空闲inode的个数*/
+	__le16	bg_used_dirs_count_hi;	/* Directories count MSB 块组中目录的个数*/
+	__le16  bg_itable_unused_hi;    /* Unused inodes count MSB 未使用的inode表的个数*/
 	__u32	bg_reserved2[3];
 };
 
@@ -519,17 +524,17 @@ struct ext4_mount_options {
  * Structure of an inode on the disk
  */
 struct ext4_inode {
-	__le16	i_mode;		/* File mode */
-	__le16	i_uid;		/* Low 16 bits of Owner Uid */
-	__le32	i_size_lo;	/* Size in bytes */
-	__le32	i_atime;	/* Access time */
-	__le32	i_ctime;	/* Inode Change time */
-	__le32	i_mtime;	/* Modification time */
-	__le32	i_dtime;	/* Deletion Time */
-	__le16	i_gid;		/* Low 16 bits of Group Id */
-	__le16	i_links_count;	/* Links count */
-	__le32	i_blocks_lo;	/* Blocks count */
-	__le32	i_flags;	/* File flags */
+	__le16	i_mode;		/* File mode 文件类型和访问权限*/
+	__le16	i_uid;		/* Low 16 bits of Owner Uid 文件所有者id*/
+	__le32	i_size_lo;	/* Size in bytes 文件大小 字节单位*/
+	__le32	i_atime;	/* Access time 最近一次访问的时间*/
+	__le32	i_ctime;	/* Inode Change time 最近一次更改inode的时间*/
+	__le32	i_mtime;	/* Modification time 最近一次修改的时间*/
+	__le32	i_dtime;	/* Deletion Time 文件删除的时间*/
+	__le16	i_gid;		/* Low 16 bits of Group Id 用户组id*/
+	__le16	i_links_count;	/* Links count 硬链接的计数*/
+	__le32	i_blocks_lo;	/* Blocks count 文件的数据块数*/
+	__le32	i_flags;	/* File flags 文件标志*/
 	union {
 		struct {
 			__le32  l_i_version;
@@ -540,18 +545,19 @@ struct ext4_inode {
 		struct {
 			__u32  m_i_reserved1;
 		} masix1;
-	} osd1;				/* OS dependent 1 */
-	__le32	i_block[EXT4_N_BLOCKS];/* Pointers to blocks */
-	__le32	i_generation;	/* File version (for NFS) */
-	__le32	i_file_acl_lo;	/* File ACL */
-	__le32	i_size_high;
+	} osd1;				/* OS dependent 1 特定的os信息 */
+	
+	__le32	i_block[EXT4_N_BLOCKS];/* Pointers to blocks 指向	数据块的指针*/
+	__le32	i_generation;	/* File version (for NFS) 文件版本 for nfs*/
+	__le32	i_file_acl_lo;	/* File ACL 低32的文件acl 指向扩展属性在磁盘上的block*/
+	__le32	i_size_high;   //文件大小的高32位
 	__le32	i_obso_faddr;	/* Obsoleted fragment address */
 	union {
 		struct {
-			__le16	l_i_blocks_high; /* were l_i_reserved1 */
-			__le16	l_i_file_acl_high;
-			__le16	l_i_uid_high;	/* these 2 fields */
-			__le16	l_i_gid_high;	/* were reserved2[0] */
+			__le16	l_i_blocks_high; /* were l_i_reserved1  数据块数的高16位*/
+			__le16	l_i_file_acl_high;  //高16位的acl
+			__le16	l_i_uid_high;	/* these 2 fields 所有者id的高16位*/
+			__le16	l_i_gid_high;	/* were reserved2[0] 组id的高16位*/
 			__u32	l_i_reserved2;
 		} linux2;
 		struct {
@@ -567,7 +573,13 @@ struct ext4_inode {
 			__u32	m_i_reserved2[2];
 		} masix2;
 	} osd2;				/* OS dependent 2 */
-	__le16	i_extra_isize;
+
+
+	__le16	i_extra_isize;/*
+                             在ext2,3中inode固定大小是128但ext4可以在格式化的时候分配一个更大的inode,大小存储在 sb的 s_inode_size中,
+                             超出128的额外空间大小则存储在此字段中, 多出的额外空间可以存放一些扩展属性信息
+	                        */    
+
 	__le16	i_pad1;
 	__le32  i_ctime_extra;  /* extra Change time      (nsec << 2 | epoch) */
 	__le32  i_mtime_extra;  /* extra Modification time(nsec << 2 | epoch) */
@@ -882,29 +894,49 @@ struct ext4_inode_info {
 struct ext4_super_block {
 /*00*/	__le32	s_inodes_count;		/*文件系统中inode的总数*/
 	__le32	s_blocks_count_lo;	/* 文件系统中块的总数 */
-	__le32	s_r_blocks_count_lo;	/* 保留块的总数 */
-	__le32	s_free_blocks_count_lo;	/* 未使用的块的总数（包括保留块） */
-/*10*/	__le32	s_free_inodes_count;	/* 未使用的inode的总数 */
-	__le32	s_first_data_block;	/* First Data Block */
-	__le32	s_log_block_size;	/* Block size */
+	__le32	s_r_blocks_count_lo;	/* 只能被super-user分配的块的数量 */
+	__le32	s_free_blocks_count_lo;	/* 空闲的块数 */
+/*10*/	__le32	s_free_inodes_count;	/* 空闲的inodes数量 */
+	__le32	s_first_data_block;	/* First Data Block 第一个使用的数据块号 总是为1 */
+	__le32	s_log_block_size;	/* Block size 块的大小      计算方式为(2 ^ (10 + sb.s_log_block_size) ) 
+                                   块的大小是在mkfs时候指定的,默认是4kb, 
+                                   块是ext4的基本单元由多个扇区组成(2^n)个扇区, 块又会组成一个更大的单元 块组                        
+                                   默认情况下 文件系统包含2^32个块, 如果启用了64位,则文件系统可以有2^64个块 
+	                                */
 	__le32	s_obso_log_frag_size;	/* Obsoleted fragment size */
-/*20*/	__le32	s_blocks_per_group;	/* # Blocks per group  每个块组中块的总数*/
+	
+/*20*/	__le32	s_blocks_per_group;	/* # Blocks per group  每个块组中块的总数 
+                                       ext4 文件系统分为一系列块组,为了减少碎片导致的性能问题,块分配器会尽力将每个文件的块保留在同一个组中,可以减少查询时间,
+                                       如果块的大小默认为4kb, 则块组中块的个数为8*4kb=32kb=32768个块,   块组的大小为32kb*4kb=128M  
+                                       块组的数量是设备的大小除以块组的大小    
+		                            */
+
 	__le32	s_obso_frags_per_group;	/* Obsoleted fragments per group */
-	__le32	s_inodes_per_group;	/* # Inodes per group */
-	__le32	s_mtime;		/* Mount time */
-/*30*/	__le32	s_wtime;		/* Write time */
-	__le16	s_mnt_count;		/* Mount count */
-	__le16	s_max_mnt_count;	/* Maximal mount count */
-	__le16	s_magic;		/* Magic signature */
-	__le16	s_state;		/* File system state */
-	__le16	s_errors;		/* Behaviour when detecting errors */
-	__le16	s_minor_rev_level;	/* minor revision level */
-/*40*/	__le32	s_lastcheck;		/* time of last check */
-	__le32	s_checkinterval;	/* max. time between checks */
-	__le32	s_creator_os;		/* OS */
-	__le32	s_rev_level;		/* Revision level */
-/*50*/	__le16	s_def_resuid;		/* Default uid for reserved blocks */
-	__le16	s_def_resgid;		/* Default gid for reserved blocks */
+	__le32	s_inodes_per_group;	/* # Inodes per group 每个组中inodes的个数 
+                                  由于0号inode不存在 所以计算inode属于哪个块组的方法为
+                                  (inodenum-1)/s_inodes_per_group = 块组号
+
+                                  inode在块组中的索引为:
+                                  index = (inodenum-1)%s_inodes_per_group
+
+                                  inode在inode表中的地址偏移为:
+                                  offset=index * s_inode_size
+                               
+ 	                                 */
+	__le32	s_mtime;		/* Mount time 最近一次的挂载时间*/
+/*30*/	__le32	s_wtime;		/* Write time  最近一次写操作时间*/
+	__le16	s_mnt_count;		/* Mount count 挂载次数*/
+	__le16	s_max_mnt_count;	/* Maximal mount count 执行文件系统check前的最大挂载次数*/
+	__le16	s_magic;		/* Magic signature 魔术标签*/
+	__le16	s_state;		/* File system state 文件系统状态标识 正常卸载为1 出错为2 其他为0*/
+	__le16	s_errors;		/* Behaviour when detecting errors 检测到错误时候的动作*/
+	__le16	s_minor_rev_level;	/* minor revision level 次版本号*/
+/*40*/	__le32	s_lastcheck;		/* time of last check 上一次check的时间*/
+	__le32	s_checkinterval;	/* max. time between checks 两次check之间最大的时间间隔*/
+	__le32	s_creator_os;		/* OS 创建文件系统的os*/
+	__le32	s_rev_level;		/* Revision level 版本号*/
+/*50*/	__le16	s_def_resuid;		/* Default uid for reserved blocks 保留快的默认uid*/
+	__le16	s_def_resgid;		/* Default gid for reserved blocks 保留快的默认用户组Id*/
 	/*
 	 * These fields are for EXT4_DYNAMIC_REV superblocks only.
 	 *
@@ -918,53 +950,59 @@ struct ext4_super_block {
 	 * feature set, it must abort and not try to meddle with
 	 * things it doesn't understand...
 	 */
-	__le32	s_first_ino;		/* First non-reserved inode */
-	__le16  s_inode_size;		/* size of inode structure */
-	__le16	s_block_group_nr;	/* block group # of this superblock */
-	__le32	s_feature_compat;	/* compatible feature set */
-/*60*/	__le32	s_feature_incompat;	/* incompatible feature set */
-	__le32	s_feature_ro_compat;	/* readonly-compatible feature set */
-/*68*/	__u8	s_uuid[16];		/* 128-bit uuid for volume */
-/*78*/	char	s_volume_name[16];	/* volume name */
-/*88*/	char	s_last_mounted[64];	/* directory where last mounted */
-/*C8*/	__le32	s_algorithm_usage_bitmap; /* For compression */
+	__le32	s_first_ino;		/* First non-reserved inode 第一个非保留的inode号码*/
+
+	__le16  s_inode_size;		/* size of inode structure inode结构的大小
+                                    可以用来计算inode table的大小
+	                               */
+	
+	__le16	s_block_group_nr;	/* block group # of this superblock 该superblock所在快组的的块组号*/
+	__le32	s_feature_compat;	/* compatible feature set 兼容性集合*/
+/*60*/	__le32	s_feature_incompat;	/* incompatible feature set 非兼容性集*/
+	__le32	s_feature_ro_compat;	/* readonly-compatible feature set 只读兼容性特集*/
+/*68*/	__u8	s_uuid[16];		/* 128-bit uuid for volume 128位卷的uuid*/
+/*78*/	char	s_volume_name[16];	/* volume name 卷名*/
+/*88*/	char	s_last_mounted[64];	/* directory where last mounted 最近一次挂载的目录*/
+/*C8*/	__le32	s_algorithm_usage_bitmap; /* For compression 用于压缩*/
 	/*
 	 * Performance hints.  Directory preallocation should only
 	 * happen if the EXT4_FEATURE_COMPAT_DIR_PREALLOC flag is on.
 	 */
-	__u8	s_prealloc_blocks;	/* Nr of blocks to try to preallocate*/
-	__u8	s_prealloc_dir_blocks;	/* Nr to preallocate for dirs */
+	__u8	s_prealloc_blocks;	/* Nr of blocks to try to preallocate预分配的块数*/
+	__u8	s_prealloc_dir_blocks;	/* Nr to preallocate for dirs 为目录预分配的块数*/
 	__le16	s_reserved_gdt_blocks;	/* Per group desc for online growth */
 	/*
 	 * Journaling support valid if EXT4_FEATURE_COMPAT_HAS_JOURNAL set.
 	 */
-/*D0*/	__u8	s_journal_uuid[16];	/* uuid of journal superblock */
-/*E0*/	__le32	s_journal_inum;		/* inode number of journal file */
-	__le32	s_journal_dev;		/* device number of journal file */
-	__le32	s_last_orphan;		/* start of list of inodes to delete */
-	__le32	s_hash_seed[4];		/* HTREE hash seed */
-	__u8	s_def_hash_version;	/* Default hash version to use */
+/*D0*/	__u8	s_journal_uuid[16];	/* uuid of journal superblock 日志superblock的uuid*/
+	
+/*E0*/	__le32	s_journal_inum;		/* inode number of journal file 日志文件的inode号*/
+		
+	__le32	s_journal_dev;		/* device number of journal file 日志文件的设备号*/
+	__le32	s_last_orphan;		/* start of list of inodes to delete 待删除的inode链表的起始位置*/
+	__le32	s_hash_seed[4];		/* HTREE hash seed HTREE散列种子*/
+	__u8	s_def_hash_version;	/* Default hash version to use *默认使用的哈希版本*/
 	__u8	s_reserved_char_pad;
-	__le16  s_desc_size;		/* size of group descriptor */
+	__le16  s_desc_size;		/* size of group descriptor 块组描述符大小*/
 /*100*/	__le32	s_default_mount_opts;
-	__le32	s_first_meta_bg;	/* First metablock block group */
-	__le32	s_mkfs_time;		/* When the filesystem was created */
-	__le32	s_jnl_blocks[17];	/* Backup of the journal inode */
+	__le32	s_first_meta_bg;	/* First metablock block group 第一个使用元块组的块组在GDT表中的数据块的偏移*/
+	__le32	s_mkfs_time;		/* When the filesystem was created 文件系统创建的时间*/
+	__le32	s_jnl_blocks[17];	/* Backup of the journal inode 日志inode备份*/
 	/* 64bit support valid if EXT4_FEATURE_COMPAT_64BIT */
-/*150*/	__le32	s_blocks_count_hi;	/* Blocks count */
-	__le32	s_r_blocks_count_hi;	/* Reserved blocks count */
-	__le32	s_free_blocks_count_hi;	/* Free blocks count */
-	__le16	s_min_extra_isize;	/* All inodes have at least # bytes */
-	__le16	s_want_extra_isize; 	/* New inodes should reserve # bytes */
-	__le32	s_flags;		/* Miscellaneous flags */
+/*150*/	__le32	s_blocks_count_hi;	/* Blocks count 数据块个数*/
+	__le32	s_r_blocks_count_hi;	/* Reserved blocks count 保留数据块个数*/
+	__le32	s_free_blocks_count_hi;	/* Free blocks count 空闲数据块的个数*/
+	__le16	s_min_extra_isize;	/* All inodes have at least # bytes 所有inode需要的字节数*/
+	__le16	s_want_extra_isize; 	/* New inodes should reserve # bytes 应当为新的inodes保留的字节数*/
+	__le32	s_flags;		/* Miscellaneous flags 其他标志*/
 	__le16  s_raid_stride;		/* RAID stride */
-	__le16  s_mmp_interval;         /* # seconds to wait in MMP checking */
+	__le16  s_mmp_interval;         /* # seconds to wait in MMP checking 早mmp检查中的等待间隔*/
 	__le64  s_mmp_block;            /* Block for multi-mount protection */
-	__le32  s_raid_stripe_width;    /* blocks on all data disks (N*stride)*/
-	__u8	s_log_groups_per_flex;  /* FLEX_BG group size */
+	__le32  s_raid_stripe_width;    /* blocks on all data disks (N*stride)数据块位于所有的数据磁盘上*/
+	__u8	s_log_groups_per_flex;  /* FLEX_BG group size flex_bg 组成弹性组,的组的数量 2^s_log_groups_per_flex*/
 	__u8	s_reserved_char_pad2;
 	__le16  s_reserved_pad;
-	__le64	s_kbytes_written;	/* nr of lifetime kilobytes written */
+	__le64	s_kbytes_written;	/* nr of lifetime kilobytes written 文件系统整个生命周期中写入的数据的总量*/
 	__u32   s_reserved[160];        /* Padding to the end of the block */
 };
 
@@ -995,7 +1033,7 @@ struct ext4_sb_info {
 	struct buffer_head * s_sbh;	/* Buffer containing the super block */
 	struct ext4_super_block *s_es;	/* Pointer to the super block in the buffer */
 	struct buffer_head **s_group_desc;
-	unsigned int s_mount_opt;
+	unsigned int s_mount_opt;  //EXT4_MOUNT_xx
 	unsigned int s_mount_flags;
 	ext4_fsblk_t s_sb_block;
 	uid_t s_resuid;
@@ -1023,8 +1061,9 @@ struct ext4_sb_info {
 	struct completion s_kobj_unregister;
 
 	/* Journaling */
-	struct inode *s_journal_inode;
-	struct journal_s *s_journal;
+	struct inode     *s_journal_inode;
+	struct journal_s *s_journal; //文件系统日志句柄
+	
 	struct list_head s_orphan;
 	struct mutex s_orphan_lock;
 	struct mutex s_resize_lock;

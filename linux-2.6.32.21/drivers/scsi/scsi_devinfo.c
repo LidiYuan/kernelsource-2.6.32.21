@@ -774,7 +774,7 @@ int __init scsi_init_devinfo(void)
 	struct proc_dir_entry *p;
 #endif
 	int error, i;
-
+     	 
 	error = scsi_dev_info_add_list(SCSI_DEVINFO_GLOBAL, NULL);
 	if (error)
 		return error;

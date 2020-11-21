@@ -24,10 +24,13 @@ struct resource {
 	resource_size_t end;//资源范围的结束
 	const char *name;//这块资源的名字
 	unsigned long flags;//各种标志  是否是有效的资源空间
-	struct resource *parent, *sibling, *child;//指向资源树中的父亲 兄弟 和孩子
+	struct resource *parent, 
+		            *sibling, 
+		            *child;//指向资源树中的父亲 兄弟 和孩子
 };
 
-struct resource_list {
+struct resource_list 
+{
 	struct resource_list *next;
 	struct resource *res;
 	struct pci_dev *dev;
@@ -140,9 +143,13 @@ static inline unsigned long resource_type(struct resource *res)
 }
 
 /* Convenience shorthand with allocation */
+//申请io端口映射
 #define request_region(start,n,name)	__request_region(&ioport_resource, (start), (n), (name), 0)
+
 #define __request_mem_region(start,n,name, excl) __request_region(&iomem_resource, (start), (n), (name), excl)
+//申请io内存映射
 #define request_mem_region(start,n,name) __request_region(&iomem_resource, (start), (n), (name), 0)
+
 #define request_mem_region_exclusive(start,n,name) \
 	__request_region(&iomem_resource, (start), (n), (name), IORESOURCE_EXCLUSIVE)
 #define rename_region(region, newname) do { (region)->name = (newname); } while (0)

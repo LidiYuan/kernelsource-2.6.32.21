@@ -300,6 +300,7 @@ write_out_data:
  * The primary function for committing a transaction to the log.  This
  * function is called by the journal thread to begin a complete commit.
  */
+ //对食物进行提交
 void journal_commit_transaction(journal_t *journal)
 {
 	transaction_t *commit_transaction;

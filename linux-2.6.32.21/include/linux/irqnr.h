@@ -13,6 +13,8 @@
  * Wrappers for non-genirq architectures:
  */
 #define nr_irqs			NR_IRQS
+
+
 #define irq_to_desc(irq)	(&irq_desc[irq])
 
 # define for_each_irq_desc(irq, desc)		\

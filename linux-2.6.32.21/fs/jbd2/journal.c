@@ -1,6 +1,9 @@
 /*
  * linux/fs/jbd2/journal.c
- *
+ *  JBD2(journaling block device 2)
+ JBD2作用的原理是在Ext4文件系统把数据提交到驱动前先调用它，JBD2根据系统的不同设置来完成数据或是操作的备份后，再让Ext4系统提交数据，当文件系统把数据写入了设备后，就通过JBD2把刚才数据或是操作备份删除，这样来保证数据的一致性
+
+ 
  * Written by Stephen C. Tweedie <sct@redhat.com>, 1998
  *
  * Copyright 1998 Red Hat corp --- All Rights Reserved
@@ -121,20 +124,21 @@ static void commit_timeout(unsigned long __data)
  *    known as checkpointing, and this thread is responsible for that job.
  */
 
+//jbd2_journal_start_thread启动此线程
 static int kjournald2(void *arg)
 {
 	journal_t *journal = arg;
 	transaction_t *transaction;
 
-	/*
+	/* 安装一个定时器 去触发提交
 	 * Set up an interval timer which can be used to trigger a commit wakeup
 	 * after the commit interval expires
 	 */
-	setup_timer(&journal->j_commit_timer, commit_timeout,
-			(unsigned long)current);
+	setup_timer(&journal->j_commit_timer, commit_timeout,(unsigned long)current);
 
 	/* Record that the journal thread is running */
 	journal->j_task = current;
+	
 	wake_up(&journal->j_wait_done_commit);
 
 	/*
@@ -143,13 +147,14 @@ static int kjournald2(void *arg)
 	spin_lock(&journal->j_state_lock);
 
 loop:
+	//日志线程已经死亡了
 	if (journal->j_flags & JBD2_UNMOUNT)
 		goto end_loop;
 
-	jbd_debug(1, "commit_sequence=%d, commit_request=%d\n",
-		journal->j_commit_sequence, journal->j_commit_request);
+	jbd_debug(1, "commit_sequence=%d, commit_request=%d\n",journal->j_commit_sequence, journal->j_commit_request);
 
-	if (journal->j_commit_sequence != journal->j_commit_request) {
+	if (journal->j_commit_sequence != journal->j_commit_request) 
+	{
 		jbd_debug(1, "OK, requests differ\n");
 		spin_unlock(&journal->j_state_lock);
 		del_timer_sync(&journal->j_commit_timer);
@@ -159,7 +164,8 @@ loop:
 	}
 
 	wake_up(&journal->j_wait_done_commit);
-	if (freezing(current)) {
+	if (freezing(current)) 
+	{
 		/*
 		 * The simpler the better. Flushing journal isn't a
 		 * good idea, because that depends on threads that may
@@ -169,7 +175,9 @@ loop:
 		spin_unlock(&journal->j_state_lock);
 		refrigerator();
 		spin_lock(&journal->j_state_lock);
-	} else {
+	} 
+	else 
+	{
 		/*
 		 * We assume on resume that commits are already there,
 		 * so we don't sleep
@@ -177,8 +185,9 @@ loop:
 		DEFINE_WAIT(wait);
 		int should_sleep = 1;
 
-		prepare_to_wait(&journal->j_wait_commit, &wait,
-				TASK_INTERRUPTIBLE);
+        
+		prepare_to_wait(&journal->j_wait_commit, &wait,TASK_INTERRUPTIBLE);
+		
 		if (journal->j_commit_sequence != journal->j_commit_request)
 			should_sleep = 0;
 		transaction = journal->j_running_transaction;
@@ -216,6 +225,7 @@ end_loop:
 	return 0;
 }
 
+//运行线程线程用于事务的提交  ,线程的名字是jbd2/xx
 static int jbd2_journal_start_thread(journal_t *journal)
 {
 	struct task_struct *t;
@@ -785,15 +795,19 @@ static const struct file_operations jbd2_seq_info_fops = {
 
 static struct proc_dir_entry *proc_jbd2_stats;
 
+//在/proc/fs/jbd2下创建一项
 static void jbd2_stats_proc_init(journal_t *journal)
 {
 	journal->j_proc_entry = proc_mkdir(journal->j_devname, proc_jbd2_stats);
-	if (journal->j_proc_entry) {
-		proc_create_data("info", S_IRUGO, journal->j_proc_entry,
-				 &jbd2_seq_info_fops, journal);
+	if (journal->j_proc_entry) 
+	{ 
+	    //如果创建成功 接着在/proc/fs/jbd2/xx/下创建 info文件
+	    //此文件的操作集为jbd2_seq_info_fops
+		proc_create_data("info", S_IRUGO, journal->j_proc_entry, &jbd2_seq_info_fops, journal);
 	}
 }
 
+//销毁/proc/fs/jbd2/xx/
 static void jbd2_stats_proc_exit(journal_t *journal)
 {
 	remove_proc_entry("info", journal->j_proc_entry);
@@ -874,10 +888,14 @@ fail:
  *  range of blocks on an arbitrary block device.
  *
  */
-journal_t * jbd2_journal_init_dev(struct block_device *bdev,
-			struct block_device *fs_dev,
-			unsigned long long start, int len, int blocksize)
+ //这个函数就是初始化日志分区的
+journal_t * jbd2_journal_init_dev(struct block_device *bdev,//日志分区描述结构体
+			                            struct block_device *fs_dev,//主分区描述结构体
+			                            unsigned long long start,//主分区数据起始的block编号 
+			                            int len, //主分区的bock数
+			                            int blocksize)//主分区的block的大小
 {
+    //给journal_t结构体分配空间，并初始化一些成员变量，主要是等待列表
 	journal_t *journal = journal_init_common();
 	struct buffer_head *bh;
 	char *p;
@@ -887,8 +905,12 @@ journal_t * jbd2_journal_init_dev(struct block_device *bdev,
 		return NULL;
 
 	/* journal descriptor can store up to n blocks -bzzz */
-	journal->j_blocksize = blocksize;
+	journal->j_blocksize = blocksize;// 记录主分区的block大小
+
+	//在/proc/fs/jbd2/下创建一个项
 	jbd2_stats_proc_init(journal);
+
+	// 计算一个block里能在放多少个buffer_head的描述符。并创建相应个数的  buffer_head的指针空间
 	n = journal->j_blocksize / sizeof(journal_block_tag_t);
 	journal->j_wbufsize = n;
 	journal->j_wbuf = kmalloc(n * sizeof(struct buffer_head*), GFP_KERNEL);
@@ -897,10 +919,14 @@ journal_t * jbd2_journal_init_dev(struct block_device *bdev,
 			__func__);
 		goto out_err;
 	}
+
+	
 	journal->j_dev = bdev;
 	journal->j_fs_dev = fs_dev;
 	journal->j_blk_offset = start;
 	journal->j_maxlen = len;
+
+	//下面就是根据主分区来生成日志的名字，就是设备名加分区名
 	bdevname(journal->j_dev, journal->j_devname);
 	p = journal->j_devname;
 	while ((p = strchr(p, '/')))
@@ -2186,19 +2212,23 @@ static void jbd2_journal_destroy_handle_cache(void)
 /*
  * Module startup and shutdown
  */
-
+//初始化jbd2缓存
 static int __init journal_init_caches(void)
 {
 	int ret;
 
+	//创建 kemecache缓存
 	ret = jbd2_journal_init_revoke_caches();
 	if (ret == 0)
+		//创建缓存
 		ret = journal_init_jbd2_journal_head_cache();
 	if (ret == 0)
+		//创建缓存
 		ret = journal_init_handle_cache();
 	return ret;
 }
 
+//销毁创建的kmemcache缓存
 static void jbd2_journal_destroy_caches(void)
 {
 	jbd2_journal_destroy_revoke_caches();
@@ -2210,13 +2240,24 @@ static int __init journal_init(void)
 {
 	int ret;
 
+	//判断journal_superblock_s这个结构体的大小是不是1024字节，如果不是，则迫使编译器报一个编译错误
 	BUILD_BUG_ON(sizeof(struct journal_superblock_s) != 1024);
 
+	//初化jbd2所需要的cache
 	ret = journal_init_caches();
-	if (ret == 0) {
+
+	//初始化成功
+	if (ret == 0) 
+	{
+	    //在release 版本此函数为空
+	    //在debug版本此函数在debugfs文件系统中创建一项jdb2
 		jbd2_create_debugfs_entry();
+
+		//在proc文件系统中创建"fs/jbd2"
 		jbd2_create_jbd_stats_proc_entry();
-	} else {
+	} 
+	else 
+	{  
 		jbd2_journal_destroy_caches();
 	}
 	return ret;
@@ -2298,9 +2339,16 @@ const char *jbd2_dev_to_name(dev_t device)
 	spin_unlock(&devname_cache_lock);
 	return ret;
 }
+
+
 EXPORT_SYMBOL(jbd2_dev_to_name);
 
 MODULE_LICENSE("GPL");
+
+
+//这个表示jbd2这个模块的入口，它通过执行journal_init这个函数来实现
 module_init(journal_init);
+
+//表示这个jbd2这个模块卸载时要执行的函数journal_exit
 module_exit(journal_exit);
 

@@ -57,8 +57,8 @@ struct scsi_cmnd;
  */
 
 struct us_unusual_dev {
-	const char* vendorName;
-	const char* productName;
+	const char* vendorName; //厂商
+	const char* productName;//产品名
 	__u8  useProtocol;
 	__u8  useTransport;
 	int (*initFunction)(struct us_data *);
@@ -95,7 +95,9 @@ typedef void (*pm_hook)(struct us_data *, int);	/* power management hook */
 #define US_SUSPEND	0
 #define US_RESUME	1
 
-/* we allocate one of these for every device that we remember */
+/* we allocate one of these for every device that we remember 
+usb stoarge data
+*/
 struct us_data {
 	/* The device we're working with
 	 * It's important to note:
@@ -105,7 +107,7 @@ struct us_data {
 	struct usb_device	*pusb_dev;	 /* this usb_device */
 	struct usb_interface	*pusb_intf;	 /* this interface */
 	struct us_unusual_dev   *unusual_dev;	 /* device-filter entry     */
-	unsigned long		fflags;		 /* fixed flags from filter */
+	unsigned long		fflags;		 /* fixed flags from filter 修订了哪写flag*/
 	unsigned long		dflags;		 /* dynamic atomic bitflags */
 	unsigned int		send_bulk_pipe;	 /* cached pipe values */
 	unsigned int		recv_bulk_pipe;
@@ -114,8 +116,8 @@ struct us_data {
 	unsigned int		recv_intr_pipe;
 
 	/* information about the device */
-	char			*transport_name;
-	char			*protocol_name;
+	char			*transport_name;// get_transport() 对于u盘属于Bulk传输方式
+	char			*protocol_name; // get_protocol() 
 	__le32			bcs_signature;
 	u8			subclass;
 	u8			protocol;

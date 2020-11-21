@@ -26,6 +26,7 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
 extern spinlock_t pgd_lock;
 extern struct list_head pgd_list;
 
+//CONFIG_PARAVIRT 支持半虚拟化(para-virtualization)
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
 #else  /* !CONFIG_PARAVIRT */
@@ -80,16 +81,20 @@ extern struct list_head pgd_list;
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
+
+//页的内容是否被修改过
 static inline int pte_dirty(pte_t pte)
 {
 	return pte_flags(pte) & _PAGE_DIRTY;
 }
 
+//访问位(_PAGE_ACCESS)是否设置了
 static inline int pte_young(pte_t pte)
 {
 	return pte_flags(pte) & _PAGE_ACCESSED;
 }
 
+//是否可以写入该页
 static inline int pte_write(pte_t pte)
 {
 	return pte_flags(pte) & _PAGE_RW;
@@ -111,6 +116,7 @@ static inline int pte_global(pte_t pte)
 	return pte_flags(pte) & _PAGE_GLOBAL;
 }
 
+//该页中的数据是否可以作为二进制代码执行
 static inline int pte_exec(pte_t pte)
 {
 	return !(pte_flags(pte) & _PAGE_NX);
@@ -154,36 +160,43 @@ static inline pte_t pte_clear_flags(pte_t pte, pteval_t clear)
 	return native_make_pte(v & ~clear);
 }
 
+//"清除"页，通常是清除_PAGE_DIRTY位
 static inline pte_t pte_mkclean(pte_t pte)
 {
 	return pte_clear_flags(pte, _PAGE_DIRTY);
 }
 
+//清除访问位
 static inline pte_t pte_mkold(pte_t pte)
 {
 	return pte_clear_flags(pte, _PAGE_ACCESSED);
 }
 
+//清除该页的写权限
 static inline pte_t pte_wrprotect(pte_t pte)
 {
 	return pte_clear_flags(pte, _PAGE_RW);
 }
 
+//允许执行页的内容
 static inline pte_t pte_mkexec(pte_t pte)
 {
 	return pte_clear_flags(pte, _PAGE_NX);
 }
 
+//将页标记为脏
 static inline pte_t pte_mkdirty(pte_t pte)
 {
 	return pte_set_flags(pte, _PAGE_DIRTY);
 }
 
+//设置访问位，通常是_PAGE_ACCESSD
 static inline pte_t pte_mkyoung(pte_t pte)
 {
 	return pte_set_flags(pte, _PAGE_ACCESSED);
 }
 
+//设置写权限
 static inline pte_t pte_mkwrite(pte_t pte)
 {
 	return pte_set_flags(pte, _PAGE_RW);
@@ -317,6 +330,7 @@ static inline int pte_same(pte_t a, pte_t b)
 	return a.pte == b.pte;
 }
 
+
 static inline int pte_present(pte_t a)
 {
 	return pte_flags(a) & (_PAGE_PRESENT | _PAGE_PROTNONE);
@@ -445,14 +459,16 @@ static inline int pud_large(pud_t pud)
 #endif	/* PAGETABLE_LEVELS > 2 */
 
 #if PAGETABLE_LEVELS > 3
+
 static inline int pgd_present(pgd_t pgd)
 {
 	return pgd_flags(pgd) & _PAGE_PRESENT;
 }
 
+//获得关联的页的虚拟地址
 static inline unsigned long pgd_page_vaddr(pgd_t pgd)
 {
-	return (unsigned long)__va((unsigned long)pgd_val(pgd) & PTE_PFN_MASK);
+	return (unsigned long) __va( (unsigned long)pgd_val(pgd) &  PTE_PFN_MASK );
 }
 
 /*
@@ -467,6 +483,7 @@ static inline unsigned long pud_index(unsigned long address)
 	return (address >> PUD_SHIFT) & (PTRS_PER_PUD - 1);
 }
 
+//
 static inline pud_t *pud_offset(pgd_t *pgd, unsigned long address)
 {
 	return (pud_t *)pgd_page_vaddr(*pgd) + pud_index(address);
@@ -491,22 +508,28 @@ static inline int pgd_none(pgd_t pgd)
  * this macro returns the index of the entry in the pgd page which would
  * control the given virtual address
  */
+//获得一个pgd数组的下标元素
 #define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
 
 /*
  * pgd_offset() returns a (pgd_t *)
  * pgd_index() is used get the offset into the pgd page's array of pgd_t's;
  */
+
+//返回一个pgd_t* 
 #define pgd_offset(mm, address) ((mm)->pgd + pgd_index((address)))
 /*
  * a shortcut which implies the use of the kernel's pgd, instead
  * of a process's
  */
+ 
 #define pgd_offset_k(address) pgd_offset(&init_mm, (address))
 
 
 #define KERNEL_PGD_BOUNDARY	pgd_index(PAGE_OFFSET)
 #define KERNEL_PGD_PTRS		(PTRS_PER_PGD - KERNEL_PGD_BOUNDARY)
+
+
 
 #ifndef __ASSEMBLY__
 

@@ -82,79 +82,108 @@ For 32-bit we have the following conventions - kernel is built with
 #define ARGOFFSET	R11
 #define SWFRAME		ORIG_RAX
 
-	.macro SAVE_ARGS addskip=0, norcx=0, nor891011=0
-	subq  $9*8+\addskip, %rsp
-	CFI_ADJUST_CFA_OFFSET	9*8+\addskip
-	movq  %rdi, 8*8(%rsp)
-	CFI_REL_OFFSET	rdi, 8*8
-	movq  %rsi, 7*8(%rsp)
+//保存寄存器到堆栈中
+/*
+addskip:要开辟的栈帧的额外大小
+norcx: 为1 不保存rcx寄存器
+nor891011: 为1 不保存r8 r9 r10 r11寄存器
+*/
+.macro SAVE_ARGS addskip=0, norcx=0, nor891011=0	
+	subq  $9*8+\addskip, %rsp             //获得一个栈帧,大小为$9*8 + \addskip
+	CFI_ADJUST_CFA_OFFSET	9*8+\addskip  
+	movq  %rdi, 8*8(%rsp)                 //#保存rdi到堆栈
+	CFI_REL_OFFSET	rdi, 8*8 
+	movq  %rsi, 7*8(%rsp)                //#保存rsi到堆栈
 	CFI_REL_OFFSET	rsi, 7*8
-	movq  %rdx, 6*8(%rsp)
+	movq  %rdx, 6*8(%rsp)                //保存rdx到堆栈
 	CFI_REL_OFFSET	rdx, 6*8
-	.if \norcx
+
+    //如果设置了norcx则不保存rcx到堆栈中
+    .if \norcx 
 	.else
 	movq  %rcx, 5*8(%rsp)
 	CFI_REL_OFFSET	rcx, 5*8
 	.endif
-	movq  %rax, 4*8(%rsp)
+
+    //保存rax到堆栈
+    movq  %rax, 4*8(%rsp)
 	CFI_REL_OFFSET	rax, 4*8
-	.if \nor891011
+
+    //如果设置了nor891011  则不保存寄存器 r8 r9 r10 r11
+ 	.if \nor891011
 	.else
-	movq  %r8, 3*8(%rsp)
-	CFI_REL_OFFSET	r8,  3*8
-	movq  %r9, 2*8(%rsp)
-	CFI_REL_OFFSET	r9,  2*8
-	movq  %r10, 1*8(%rsp)
-	CFI_REL_OFFSET	r10, 1*8
-	movq  %r11, (%rsp)
-	CFI_REL_OFFSET	r11, 0*8
+		movq  %r8, 3*8(%rsp)
+		CFI_REL_OFFSET	r8,  3*8
+		movq  %r9, 2*8(%rsp)
+		CFI_REL_OFFSET	r9,  2*8
+		movq  %r10, 1*8(%rsp)
+		CFI_REL_OFFSET	r10, 1*8
+		movq  %r11, (%rsp)
+		CFI_REL_OFFSET	r11, 0*8
 	.endif
-	.endm
+.endm
 
 #define ARG_SKIP	9*8
 
-	.macro RESTORE_ARGS skiprax=0, addskip=0, skiprcx=0, skipr11=0, \
-			    skipr8910=0, skiprdx=0
-	.if \skipr11
+.macro RESTORE_ARGS skiprax=0, addskip=0, skiprcx=0, skipr11=0, skipr8910=0, skiprdx=0
+
+    #判断是否跳过r11寄存器 
+    .if \skipr11
 	.else
-	movq (%rsp), %r11
-	CFI_RESTORE r11
+	    movq (%rsp), %r11
+	    CFI_RESTORE r11
 	.endif
+
+	 
+	 #判断是否跳过 r8 r9 r10寄存器
 	.if \skipr8910
 	.else
-	movq 1*8(%rsp), %r10
-	CFI_RESTORE r10
-	movq 2*8(%rsp), %r9
-	CFI_RESTORE r9
-	movq 3*8(%rsp), %r8
-	CFI_RESTORE r8
+		movq 1*8(%rsp), %r10
+		CFI_RESTORE r10
+		movq 2*8(%rsp), %r9
+		CFI_RESTORE r9
+		movq 3*8(%rsp), %r8
+		CFI_RESTORE r8
 	.endif
+
+	 #判断是否跳过rax寄存器
 	.if \skiprax
 	.else
-	movq 4*8(%rsp), %rax
-	CFI_RESTORE rax
+		movq 4*8(%rsp), %rax
+		CFI_RESTORE rax
 	.endif
+
+	 #判断是否跳过rcx寄存器
 	.if \skiprcx
 	.else
-	movq 5*8(%rsp), %rcx
-	CFI_RESTORE rcx
+		movq 5*8(%rsp), %rcx
+		CFI_RESTORE rcx
 	.endif
+
+	 #判断是否跳过rdx寄存器
 	.if \skiprdx
 	.else
-	movq 6*8(%rsp), %rdx
-	CFI_RESTORE rdx
+		movq 6*8(%rsp), %rdx
+		CFI_RESTORE rdx
 	.endif
+
+	#恢复 rsi rdi寄存器 
 	movq 7*8(%rsp), %rsi
 	CFI_RESTORE rsi
 	movq 8*8(%rsp), %rdi
 	CFI_RESTORE rdi
-	.if ARG_SKIP+\addskip > 0
-	addq $ARG_SKIP+\addskip, %rsp
-	CFI_ADJUST_CFA_OFFSET	-(ARG_SKIP+\addskip)
-	.endif
-	.endm
 
-	.macro LOAD_ARGS offset, skiprax=0
+	#rsp要跳过的大小 
+	.if ARG_SKIP+\addskip > 0
+		addq $ARG_SKIP+\addskip, %rsp
+		CFI_ADJUST_CFA_OFFSET	-(ARG_SKIP+\addskip)
+	.endif
+	
+.endm
+
+//恢复寄存器的值
+.macro LOAD_ARGS offset, skiprax=0
+
 	movq \offset(%rsp),    %r11
 	movq \offset+8(%rsp),  %r10
 	movq \offset+16(%rsp), %r9
@@ -163,15 +192,19 @@ For 32-bit we have the following conventions - kernel is built with
 	movq \offset+48(%rsp), %rdx
 	movq \offset+56(%rsp), %rsi
 	movq \offset+64(%rsp), %rdi
+
+	//是否需要恢复rax
 	.if \skiprax
 	.else
-	movq \offset+72(%rsp), %rax
+	     movq \offset+72(%rsp), %rax
 	.endif
-	.endm
+
+.endm
 
 #define REST_SKIP	6*8
 
-	.macro SAVE_REST
+//保存rbx,  rbp,r12,r13,r14,r15寄存器的值到堆栈中 
+.macro SAVE_REST
 	subq $REST_SKIP, %rsp
 	CFI_ADJUST_CFA_OFFSET	REST_SKIP
 	movq %rbx, 5*8(%rsp)
@@ -186,9 +219,10 @@ For 32-bit we have the following conventions - kernel is built with
 	CFI_REL_OFFSET	r14, 1*8
 	movq %r15, (%rsp)
 	CFI_REL_OFFSET	r15, 0*8
-	.endm
+.endm
 
-	.macro RESTORE_REST
+//从堆栈中恢复rbx,  rbp,r12,r13,r14,r15寄存器的值 
+.macro RESTORE_REST
 	movq (%rsp),     %r15
 	CFI_RESTORE r15
 	movq 1*8(%rsp),  %r14
@@ -203,7 +237,7 @@ For 32-bit we have the following conventions - kernel is built with
 	CFI_RESTORE rbx
 	addq $REST_SKIP, %rsp
 	CFI_ADJUST_CFA_OFFSET	-(REST_SKIP)
-	.endm
+.endm
 
 	.macro SAVE_ALL
 	SAVE_ARGS

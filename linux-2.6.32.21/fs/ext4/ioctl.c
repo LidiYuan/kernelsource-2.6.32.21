@@ -31,7 +31,8 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		ext4_get_inode_flags(ei);
 		flags = ei->i_flags & EXT4_FL_USER_VISIBLE;
 		return put_user(flags, (int __user *) arg);
-	case EXT4_IOC_SETFLAGS: {
+	case EXT4_IOC_SETFLAGS: 
+	{
 		handle_t *handle = NULL;
 		int err, migrate = 0;
 		struct ext4_iloc iloc;
@@ -44,6 +45,8 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (get_user(flags, (int __user *) arg))
 			return -EFAULT;
 
+
+		//获得mnt的写权限
 		err = mnt_want_write(filp->f_path.mnt);
 		if (err)
 			return err;

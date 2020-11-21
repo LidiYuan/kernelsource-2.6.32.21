@@ -53,15 +53,19 @@
  * are used for message routing and 
  * must be registered in connector.h for in-kernel usage.
  */
-
+//结构 cb_id 是连接器实例的标识 ID，它用于确定 netlink 消息与回调函数的对应关系。当连接器接收到标识 ID 为 {idx，val} 的 netlink 消息时，注册的回调函数 void (*callback) (void *) 将被调用。该回调函数的参数为结构 struct cn_msg 的指针
 struct cb_id {
 	__u32 idx;
 	__u32 val;
 };
 
+//连接器定义的消息头
 struct cn_msg {
 	struct cb_id id;
 
+	//字段 seq 和 ack 用于确保消息的可靠传输
+	//netlink 在内存紧张的情况下可能丢失消息，因此该头使用顺序号和响应号来满足要求可靠传输用户的需求
+	//当发送消息时，用户需要设置独一无二的顺序号和随机的响应号，顺序号也应当设置到 nlmsghdr->nlmsg_seq
 	__u32 seq;
 	__u32 ack;
 
@@ -139,11 +143,24 @@ struct cn_dev {
 	struct cn_queue_dev *cbdev;
 };
 
-int cn_add_callback(struct cb_id *, char *, void (*callback) (struct cn_msg *, struct netlink_skb_parms *));
+//用于向连接器注册新的连接器实例以及相应的回调函数，参数 id 指定注册的标识 ID，参数 name 指定连接器回调函数的符号名，参数 callback 为回调函数
+int cn_add_callback(struct cb_id *, char *,  void (*callback) (struct cn_msg *, struct netlink_skb_parms *));
+
+//用于卸载回调函数，参数 id 为注册函数 cn_add_callback 注册的连接器标识 ID
 void cn_del_callback(struct cb_id *);
-int cn_netlink_send(struct cn_msg *, u32, gfp_t);
+
+//用于向给定的组发送消息，它可以在任何上下文安全地调用。但是，如果内存不足，可能会发送失败。在具体的连接器实例中，该函数用于向用户态发送 netlink 消息
+/*
+参数 msg 为发送的 netlink 消息的消息头
+参数 __group 为接收消息的组，如果它为 0，那么连接器将搜索所有注册的连接器用户，最终将发送给用户 ID 与在 msg 中的 ID 相同的组，但如果 __group 不为 0，消息将发送给 __group 指定的组
+参数 gfp_mask 指定页分配标志
+当注册新的回调函数时，连接器将指定它的组为 id.idx。
+*/
+int cn_netlink_send(struct cn_msg *msg, u32 __group, gfp_t gfp_mask);
+
 
 int cn_queue_add_callback(struct cn_queue_dev *dev, char *name, struct cb_id *id, void (*callback)(struct cn_msg *, struct netlink_skb_parms *));
+
 void cn_queue_del_callback(struct cn_queue_dev *dev, struct cb_id *id);
 
 int queue_cn_work(struct cn_callback_entry *cbq, struct work_struct *work);

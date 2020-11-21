@@ -35,8 +35,7 @@ static const struct file_operations mark_ops = {
 static int __init sample_init(void)
 {
 	printk(KERN_ALERT "sample init\n");
-	pentry_sample = proc_create("tracepoint-sample", 0444, NULL,
-		&mark_ops);
+	pentry_sample = proc_create("tracepoint-sample", 0444, NULL,&mark_ops);
 	if (!pentry_sample)
 		return -EPERM;
 	return 0;

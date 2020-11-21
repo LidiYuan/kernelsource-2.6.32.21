@@ -49,8 +49,7 @@ static void __user *sig_handler(struct task_struct *t, int sig)
 static int sig_handler_ignored(void __user *handler, int sig)
 {
 	/* Is it explicitly or implicitly ignored? */
-	return handler == SIG_IGN ||
-		(handler == SIG_DFL && sig_kernel_ignore(sig));
+	return handler == SIG_IGN || (handler == SIG_DFL && sig_kernel_ignore(sig));
 }
 
 static int sig_task_ignored(struct task_struct *t, int sig,
@@ -440,8 +439,11 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 	/* We only dequeue private signals from ourselves, we don't let
 	 * signalfd steal them
 	 */
+	 //先处理线程信号
 	signr = __dequeue_signal(&tsk->pending, mask, info);
-	if (!signr) {
+	if (!signr) 
+	{
+	    //再处理进程信号
 		signr = __dequeue_signal(&tsk->signal->shared_pending,
 					 mask, info);
 		/*
@@ -457,7 +459,8 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 		 * reducing the timer noise on heavy loaded !highres
 		 * systems too.
 		 */
-		if (unlikely(signr == SIGALRM)) {
+		if (unlikely(signr == SIGALRM)) 
+		{
 			struct hrtimer *tmr = &tsk->signal->real_timer;
 
 			if (!hrtimer_is_queued(tmr) &&
@@ -473,7 +476,8 @@ int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
 	if (!signr)
 		return 0;
 
-	if (unlikely(sig_kernel_stop(signr))) {
+	if (unlikely(sig_kernel_stop(signr))) 
+	{
 		/*
 		 * Set a marker that we have dequeued a stop signal.  Our
 		 * caller might release the siglock and then the pending
@@ -982,7 +986,8 @@ int do_send_sig_info(int sig, struct siginfo *info, struct task_struct *p,
 	unsigned long flags;
 	int ret = -ESRCH;
 
-	if (lock_task_sighand(p, &flags)) {
+	if (lock_task_sighand(p, &flags)) 
+	{
 		ret = send_signal(sig, info, p, group);
 		unlock_task_sighand(p, &flags);
 	}
@@ -1131,7 +1136,8 @@ int kill_pid_info(int sig, struct siginfo *info, struct pid *pid)
 	rcu_read_lock();
 retry:
 	p = pid_task(pid, PIDTYPE_PID);
-	if (p) {
+	if (p) 
+	{
 		error = group_send_sig_info(sig, info, p);
 		if (unlikely(error == -ESRCH))
 			/*
@@ -1851,7 +1857,8 @@ relock:
 			goto relock;
 		if (unlikely(signr != 0))
 			ka = return_ka;
-		else {
+		else 
+		{
 			signr = dequeue_signal(current, &current->blocked,
 					       info);
 

@@ -1148,18 +1148,23 @@ int gfs2_xattr_set(struct inode *inode, int type, const char *name,
 	unsigned int namel = strlen(name);
 	int error;
 
+    //检查操作权限
 	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 		return -EPERM;
+
+	//如果名字太长 超过
 	if (namel > GFS2_EA_MAX_NAME_LEN)
 		return -ERANGE;
 
+	 //如果是空value 执行删除操作
 	if (value == NULL)
 		return gfs2_xattr_remove(inode, type, name);
 
 	if (ea_check_size(sdp, namel, size))
 		return -ERANGE;
 
-	if (!ip->i_eattr) {
+	if (!ip->i_eattr) 
+	{
 		if (flags & XATTR_REPLACE)
 			return -ENODATA;
 		return ea_init(ip, type, name, value, size);
@@ -1169,7 +1174,8 @@ int gfs2_xattr_set(struct inode *inode, int type, const char *name,
 	if (error)
 		return error;
 
-	if (el.el_ea) {
+	if (el.el_ea) 
+	{
 		if (ip->i_diskflags & GFS2_DIF_APPENDONLY) {
 			brelse(el.el_bh);
 			return -EPERM;

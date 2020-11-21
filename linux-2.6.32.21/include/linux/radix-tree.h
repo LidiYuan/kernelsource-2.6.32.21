@@ -58,9 +58,10 @@ static inline int radix_tree_is_indirect_ptr(void *ptr)
 #define RADIX_TREE_MAX_TAGS 2
 
 /* root tags are stored in gfp_mask, shifted by __GFP_BITS_SHIFT */
-struct radix_tree_root {
+struct radix_tree_root 
+{
 	unsigned int		height;//树的高度
-	gfp_t			gfp_mask;
+	gfp_t			    gfp_mask;
 	struct radix_tree_node	*rnode;//指向树的节点
 };
 
@@ -159,28 +160,18 @@ int radix_tree_insert(struct radix_tree_root *, unsigned long, void *);
 void *radix_tree_lookup(struct radix_tree_root *, unsigned long);
 void **radix_tree_lookup_slot(struct radix_tree_root *, unsigned long);
 void *radix_tree_delete(struct radix_tree_root *, unsigned long);
-unsigned int
-radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
-			unsigned long first_index, unsigned int max_items);
-unsigned int
-radix_tree_gang_lookup_slot(struct radix_tree_root *root, void ***results,
-			unsigned long first_index, unsigned int max_items);
-unsigned long radix_tree_next_hole(struct radix_tree_root *root,
-				unsigned long index, unsigned long max_scan);
-unsigned long radix_tree_prev_hole(struct radix_tree_root *root,
-				unsigned long index, unsigned long max_scan);
+unsigned int radix_tree_gang_lookup(struct radix_tree_root *root, void **results,unsigned long first_index, unsigned int max_items);
+unsigned int radix_tree_gang_lookup_slot(struct radix_tree_root *root, void ***results, unsigned long first_index, unsigned int max_items);
+unsigned long radix_tree_next_hole(struct radix_tree_root *root,unsigned long index, unsigned long max_scan);
+unsigned long radix_tree_prev_hole(struct radix_tree_root *root,unsigned long index, unsigned long max_scan);
 int radix_tree_preload(gfp_t gfp_mask);
 void radix_tree_init(void);
-void *radix_tree_tag_set(struct radix_tree_root *root,
-			unsigned long index, unsigned int tag);
-void *radix_tree_tag_clear(struct radix_tree_root *root,
-			unsigned long index, unsigned int tag);
-int radix_tree_tag_get(struct radix_tree_root *root,
-			unsigned long index, unsigned int tag);
-unsigned int
-radix_tree_gang_lookup_tag(struct radix_tree_root *root, void **results,
-		unsigned long first_index, unsigned int max_items,
-		unsigned int tag);
+void *radix_tree_tag_set(struct radix_tree_root *root,unsigned long index, unsigned int tag);
+void *radix_tree_tag_clear(struct radix_tree_root *root,unsigned long index, unsigned int tag);
+int radix_tree_tag_get(struct radix_tree_root *root, unsigned long index, unsigned int tag);
+unsigned int radix_tree_gang_lookup_tag(struct radix_tree_root *root, void **results,
+		                                       unsigned long first_index, unsigned int max_items,
+		                                       unsigned int tag);
 unsigned int
 radix_tree_gang_lookup_tag_slot(struct radix_tree_root *root, void ***results,
 		unsigned long first_index, unsigned int max_items,

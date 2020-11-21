@@ -43,7 +43,8 @@ static struct idr_layer *get_from_free_list(struct idr *idp)
 	unsigned long flags;
 
 	spin_lock_irqsave(&idp->lock, flags);
-	if ((p = idp->id_free)) {
+	if ((p = idp->id_free)) 
+	{
 		idp->id_free = p->ary[0];
 		idp->id_free_cnt--;
 		p->ary[0] = NULL;
@@ -73,6 +74,7 @@ static void __move_to_free_list(struct idr *idp, struct idr_layer *p)
 	idp->id_free_cnt++;
 }
 
+
 static void move_to_free_list(struct idr *idp, struct idr_layer *p)
 {
 	unsigned long flags;
@@ -90,6 +92,7 @@ static void idr_mark_full(struct idr_layer **pa, int id)
 	struct idr_layer *p = pa[0];
 	int l = 0;
 
+    //设置映射位
 	__set_bit(id & IDR_MASK, &p->bitmap);
 	/*
 	 * If this layer is full mark the bit in the layer above to
@@ -97,9 +100,12 @@ static void idr_mark_full(struct idr_layer **pa, int id)
 	 * complete the layer above and require walking up the radix
 	 * tree.
 	 */
-	while (p->bitmap == IDR_FULL) {
-		if (!(p = pa[++l]))
+	//看 标志位是否都满了 
+	while (p->bitmap == IDR_FULL) 
+	{
+		if ( !(p = pa[++l]) )
 			break;
+		
 		id = id >> IDR_BITS;
 		__set_bit((id & IDR_MASK), &p->bitmap);
 	}
@@ -120,7 +126,8 @@ static void idr_mark_full(struct idr_layer **pa, int id)
  //每次通过idr获得ID号之前，需要先分配内存。
  //返回0表示错误，非零值代表正常
 int idr_pre_get(struct idr *idp, gfp_t gfp_mask)
-{
+{   
+    //idp->id_free_cnt < 12
 	while (idp->id_free_cnt < IDR_FREE_MAX) 
 	{
 		struct idr_layer *new;
@@ -146,14 +153,19 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 	p = idp->top;
 	l = idp->layers;
 	pa[l--] = NULL;
-	while (1) {
+	while (1) 
+	{
 		/*
 		 * We run around this while until we reach the leaf node...
 		 */
 		n = (id >> (IDR_BITS*l)) & IDR_MASK;
 		bm = ~p->bitmap;
+
+		//从位n开始找第一个没有被置位位1的位置,查找内存区域范围是IDR_SIZE大小
 		m = find_next_bit(&bm, IDR_SIZE, n);
-		if (m == IDR_SIZE) {
+		
+		if (m == IDR_SIZE) 
+		{
 			/* no space available go back to previous layer. */
 			l++;
 			oid = id;
@@ -176,10 +188,13 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 			else
 				goto restart;
 		}
-		if (m != n) {
+
+		if (m != n) 
+		{
 			sh = IDR_BITS*l;
 			id = ((id >> sh) ^ n ^ m) << sh;
 		}
+		
 		if ((id >= MAX_ID_BIT) || (id < 0))
 			return IDR_NOMORE_SPACE;
 		if (l == 0)
@@ -187,7 +202,8 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 		/*
 		 * Create the layer below if it is missing.
 		 */
-		if (!p->ary[m]) {
+		if (!p->ary[m]) 
+		{
 			new = get_from_free_list(idp);
 			if (!new)
 				return -1;
@@ -203,8 +219,10 @@ static int sub_alloc(struct idr *idp, int *starting_id, struct idr_layer **pa)
 	return id;
 }
 
-static int idr_get_empty_slot(struct idr *idp, int starting_id,
-			      struct idr_layer **pa)
+//查找一个空闲的id
+static int idr_get_empty_slot(struct idr *idp, 
+                                   int starting_id, //查找的起始位置
+			                       struct idr_layer **pa)
 {
 	struct idr_layer *p, *new;
 	int layers, v, id;
@@ -226,9 +244,11 @@ build_up:
 	 * Add a new layer to the top of the tree if the requested
 	 * id is larger than the currently allocated space.
 	 */
-	while ((layers < (MAX_LEVEL - 1)) && (id >= (1 << (layers*IDR_BITS)))) {
+	while ((layers < (MAX_LEVEL - 1)) && (id >= (1 << (layers*IDR_BITS)))) 
+	{
 		layers++;
-		if (!p->count) {
+		if (!p->count) 
+		{
 			/* special case: if the tree is currently empty,
 			 * then we grow the tree by moving the top node
 			 * upwards.
@@ -236,7 +256,8 @@ build_up:
 			p->layer++;
 			continue;
 		}
-		if (!(new = get_from_free_list(idp))) {
+		if (!(new = get_from_free_list(idp))) 
+		{
 			/*
 			 * The allocation failed.  If we built part of
 			 * the structure tear it down.
@@ -272,20 +293,22 @@ build_up:
 //参数start_id是起始ID号。
 static int idr_get_new_above_int(struct idr *idp, void *ptr, int starting_id)
 {
+    //struct idr_layer *pa[6];
 	struct idr_layer *pa[MAX_LEVEL];
 	int id;
 	
 	//在该idr的idr_layer树中分配一个合适的id，并且分配的idr_layer路径记录在pa数组中
+	//配个大于starting_id的数字作为ptr的ID
 	id = idr_get_empty_slot(idp, starting_id, pa);
-	if (id >= 0) {
+	if (id >= 0) 
+	{
 		/*
 		 * Successfully found an empty slot.  Install the user
 		 * pointer and mark the slot full.
 		 */
-		rcu_assign_pointer(pa[0]->ary[id & IDR_MASK],
-				(struct idr_layer *)ptr);
-		pa[0]->count++;
-		idr_mark_full(pa, id);
+		rcu_assign_pointer(pa[0]->ary[id & IDR_MASK],(struct idr_layer *)ptr);//将叶子节点id对应的ary数组的元素赋值为 ptr
+		pa[0]->count++;//将叶子层的count++，表示又分配出去一个
+		idr_mark_full(pa, id);//叶子层的位图bitmap对应槽位置1的工作是idr_mark_full完成。如果叶子层全满了，则通知叶子层的父亲对应槽位置1，依次传递
 	}
 
 	return id;
@@ -370,6 +393,7 @@ int idr_get_new(struct idr *idp, void *ptr, int *id)
 	if (rv < 0)
 		return _idr_rc_to_errno(rv);
 	*id = rv;
+	
 	return 0;
 }
 EXPORT_SYMBOL(idr_get_new);

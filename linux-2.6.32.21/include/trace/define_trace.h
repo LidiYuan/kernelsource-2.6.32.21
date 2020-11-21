@@ -14,7 +14,9 @@
  *     define_trace.h, not the file including it. Full path names for out of tree
  *     modules must be used.
  */
+//此头文件  创建struct tracepoint
 
+//如果想创建struct tracepoint 结构要先定义此宏
 #ifdef CREATE_TRACE_POINTS
 
 /* Prevent recursion */
@@ -39,7 +41,7 @@
 #undef __TRACE_INCLUDE
 
 #ifndef TRACE_INCLUDE_FILE
-# define TRACE_INCLUDE_FILE TRACE_SYSTEM
+# define TRACE_INCLUDE_FILE TRACE_SYSTEM   //对于系统调用 此处是syscalls
 # define UNDEF_TRACE_INCLUDE_FILE
 #endif
 
@@ -55,6 +57,7 @@
 /* Let the trace headers be reread */
 #define TRACE_HEADER_MULTI_READ
 
+//此处又包含一次trace/events/syscalls.h 从此定义了 
 #include TRACE_INCLUDE(TRACE_INCLUDE_FILE)
 
 #ifdef CONFIG_EVENT_TRACING

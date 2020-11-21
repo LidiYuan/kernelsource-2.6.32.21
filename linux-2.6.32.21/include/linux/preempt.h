@@ -47,8 +47,10 @@ do { \
 
 #define preempt_enable() \//抢占功能再度开启，（须要先检查引用计数器是否为0）
 do { \
+	//抢占计数器值减1
 	preempt_enable_no_resched(); \
 	barrier(); \
+	//检查是否需要进行内核抢占调度, 如果设置了TIF_NEED_RESCHED 会进行进程调度
 	preempt_check_resched(); \
 } while (0)
 

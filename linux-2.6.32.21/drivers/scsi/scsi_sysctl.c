@@ -41,6 +41,7 @@ static ctl_table scsi_root_table[] = {
 
 static struct ctl_table_header *scsi_table_header;
 
+//在/proc/sys/下建立dev/scsi/logging_level 文件
 int __init scsi_init_sysctl(void)
 {
 	scsi_table_header = register_sysctl_table(scsi_root_table);

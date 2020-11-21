@@ -36,7 +36,9 @@
 struct inode;
 struct dentry;
 
-struct xattr_handler {
+//用于扩展属性的结构 操作设置
+struct xattr_handler 
+{
 	char *prefix;
 	size_t (*list)(struct inode *inode, char *list, size_t list_size,
 		       const char *name, size_t name_len);

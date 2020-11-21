@@ -81,7 +81,8 @@ char **argv_split(gfp_t gfp, const char *str, int *argcp)
 
 	argvp = argv;
 
-	while (*str) {
+	while (*str) 
+	{
 		str = skip_sep(str);
 
 		if (*str) {

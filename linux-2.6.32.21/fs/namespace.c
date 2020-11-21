@@ -193,8 +193,11 @@ out_free_cache:
  */
 int __mnt_is_readonly(struct vfsmount *mnt)
 {
+    //mount是只读的不能被写�?
 	if (mnt->mnt_flags & MNT_READONLY)
 		return 1;
+
+	//mnt属于的块是只读的
 	if (mnt->mnt_sb->s_flags & MS_RDONLY)
 		return 1;
 	return 0;
@@ -253,11 +256,15 @@ static unsigned int count_mnt_writers(struct vfsmount *mnt)
  * the write operation is finished, mnt_drop_write()
  * must be called.  This is effectively a refcount.
  */
+ //获得一个mount点的写权�?
 int mnt_want_write(struct vfsmount *mnt)
 {
 	int ret = 0;
 
+    //抢占禁止
 	preempt_disable();
+
+	//增加mnt写的引用计数
 	inc_mnt_writers(mnt);
 	/*
 	 * The store to inc_mnt_writers must be visible before we pass
@@ -265,6 +272,8 @@ int mnt_want_write(struct vfsmount *mnt)
 	 * incremented count after it has set MNT_WRITE_HOLD.
 	 */
 	smp_mb();
+
+	//检查mnt是否持有MNT_WRITE_HOLD，如果持有的话，则通过cpu_relax 进行忙等�?
 	while (mnt->mnt_flags & MNT_WRITE_HOLD)
 		cpu_relax();
 	/*
@@ -273,13 +282,21 @@ int mnt_want_write(struct vfsmount *mnt)
 	 * MNT_WRITE_HOLD is cleared.
 	 */
 	smp_rmb();
-	if (__mnt_is_readonly(mnt)) {
+
+	//#检查mnt是否是只读的
+	if (__mnt_is_readonly(mnt)) 
+	{
+	    //如果只读  返回错误
 		dec_mnt_writers(mnt);
 		ret = -EROFS;
 		goto out;
 	}
+	
 out:
+    //开启抢�?
 	preempt_enable();
+
+	//返回获得的结果成功或失败
 	return ret;
 }
 EXPORT_SYMBOL_GPL(mnt_want_write);
@@ -1978,24 +1995,20 @@ long do_mount(char *dev_name,
 	if (retval)
 		return retval;
 
-	retval = security_sb_mount(dev_name, &path,
-				   type_page, flags, data_page);
+	retval = security_sb_mount(dev_name, &path,type_page, flags, data_page);
 	if (retval)
 		goto dput_out;
 
 	if (flags & MS_REMOUNT)
-		retval = do_remount(&path, flags & ~MS_REMOUNT, mnt_flags,
-				    data_page);
+		retval = do_remount(&path, flags & ~MS_REMOUNT, mnt_flags,data_page);
 	else if (flags & MS_BIND)  //�󶨹���
 		retval = do_loopback(&path, dev_name, flags & MS_REC);
-	
 	else if (flags & (MS_SHARED | MS_PRIVATE | MS_SLAVE | MS_UNBINDABLE))
 		retval = do_change_type(&path, flags);
 	else if (flags & MS_MOVE)
 		retval = do_move_mount(&path, dev_name);
 	else
-		retval = do_new_mount(&path, type_page, flags, mnt_flags,
-				               dev_name, data_page);
+		retval = do_new_mount(&path, type_page, flags, mnt_flags,dev_name, data_page);
 dput_out:
 	path_put(&path);
 	return retval;
@@ -2138,8 +2151,7 @@ SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name,
 	if (ret < 0)
 		goto out_data;
 
-	ret = do_mount(kernel_dev, kernel_dir, kernel_type, flags,
-		(void *) data_page);
+	ret = do_mount(kernel_dev, kernel_dir, kernel_type, flags,(void *) data_page);
 
 	free_page(data_page);
 out_data:

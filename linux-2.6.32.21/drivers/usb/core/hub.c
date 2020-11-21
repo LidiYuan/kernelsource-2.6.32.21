@@ -859,8 +859,7 @@ static int hub_post_reset(struct usb_interface *intf)
 	return 0;
 }
 
-static int hub_configure(struct usb_hub *hub,
-	struct usb_endpoint_descriptor *endpoint)
+static int hub_configure(struct usb_hub *hub, struct usb_endpoint_descriptor *endpoint)
 {
 	struct usb_hcd *hcd;
 	struct usb_device *hdev = hub->hdev;
@@ -1113,8 +1112,7 @@ static int hub_configure(struct usb_hub *hub,
 
 
 	//填充usb中断处理程序hub_irq()
-	usb_fill_int_urb(hub->urb, hdev, pipe, *hub->buffer, maxp, hub_irq,
-		hub, endpoint->bInterval);
+	usb_fill_int_urb(hub->urb, hdev, pipe, *hub->buffer, maxp, hub_irq,hub, endpoint->bInterval);
 	hub->urb->transfer_dma = hub->buffer_dma;
 	hub->urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
@@ -1182,7 +1180,8 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	desc = intf->cur_altsetting;
 	hdev = interface_to_usbdev(intf);
 
-	if (hdev->level == MAX_TOPO_LEVEL) {
+	if (hdev->level == MAX_TOPO_LEVEL) 
+	{
 		dev_err(&intf->dev,
 			"Unsupported bus topology: hub nested too deep\n");
 		return -E2BIG;
@@ -1719,6 +1718,7 @@ static int usb_enumerate_device(struct usb_device *udev)
 	int err;
 
 	if (udev->config == NULL) {
+		//来获取设备的各种描述符(设备描述符,配置描述符等)
 		err = usb_get_configuration(udev);
 		if (err < 0) {
 			dev_err(&udev->dev, "can't read configurations, error %d\n",
@@ -1764,6 +1764,7 @@ fail:
  *
  * Only the hub driver or root-hub registrar should ever call this.
  */
+ //来获取这个usb设备的各种描述符并为每个interface找到对用的driver.
 int usb_new_device(struct usb_device *udev)
 {
 	int err;
@@ -1789,12 +1790,15 @@ int usb_new_device(struct usb_device *udev)
 	 * for configuring the device and invoking the add-device
 	 * notifier chain (used by usbfs and possibly others).
 	 */
+	//把这个USB设备添加到USB系统中去
 	err = device_add(&udev->dev);
-	if (err) {
+	if (err) 
+	{
 		dev_err(&udev->dev, "can't device_add, error %d\n", err);
 		goto fail;
 	}
 
+	//
 	(void) usb_create_ep_devs(&udev->dev, &udev->ep0, udev);
 	return err;
 
@@ -2928,8 +2932,10 @@ hub_power_remaining (struct usb_hub *hub)
  *		a firmware download)
  * caller already locked the hub
  */
-static void hub_port_connect_change(struct usb_hub *hub, int port1,
-					u16 portstatus, u16 portchange)
+static void hub_port_connect_change(struct usb_hub *hub, 
+                                          int port1,
+                                          u16 portstatus, 
+                                          u16 portchange)
 {
 	struct usb_device *hdev = hub->hdev;
 	struct device *hub_dev = hub->intfdev;
@@ -3415,9 +3421,10 @@ static struct usb_device_id hub_id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, hub_id_table);
 
+
 static struct usb_driver hub_driver = {
 	.name =		"hub",
-	.probe =	hub_probe,
+	.probe =	hub_probe, 
 	.disconnect =	hub_disconnect,
 	.suspend =	hub_suspend,
 	.resume =	hub_resume,
@@ -3431,13 +3438,14 @@ static struct usb_driver hub_driver = {
 
 int usb_hub_init(void)
 {
-	if (usb_register(&hub_driver) < 0) {
+	if (usb_register(&hub_driver) < 0) 
+	{
 		printk(KERN_ERR "%s: can't register hub driver\n",
 			usbcore_name);
 		return -1;
 	}
 
-   //用kick_khubd()唤醒此线程
+
 	khubd_task = kthread_run(hub_thread, NULL, "khubd");
 	if (!IS_ERR(khubd_task))
 		return 0;

@@ -694,7 +694,8 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	int ret;
 
 	/* Are we from a system call? */
-	if (syscall_get_nr(current, regs) >= 0) {
+	if (syscall_get_nr(current, regs) >= 0) 
+	{
 		/* If so, check system call restarting.. */
 		switch (syscall_get_error(current, regs)) {
 		case -ERESTART_RESTARTBLOCK:
@@ -757,8 +758,7 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	tracehook_signal_handler(sig, info, ka, regs,
-				 test_thread_flag(TIF_SINGLESTEP));
+	tracehook_signal_handler(sig, info, ka, regs, test_thread_flag(TIF_SINGLESTEP));
 
 	return 0;
 }
@@ -813,7 +813,8 @@ static void do_signal(struct pt_regs *regs)
 			set_debugreg(current->thread.debugreg7, 7);
 
 		/* Whee! Actually deliver the signal.  */
-		if (handle_signal(signr, &info, &ka, oldset, regs) == 0) {
+		if (handle_signal(signr, &info, &ka, oldset, regs) == 0) 
+		{
 			/*
 			 * A signal was successfully delivered; the saved
 			 * sigmask will have been stored in the signal frame,
@@ -826,13 +827,16 @@ static void do_signal(struct pt_regs *regs)
 	}
 
 	/* Did we come from a system call? */
-	if (syscall_get_nr(current, regs) >= 0) {
+	//是否来自系统调用
+	if (syscall_get_nr(current, regs) >= 0) 
+	{
 		/* Restart the system call - no handlers present */
+	   //对系统调用进行重启
 		switch (syscall_get_error(current, regs)) {
 		case -ERESTARTNOHAND:
 		case -ERESTARTSYS:
 		case -ERESTARTNOINTR:
-			regs->ax = regs->orig_ax;
+			regs->ax = regs->orig_ax;//系统调用号
 			regs->ip -= 2;
 			break;
 
@@ -857,8 +861,7 @@ static void do_signal(struct pt_regs *regs)
  * notification of userspace execution resumption
  * - triggered by the TIF_WORK_MASK flags
  */
-void
-do_notify_resume(struct pt_regs *regs, void *unused, __u32 thread_info_flags)
+void do_notify_resume(struct pt_regs *regs, void *unused, __u32 thread_info_flags)
 {
 #ifdef CONFIG_X86_MCE
 	/* notify userspace of pending MCEs */
@@ -871,7 +874,8 @@ do_notify_resume(struct pt_regs *regs, void *unused, __u32 thread_info_flags)
 	if (thread_info_flags & _TIF_SIGPENDING)
 		do_signal(regs);
 
-	if (thread_info_flags & _TIF_NOTIFY_RESUME) {
+	if (thread_info_flags & _TIF_NOTIFY_RESUME) 
+	{
 		clear_thread_flag(TIF_NOTIFY_RESUME);
 		tracehook_notify_resume(regs);
 		if (current->replacement_session_keyring)

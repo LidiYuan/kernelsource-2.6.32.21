@@ -152,9 +152,10 @@ static const u32 twobyte_has_modrm[256 / 32] = {
 };
 #undef W
 
-struct kretprobe_blackpoint kretprobe_blacklist[] = {
+struct kretprobe_blackpoint kretprobe_blacklist[] = 
+{
 	{"__switch_to", }, /* This function switches only current task, but
-			      doesn't switch kernel stack.*/
+			      doesn't switch kernel stack. x86_64架构下的__switch_to函数不可以被kretprobe所探测*/
 	{NULL, NULL}	/* Terminator */
 };
 const int kretprobe_blacklist_size = ARRAY_SIZE(kretprobe_blacklist);
@@ -435,6 +436,9 @@ static void __kprobes prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
 		regs->ip = (unsigned long)p->ainsn.insn;
 }
 
+/*
+主要功能是把被探测函数的返回地址变换为&kretprobe_trampoline所 在的地址，这是一个汇编地址标签。这个标签的地址在kretprobe_trampoline_holder()中用汇编伪指令定义
+*/
 void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
 				      struct pt_regs *regs)
 {
@@ -442,6 +446,7 @@ void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
 
 	ri->ret_addr = (kprobe_opcode_t *) *sara;
 
+    //
 	/* Replace the return addr with trampoline addr */
 	*sara = (unsigned long) &kretprobe_trampoline;
 }
@@ -470,7 +475,8 @@ static void __kprobes setup_singlestep(struct kprobe *p, struct pt_regs *regs,
 static int __kprobes reenter_kprobe(struct kprobe *p, struct pt_regs *regs,
 				    struct kprobe_ctlblk *kcb)
 {
-	switch (kcb->kprobe_status) {
+	switch (kcb->kprobe_status) 
+	{
 	case KPROBE_HIT_SSDONE:
 #ifdef CONFIG_X86_64
 		/* TODO: Provide re-entrancy from post_kprobes_handler() and
@@ -516,12 +522,14 @@ static int __kprobes reenter_kprobe(struct kprobe *p, struct pt_regs *regs,
  * Interrupts are disabled on entry as trap3 is an interrupt gate and they
  * remain disabled thorough out this function.
  */
+ //触发探测点的执行
 static int __kprobes kprobe_handler(struct pt_regs *regs)
 {
 	kprobe_opcode_t *addr;
 	struct kprobe *p;
 	struct kprobe_ctlblk *kcb;
 
+    //获取被探测指令的地址保存到addr中
 	addr = (kprobe_opcode_t *)(regs->ip - sizeof(kprobe_opcode_t));
 	if (*addr != BREAKPOINT_INSTRUCTION) 
 	{
@@ -544,13 +552,16 @@ static int __kprobes kprobe_handler(struct pt_regs *regs)
 	 * re-enable preemption at the end of this function,
 	 * and also in reenter_kprobe() and setup_singlestep().
 	 */
+	//禁止抢占 
 	preempt_disable();
 
+    //获取当前cpu的kprobe_ctlblk控制结构体和本次要处理的kprobe实例p
 	kcb = get_kprobe_ctlblk();
 	p = get_kprobe(addr);
 
 	if (p) 
 	{
+	    //对于kprobe重入的情况，调用reenter_kprobe函数单独处理
 		if (kprobe_running()) 
 		{
 			if (reenter_kprobe(p, regs, kcb))
@@ -558,6 +569,7 @@ static int __kprobes kprobe_handler(struct pt_regs *regs)
 		} 
 		else
 		{
+		    //绑定p为当前正在处理的kprobe
 			set_current_kprobe(p, regs, kcb);
 			kcb->kprobe_status = KPROBE_HIT_ACTIVE;
 
@@ -570,7 +582,7 @@ static int __kprobes kprobe_handler(struct pt_regs *regs)
 			 * more here.
 			 */
 			if (!p->pre_handler || !p->pre_handler(p, regs))
-				setup_singlestep(p, regs, kcb); //���õ�������
+				setup_singlestep(p, regs, kcb); 
 			return 1;
 		}
 	} 
@@ -682,6 +694,8 @@ static void __used __kprobes kretprobe_trampoline_holder(void)
 
 /*
  * Called from kretprobe_trampoline
+ *
+   该函数用于执行调试者定义的回调函数以及把被探测函数的返回地址修改回原来的返回地址
  */
 static __used __kprobes void *trampoline_handler(struct pt_regs *regs)
 {
@@ -959,7 +973,7 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 /*
  * Wrapper routine for handling exceptions.
  */
-int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
+ int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
 				       unsigned long val, void *data)
 {
 	struct die_args *args = data;
@@ -968,8 +982,9 @@ int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
 	if (args->regs && user_mode_vm(args->regs))
 		return ret;
 
-	switch (val) {
-	case DIE_INT3:
+	switch (val) 
+	{
+	case DIE_INT3:  //当int3 陷入的时候会走到此处
 		if (kprobe_handler(args->regs))
 			ret = NOTIFY_STOP;
 		break;

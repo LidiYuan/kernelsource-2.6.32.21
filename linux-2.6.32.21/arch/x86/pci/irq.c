@@ -1239,6 +1239,7 @@ static struct dmi_system_id __initdata pciirq_dmi_table[] = {
 	{ }
 };
 
+//pci中断路由路由的入口函数
 int __init pcibios_irq_init(void)
 {
 	DBG(KERN_DEBUG "PCI: IRQ init\n");

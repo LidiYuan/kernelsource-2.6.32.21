@@ -3,13 +3,18 @@
 
 #ifndef __ASSEMBLY__
 
-#ifdef __CHECKER__
-# define __user		__attribute__((noderef, address_space(1)))
+#ifdef __CHECKER__ //这里的CHECKER表示是否使用了Sprase（就是一种静态分析工具，用来分析内核源码中的BUG） 具体参考http://sparse.wiki.kernel.org/index.php/Main_Page
+//noderef告诉编译器，不应该解除该指针的引用，因为在当前地址空间中它是没有意义的
+# define __user		__attribute__((noderef, address_space(1)))//__user表示是一个用户空间的指针，所以kernel不可能直接使用
 # define __kernel	/* default address space */
 # define __safe		__attribute__((safe))
 # define __force	__attribute__((force))
 # define __nocast	__attribute__((nocast))
+
+//__iomem是linux2.6.9内核中加入的特性。是用来个表示指针是指向一个I/O的内存空间
+//主要是为了驱动程序的通用性考虑。由于不同的CPU体系结构对I/O空间的表示可能不同
 # define __iomem	__attribute__((noderef, address_space(2)))
+
 # define __acquires(x)	__attribute__((context(x,0,1)))
 # define __releases(x)	__attribute__((context(x,1,0)))
 # define __acquire(x)	__context__(x,1)

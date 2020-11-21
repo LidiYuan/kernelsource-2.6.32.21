@@ -1366,8 +1366,7 @@ static int rtnetlink_net_init(struct net *net)
 
 	//创建 NETLINK_ROUTE 协议簇类型的 netlink 套接字
 	////在创建内核的netlink时，注册了路由netlink的接收函数，rtnetlink_rc
-	sk = netlink_kernel_create(net, NETLINK_ROUTE, RTNLGRP_MAX,
-				   rtnetlink_rcv, &rtnl_mutex, THIS_MODULE);
+	sk = netlink_kernel_create(net, NETLINK_ROUTE, RTNLGRP_MAX,rtnetlink_rcv, &rtnl_mutex, THIS_MODULE);
 	if (!sk)
 		return -ENOMEM;
 	net->rtnl = sk;

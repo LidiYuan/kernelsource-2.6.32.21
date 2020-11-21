@@ -21,8 +21,8 @@ pci访问配置空间有多种方法,具体选择哪种要看内核编译选择哪种,或linux启动命令行参数
 static __init int pci_arch_init(void)
 {
 
-   /*1)内核编译配置了CONFIG_PCI_DIRECT使用机制#1访问pci配置空间
-       
+   /*1)内核编译配置了CONFIG_PCI_DIRECT使用机制#1或#2访问pci配置空间
+       这两种方式都是直接访问设备
    */
 #ifdef CONFIG_PCI_DIRECT
 	int type = 0;

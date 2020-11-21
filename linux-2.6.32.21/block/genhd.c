@@ -885,12 +885,10 @@ static ssize_t disk_removable_show(struct device *dev,
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
-	return sprintf(buf, "%d\n",
-		       (disk->flags & GENHD_FL_REMOVABLE ? 1 : 0));
+	return sprintf(buf, "%d\n",(disk->flags & GENHD_FL_REMOVABLE ? 1 : 0));
 }
 
-static ssize_t disk_ro_show(struct device *dev,
-				   struct device_attribute *attr, char *buf)
+static ssize_t disk_ro_show(struct device *dev,struct device_attribute *attr, char *buf)
 {
 	struct gendisk *disk = dev_to_disk(dev);
 
@@ -1303,12 +1301,14 @@ void set_device_ro(struct block_device *bdev, int flag)
 
 EXPORT_SYMBOL(set_device_ro);
 
+//设置只读属性
 void set_disk_ro(struct gendisk *disk, int flag)
 {
 	struct disk_part_iter piter;
 	struct hd_struct *part;
 
-	if (disk->part0.policy != flag) {
+	if (disk->part0.policy != flag) 
+	{
 		set_disk_ro_uevent(disk, flag);
 		disk->part0.policy = flag;
 	}

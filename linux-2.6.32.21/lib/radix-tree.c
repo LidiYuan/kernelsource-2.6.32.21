@@ -19,6 +19,19 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+/*
+基数树的介绍:
+1)RADIX-TREE，也称为Radix Trie或Compact Prefix Tree，中文翻译基数树，是一种空间 优化的字典树，
+其每一个节点都是由子节点和它的父节点合并而成。其结果是，每个内部 节点的子节点数目至少是基数数的基数r，其中r是一个正数，且为 2x，其中x≥1。 
+有别于其他的字典树，RADIX树的边可以标记为元素序列或单个元素，这使得小集合场景下 基数树更加有效
+
+2)普通的树在对比时，总是进行完整的键值比对（比如红黑树、AVL树都是这样）。RADIX树在 进行比对时，键值在给定节点上进行位组比对,位组中位的数量是基数树的基数r,当r=2 时为二进制RADIX树
+
+3)RADIX树不同于 其他树的最大特点是，它不在每个分支上比较整个键值，在进行搜索操作时，只需将键值的 一部分与节点中存储的键值进行比较
+
+
+*/
+
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -34,13 +47,17 @@
 #include <linux/rcupdate.h>
 
 
+//定义基数r 内核通过CONFIG选项，可设置为4或6，默认为6
 #ifdef __KERNEL__
 #define RADIX_TREE_MAP_SHIFT	(CONFIG_BASE_SMALL ? 4 : 6)
 #else
 #define RADIX_TREE_MAP_SHIFT	3	/* For more stressful testing */
 #endif
 
+//定义为2^RADIX_TREE_MAP_SHIFT，等于64。该数值定义指针 数组 slot 数量
 #define RADIX_TREE_MAP_SIZE	(1UL << RADIX_TREE_MAP_SHIFT)
+
+//在提取特定位时使用，C语言通常使用移位与掩码操作实现位组 提取
 #define RADIX_TREE_MAP_MASK	(RADIX_TREE_MAP_SIZE-1)
 
 #define RADIX_TREE_TAG_LONGS	\
@@ -56,19 +73,28 @@ struct radix_tree_node {
 	unsigned long	tags[RADIX_TREE_MAX_TAGS][RADIX_TREE_TAG_LONGS];
 };
 
-struct radix_tree_path {
+struct radix_tree_path 
+{
 	struct radix_tree_node *node;
 	int offset;
 };
 
+//基数数key值为unsigned long，因此bit数合计 8*sizeof(unsigned log) ；
 #define RADIX_TREE_INDEX_BITS  (8 /* CHAR_BIT */ * sizeof(unsigned long))
-#define RADIX_TREE_MAX_PATH (DIV_ROUND_UP(RADIX_TREE_INDEX_BITS, \
-					  RADIX_TREE_MAP_SHIFT))
+
+//根据RADIX定义，可知最大深度为 ?RADIX_TREE_INDEX_BITS/RADIX_TREE_MAP_SHIFT?{}，64位下为11。
+#define RADIX_TREE_MAX_PATH (DIV_ROUND_UP(RADIX_TREE_INDEX_BITS,RADIX_TREE_MAP_SHIFT))
+/*
+#define RADIX_TREE_MAX_PATH  (8*8 + (6-1) ) / (8*8) = (64+5) / 6 = 11
+
+*/
 
 /*
  * The height_to_maxindex array needs to be one deeper than the maximum
  * path as height 0 holds only 1 entry.
  */
+ //存储每层树高所能表示的最大索引数
+static unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1]; //12
 static unsigned long height_to_maxindex[RADIX_TREE_MAX_PATH + 1] __read_mostly;
 
 /*
@@ -145,13 +171,13 @@ static inline int any_tag_set(struct radix_tree_node *node, unsigned int tag)
  * This assumes that the caller has performed appropriate preallocation, and
  * that the caller has pinned this thread of control to the current CPU.
  */
-static struct radix_tree_node *
-radix_tree_node_alloc(struct radix_tree_root *root)
+static struct radix_tree_node * radix_tree_node_alloc(struct radix_tree_root *root)
 {
 	struct radix_tree_node *ret = NULL;
 	gfp_t gfp_mask = root_gfp_mask(root);
 
-	if (!(gfp_mask & __GFP_WAIT)) {
+	if (!(gfp_mask & __GFP_WAIT)) 
+	{
 		struct radix_tree_preload *rtp;
 
 		/*
@@ -159,6 +185,7 @@ radix_tree_node_alloc(struct radix_tree_root *root)
 		 * succeed in getting a node here (and never reach
 		 * kmem_cache_alloc)
 		 */
+		//进行了预先申请节点 
 		rtp = &__get_cpu_var(radix_tree_preloads);
 		if (rtp->nr) {
 			ret = rtp->nodes[rtp->nr - 1];
@@ -191,8 +218,7 @@ static void radix_tree_node_rcu_free(struct rcu_head *head)
 	kmem_cache_free(radix_tree_node_cachep, node);
 }
 
-static inline void
-radix_tree_node_free(struct radix_tree_node *node)
+static inline void radix_tree_node_free(struct radix_tree_node *node)
 {
 	call_rcu(&node->rcu_head, radix_tree_node_rcu_free);
 }
@@ -232,7 +258,7 @@ out:
 }
 EXPORT_SYMBOL(radix_tree_preload);
 
-/*
+/*  返回某个高度可以存储的最大索引值
  *	Return the maximum key which can be store into a
  *	radix tree with height HEIGHT.
  */
@@ -241,7 +267,7 @@ static inline unsigned long radix_tree_maxindex(unsigned int height)
 	return height_to_maxindex[height];
 }
 
-/*
+/*  扩展一个radix树  ,将树进行拔高
  *	Extend a radix tree so it can store key @index.
  */
 static int radix_tree_extend(struct radix_tree_root *root, unsigned long index)
@@ -255,17 +281,22 @@ static int radix_tree_extend(struct radix_tree_root *root, unsigned long index)
 	while (index > radix_tree_maxindex(height))
 		height++;
 
-	if (root->rnode == NULL) {
+	if (root->rnode == NULL) 
+	{
 		root->height = height;
 		goto out;
 	}
 
 	do {
 		unsigned int newheight;
+
+	    //此函数可能会从预先申请的struct radix_tree_node 池中获得此结构体
+	    //意思解释分配一个新的struct radix_tree_node结构体
 		if (!(node = radix_tree_node_alloc(root)))
 			return -ENOMEM;
 
 		/* Increase the height.  */
+		
 		node->slots[0] = radix_tree_indirect_to_ptr(root->rnode);
 
 		/* Propagate the aggregated tag info into the new root */
@@ -290,46 +321,66 @@ out:
  *	@root:		radix tree root
  *	@index:		index key
  *	@item:		item to insert
- *
+ *  
+    在树中加入一个树的节点
  *	Insert an item into the radix tree at position @index.
+
+构造的radix树于越靠近树根 height层级越大
  */
-int radix_tree_insert(struct radix_tree_root *root,
-			unsigned long index, void *item)
+int radix_tree_insert(struct radix_tree_root *root, //树根
+			               unsigned long index,          //key 即一个长整数
+			               void *item)                   //长整型对应的一个指针
 {
-	struct radix_tree_node *node = NULL, *slot;
+	struct radix_tree_node *node = NULL, 
+		                   *slot;
 	unsigned int height, shift;
 	int offset;
 	int error;
 
+    //意思为item地址的最后一位不能被标记为RADIX_TREE_INDIRECT_PTR,否则会和标记为冲突 出现bug
 	BUG_ON(radix_tree_is_indirect_ptr(item));
 
 	/* Make sure the tree is high enough.  */
-	if (index > radix_tree_maxindex(root->height)) {
+	//确保当前树的高度能够存储index
+	if (index > radix_tree_maxindex(root->height)) //获得当前高度下可以存储的最大key index
+	{
+	    //增加树的高度,调用函数radix_tree_extend扩展树的层数以满足index
+	    //树的高度是从下往上增长的
 		error = radix_tree_extend(root, index);
 		if (error)
 			return error;
 	}
 
+
+	//得到当前指向的槽
 	slot = radix_tree_indirect_to_ptr(root->rnode);
 
 	height = root->height;
+
+	//获得在height层 长整型的偏移值
 	shift = (height-1) * RADIX_TREE_MAP_SHIFT;
 
 	offset = 0;			/* uninitialised var warning */
-	while (height > 0) {
-		if (slot == NULL) {
+
+	//循环初始化各层的radix_tree_node对象
+	//对节点进行填充 从下往上的填充, 
+	while (height > 0) 
+	{
+		if (slot == NULL) 
+		{
 			/* Have to add a child node.  */
 			if (!(slot = radix_tree_node_alloc(root)))
 				return -ENOMEM;
 			slot->height = height;
-			if (node) {
+			if (node) 
+			{
 				rcu_assign_pointer(node->slots[offset], slot);
 				node->count++;
-			} else
-				rcu_assign_pointer(root->rnode,
-					radix_tree_ptr_to_indirect(slot));
+			} 
+			else
+				rcu_assign_pointer(root->rnode,radix_tree_ptr_to_indirect(slot));
 		}
-
+        
 		/* Go a level down */
 		offset = (index >> shift) & RADIX_TREE_MAP_MASK;
 		node = slot;
@@ -341,12 +392,15 @@ int radix_tree_insert(struct radix_tree_root *root,
 	if (slot != NULL)
 		return -EEXIST;
 
-	if (node) {
+	if (node) 
+	{
 		node->count++;
 		rcu_assign_pointer(node->slots[offset], item);
 		BUG_ON(tag_get(node, 0, offset));
 		BUG_ON(tag_get(node, 1, offset));
-	} else {
+	} 
+	else  //如果第一次插入操作就传入的index为 0 则会走到此处
+	{
 		rcu_assign_pointer(root->rnode, item);
 		BUG_ON(root_tag_get(root, 0));
 		BUG_ON(root_tag_get(root, 1));
@@ -357,11 +411,11 @@ int radix_tree_insert(struct radix_tree_root *root,
 EXPORT_SYMBOL(radix_tree_insert);
 
 /*
- * is_slot == 1 : search for the slot.
- * is_slot == 0 : search for the node.
+ * is_slot == 1 寻找存放数据指针的槽,用于数据指针的替换.
+ * is_slot == 0 寻找数据指针.
  */
 static void *radix_tree_lookup_element(struct radix_tree_root *root,
-				unsigned long index, int is_slot)
+				                              unsigned long index, int is_slot)
 {
 	unsigned int height, shift;
 	struct radix_tree_node *node, **slot;
@@ -370,11 +424,16 @@ static void *radix_tree_lookup_element(struct radix_tree_root *root,
 	if (node == NULL)
 		return NULL;
 
-	if (!radix_tree_is_indirect_ptr(node)) {
-		if (index > 0)
+    /*为了第一次就插入index 0,然后没有插入别的数据就再次要替换index 0的情况*/
+	if (!radix_tree_is_indirect_ptr(node)) 
+	{
+		if (index > 0)  //此处index只能是 0,如果是别的值 则相应的数据指针还没有插入
 			return NULL;
+		
 		return is_slot ? (void *)&root->rnode : node;
 	}
+
+	
 	node = radix_tree_indirect_to_ptr(node);
 
 	height = node->height;
@@ -383,11 +442,11 @@ static void *radix_tree_lookup_element(struct radix_tree_root *root,
 
 	shift = (height-1) * RADIX_TREE_MAP_SHIFT;
 
+    //下面是主要的遍历查找过程,在每层进行偏移查找 直到最底层
 	do {
-		slot = (struct radix_tree_node **)
-			(node->slots + ((index>>shift) & RADIX_TREE_MAP_MASK));
-		node = rcu_dereference(*slot);
-		if (node == NULL)
+		slot = (struct radix_tree_node **)(node->slots + ((index>>shift) & RADIX_TREE_MAP_MASK));
+		node = rcu_dereference(*slot);//获取真正的数据指针
+		if (node == NULL) //如果为NULL 说明数据指针是空的
 			return NULL;
 
 		shift -= RADIX_TREE_MAP_SHIFT;
@@ -448,7 +507,8 @@ EXPORT_SYMBOL(radix_tree_lookup);
  *	item is a bug.
  */
 void *radix_tree_tag_set(struct radix_tree_root *root,
-			unsigned long index, unsigned int tag)
+			                  unsigned long index, 
+			                  unsigned int tag)
 {
 	unsigned int height, shift;
 	struct radix_tree_node *slot;
@@ -751,8 +811,8 @@ out:
  *	of an RCU protected gang lookup are as though multiple radix_tree_lookups
  *	have been issued in individual locks, and results stored in 'results'.
  */
-unsigned int
-radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
+ //循环调用函数__lookup，查找radix_tree_root中最底层的非空页
+unsigned int radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
 			unsigned long first_index, unsigned int max_items)
 {
 	unsigned long max_index;
@@ -1060,10 +1120,12 @@ EXPORT_SYMBOL(radix_tree_gang_lookup_tag_slot);
  *	radix_tree_shrink    -    shrink height of a radix tree to minimal
  *	@root		radix tree root
  */
+ /*将基数树的高度缩减到最小*/
 static inline void radix_tree_shrink(struct radix_tree_root *root)
 {
 	/* try to shrink tree height */
-	while (root->height > 0) {
+	while (root->height > 0) 
+	{
 		struct radix_tree_node *to_free = root->rnode;
 		void *newptr;
 
@@ -1074,8 +1136,15 @@ static inline void radix_tree_shrink(struct radix_tree_root *root)
 		 * The candidate node has more than one child, or its child
 		 * is not at the leftmost slot, we cannot shrink.
 		 */
+		 //当发现 当前层只有一个孩子，并且是最左边的槽保存的孩子的时候 才能将此层给去掉,如果不是孩子不是在最左边 此节点就不能不删除掉	
+		 /*
+         比如树只有两层的化,  因为树的高度是从下往上长的, 所以如果要删除掉heigh=2层,则必须它下面只有最左边的槽也就是范围为0~(2^6-1)范围内的节点可以直接成为root的子节点
+         ,heigh=2层的其他子节点比如64~127范围内的第二个孩子  是不能直接成为root的子节点的
+		*/
 		if (to_free->count != 1)
 			break;
+
+		//缩减的化 只能是最左边的孩子成为上一层节点
 		if (!to_free->slots[0])
 			break;
 
@@ -1086,11 +1155,16 @@ static inline void radix_tree_shrink(struct radix_tree_root *root)
 		 * (to_free->slots[0]), it will be safe to dereference the new
 		 * one (root->rnode).
 		 */
+
+		//得到下一个节点的地址
 		newptr = to_free->slots[0];
+
 		if (root->height > 1)
 			newptr = radix_tree_ptr_to_indirect(newptr);
+
 		root->rnode = newptr;
 		root->height--;
+
 		radix_tree_node_free(to_free);
 	}
 }
@@ -1117,21 +1191,31 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 	int tag;
 	int offset;
 
+    //获得当前树的总高度
 	height = root->height;
+
+	//判断索引范围是否不存在与树中
 	if (index > radix_tree_maxindex(height))
 		goto out;
 
+    
 	slot = root->rnode;
-	if (height == 0) {
+
+	//如果高度为0  ,则认为树还没有数据
+	if (height == 0) 
+	{
 		root_tag_clear_all(root);
 		root->rnode = NULL;
 		goto out;
 	}
+	
 	slot = radix_tree_indirect_to_ptr(slot);
 
+	//计算height index的偏移
 	shift = (height - 1) * RADIX_TREE_MAP_SHIFT;
 	pathp->node = NULL;
 
+    ////对删除路径进行记录
 	do {
 		if (slot == NULL)
 			goto out;
@@ -1157,10 +1241,16 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 	}
 
 	to_free = NULL;
+	//现在开始释放不需要的节点
 	/* Now free the nodes we do not need anymore */
-	while (pathp->node) {
+    //当前pathp->node记录的是保存数据槽的地址,  真实的数据现在保存在slot变量中
+    //从下往上进行释放,发现node中槽的使用计数不为0 则退出，删除完毕
+	while (pathp->node) 
+	{
+	    //将槽中的数据设置为空,槽数组的使用计数减一
 		pathp->node->slots[pathp->offset] = NULL;
 		pathp->node->count--;
+
 		/*
 		 * Queue the node for deferred freeing after the
 		 * last reference to it disappears (set NULL, above).
@@ -1168,10 +1258,12 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 		if (to_free)
 			radix_tree_node_free(to_free);
 
-		if (pathp->node->count) {
-			if (pathp->node ==
-					radix_tree_indirect_to_ptr(root->rnode))
-				radix_tree_shrink(root);
+		//如果此节点的其他slot还被使用 则不执行下面的节点释放
+		if (pathp->node->count) 
+		{ 
+		    
+			if (pathp->node == radix_tree_indirect_to_ptr(root->rnode))
+				radix_tree_shrink(root);//对树的高度进行调整
 			goto out;
 		}
 
@@ -1180,6 +1272,8 @@ void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 		pathp--;
 
 	}
+
+	//走到此处 说明整个树都被释放了
 	root_tag_clear_all(root);
 	root->height = 0;
 	root->rnode = NULL;
@@ -1202,21 +1296,32 @@ int radix_tree_tagged(struct radix_tree_root *root, unsigned int tag)
 }
 EXPORT_SYMBOL(radix_tree_tagged);
 
-static void
-radix_tree_node_ctor(void *node)
+
+//每次申请一个radix_tree_node结构后的初始化回调
+static void radix_tree_node_ctor(void *node)
 {
 	memset(node, 0, sizeof(struct radix_tree_node));
 }
 
+
 static __init unsigned long __maxindex(unsigned int height)
 {
-	unsigned int width = height * RADIX_TREE_MAP_SHIFT;
+    //每一层的数据宽度
+    /*
+      如0层: 整数范围  width=0*6   即                shift=64 - 0=64   
+        1层: 整数范围  width=1*6即 0~    (2^6 - 1)  shift=64 - 6=58 
+        2层: 整数范围  width=2*6即 0~(2^12 -1)      shift=64 - 12=52  
+	*/
+	unsigned int width = height * RADIX_TREE_MAP_SHIFT;	
 	int shift = RADIX_TREE_INDEX_BITS - width;
 
 	if (shift < 0)
 		return ~0UL;
+	
 	if (shift >= BITS_PER_LONG)
 		return 0UL;
+
+	//获得每层的具体表示范围
 	return ~0UL >> shift;
 }
 
@@ -1224,14 +1329,31 @@ static __init void radix_tree_init_maxindex(void)
 {
 	unsigned int i;
 
+	/*计算每层树高可以存储的最大索引  下面是将radix做成一个2^6为一组的多叉树
+	0
+	63
+	4095
+	262143
+	16777215
+	1073741823
+	68719476735
+	4398046511103
+	281474976710655
+	18014398509481983
+	1152921504606846975
+	-1 
+	*/
 	for (i = 0; i < ARRAY_SIZE(height_to_maxindex); i++)
 		height_to_maxindex[i] = __maxindex(i);
 }
 
+
+//cpu热插拔的回调函数,拔掉cou后释放一些和此cpu相关的资源
 static int radix_tree_callback(struct notifier_block *nfb,
-                            unsigned long action,
-                            void *hcpu)
+                                     unsigned long action,
+                                     void *hcpu)
 {
+       
        int cpu = (long)hcpu;
        struct radix_tree_preload *rtp;
 
@@ -1241,8 +1363,7 @@ static int radix_tree_callback(struct notifier_block *nfb,
                rtp = &per_cpu(radix_tree_preloads, cpu);
                while (rtp->nr)
 			   {
-                       kmem_cache_free(radix_tree_node_cachep,
-                                       rtp->nodes[rtp->nr-1]);
+                       kmem_cache_free(radix_tree_node_cachep,rtp->nodes[rtp->nr-1]);
                        rtp->nodes[rtp->nr-1] = NULL;
                        rtp->nr--;
                }
@@ -1250,12 +1371,19 @@ static int radix_tree_callback(struct notifier_block *nfb,
        return NOTIFY_OK;
 }
 
+
+//在 start_kernel() 中进行初始化
 void __init radix_tree_init(void)
 {
+
+    //分配一个slab高速缓存,以后可以从radix_tree_node_cachep快速分配struct radix_tree_node结构体
 	radix_tree_node_cachep = kmem_cache_create("radix_tree_node",
 		                                        sizeof(struct radix_tree_node), 0,
 			                                    SLAB_PANIC | SLAB_RECLAIM_ACCOUNT,
 			                                    radix_tree_node_ctor);
+    //初始化书中各层的最大索引
 	radix_tree_init_maxindex();
+
+	//设置热插拔cpu时的回调函数
 	hotcpu_notifier(radix_tree_callback, 0);
 }

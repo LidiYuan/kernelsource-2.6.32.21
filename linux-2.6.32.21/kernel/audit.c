@@ -641,19 +641,22 @@ static int audit_log_common_recv_msg(struct audit_buffer **ab, u16 msg_type,
 	char *ctx = NULL;
 	u32 len;
 
-	if (!audit_enabled) {
+	if (!audit_enabled) 
+	{
 		*ab = NULL;
 		return rc;
 	}
 
+	
 	*ab = audit_log_start(NULL, GFP_KERNEL, msg_type);
-	audit_log_format(*ab, "user pid=%d uid=%u auid=%u ses=%u",
-			 pid, uid, auid, ses);
-	if (sid) {
+	audit_log_format(*ab, "user pid=%d uid=%u auid=%u ses=%u",pid, uid, auid, ses);
+	if (sid) 
+	{
 		rc = security_secid_to_secctx(sid, &ctx, &len);
 		if (rc)
 			audit_log_format(*ab, " ssid=%u", sid);
-		else {
+		else 
+		{
 			audit_log_format(*ab, " subj=%s", ctx);
 			security_release_secctx(ctx, len);
 		}
@@ -772,13 +775,13 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		if (err == 1) 
 		{
 			err = 0;
-			if (msg_type == AUDIT_USER_TTY) {
+			if (msg_type == AUDIT_USER_TTY) 
+			{
 				err = audit_prepare_user_tty(pid, loginuid,sessionid);
 				if (err)
 					break;
 			}
-			audit_log_common_recv_msg(&ab, msg_type, pid, uid,
-						  loginuid, sessionid, sid);
+			audit_log_common_recv_msg(&ab, msg_type, pid, uid,loginuid, sessionid, sid);
 
 			if (msg_type != AUDIT_USER_TTY)
 				audit_log_format(ab, " msg='%.1024s'",(char *)data);
@@ -806,8 +809,7 @@ static int audit_receive_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 			audit_log_common_recv_msg(&ab, AUDIT_CONFIG_CHANGE, pid,
 						  uid, loginuid, sessionid, sid);
 
-			audit_log_format(ab, " audit_enabled=%d res=0",
-					 audit_enabled);
+			audit_log_format(ab, " audit_enabled=%d res=0",audit_enabled);
 			audit_log_end(ab);
 			return -EPERM;
 		}
@@ -1151,7 +1153,7 @@ unsigned int audit_serial(void)
 
 	unsigned long flags;
 	unsigned int ret;
-
+    
 	spin_lock_irqsave(&serial_lock, flags);
 	do {
 		ret = ++serial;
@@ -1164,7 +1166,8 @@ unsigned int audit_serial(void)
 static inline void audit_get_stamp(struct audit_context *ctx,
 				   struct timespec *t, unsigned int *serial)
 {
-	if (!ctx || !auditsc_get_stamp(ctx, t, serial)) {
+	if (!ctx || !auditsc_get_stamp(ctx, t, serial)) 
+	{
 		*t = CURRENT_TIME;
 		*serial = audit_serial();
 	}
@@ -1363,8 +1366,7 @@ void audit_log_format(struct audit_buffer *ab, const char *fmt, ...)
  * This function will take the passed buf and convert it into a string of
  * ascii hex digits. The new string is placed onto the skb.
  */
-void audit_log_n_hex(struct audit_buffer *ab, const unsigned char *buf,
-		size_t len)
+void audit_log_n_hex(struct audit_buffer *ab, const unsigned char *buf,size_t len)
 {
 	int i, avail, new_len;
 	unsigned char *ptr;

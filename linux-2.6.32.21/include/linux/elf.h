@@ -82,27 +82,42 @@ typedef __s64	Elf64_Sxword;
 #define ET_HIPROC 0xffff //特定处理器文件
 
 /* This is the info that is needed to parse the dynamic section of the file */
-#define DT_NULL		0
-#define DT_NEEDED	1 //依赖库的名称  d_val存放的动态字符串表中的下标
+#define DT_NULL		0  //.dynamic是个数组    _DYNAMIC  这个值表述数组的结尾
+#define DT_NEEDED	1  //依赖库的名称  d_val存放的动态字符串表中(DT_STRTAB标识)的下标
 #define DT_PLTRELSZ	2 //.rela.plt重定位表的总大小 d_val
 #define DT_PLTGOT	3 //.got.plt 保存了重定位地址 d_ptr
 #define DT_HASH		4 //d_ptr
-#define DT_STRTAB	5 //动态字符串表地址d_ptr
-#define DT_SYMTAB	6 //动态符号表地址 d_ptr
+
+#define DT_STRTAB	5  //动态字符串表地址d_ptr
+#define DT_STRSZ	10 //DT_STRTAB 字符串表的总大小 d_val
+
+
+#define DT_SYMTAB	6 //动态符号表地址 d_ptr  每一项是Elf32_Sym
+#define DT_SYMENT	11 //DT_SYMTAB 符号项的大小
+
+
+//这三个是相互依赖的
 #define DT_RELA		7 //重定位表的地址d_ptr
 #define DT_RELASZ	8 //DT_RELA 重定位表的总大小 d_val
 #define DT_RELAENT	9 //DT_RELA 重定位项的大小 d_val 
-#define DT_STRSZ	10 //DT_STRTAB 字符串表的总大小 d_val
-#define DT_SYMENT	11 //DT_SYMTAB 符号项的大小
+
+
 #define DT_INIT		12 //初始化函数的地址 d_ptr
 #define DT_FINI		13 //终止函数的地址 d_ptr
+
 #define DT_SONAME	14 //以空字符结尾的字符串的 DT_STRTAB 字符串表偏移，用于标识共享目标文件的名称 d_val
+                       //在编译的时候-Wl,-soname,linte.so.1.0 来指定动态库的名字
+                       
 #define DT_RPATH 	15 //以空字符结尾的库搜索路径字符串的 DT_STRTAB 字符串表偏移。此元素的用途已被 d_val
                        //在编译的时候采用-Wl,-rpath=""指定动态库动态路径的时候 用来索引此路径的字符串
+                       
 #define DT_SYMBOLIC	16 
+
+
 #define DT_REL	    17 //与 DT_RELA 类似，但其表中包含隐式加数。此元素要求同时存在 DT_RELSZ 和 DT_RELENT 元素d_ptr
 #define DT_RELSZ	18 //DT_REL 重定位表的总大小d_val
 #define DT_RELENT	19 //DT_REL 重定位项的大小d_val 
+
 #define DT_PLTREL	20 //d_val 表示过程链接表指向的重定位项的类型（DT_REL 或 DT_RELA）。过程链接表中的所有重定位都必须使用相同的重定位项
 #define DT_DEBUG	21 //用于调试 d_ptr
 #define DT_TEXTREL	22 //表示一个或多个重定位项可能会要求修改非可写段，并且运行时链接程序会进行相应准备。此元素已被 DF_TEXTREL 标志取代
@@ -116,7 +131,7 @@ typedef __s64	Elf64_Sxword;
 #define DT_ADDRRNGLO	0x6ffffe00
 #define DT_ADDRRNGHI	0x6ffffeff
 #define DT_VERSYM	0x6ffffff0 //.gnu.version节虚拟地址
-#define DT_RELACOUNT	0x6ffffff9
+#define DT_RELACOUNT	0x6ffffff9 //指定相对重定位计数
 #define DT_RELCOUNT	0x6ffffffa
 #define DT_FLAGS_1	0x6ffffffb
 #define DT_VERDEF	0x6ffffffc
@@ -228,7 +243,7 @@ typedef struct elf64_rel {
 
 						/*
                             重定位入口的类型和符号 低8位表示重定位入口的类型 (R_386_32)
-                            高24位表示重定位入口的符号在符号表中的下标
+                            高24位表示重定位入口的符号在符号表(Elf64_Sym)中的下标(可能在动态符号表中)
 						*/
   Elf64_Xword r_info;	/* index and type of relocation */
 } Elf64_Rel;
@@ -282,7 +297,7 @@ typedef struct elf64_sym {
 
 /*
       对于st_shndx不是SHN_COMMON  则st_value 表示该符号在段中的偏移,即st_shndx指定段 st_value指定在段的偏移
-      对于st_shndx 是SHN_COMMON   则st_value 表示该符号的对齐属性
+      对于st_shndx 是 SHN_COMMON    则st_value 表示该符号的对齐属性
       在可执行文件中 st_value表示符号的虚拟地址
 */							
   Elf64_Addr st_value;		/* Value of the symbol  符号相对应的值。这个值跟符号有关，可能
@@ -369,7 +384,7 @@ typedef struct elf64_phdr {
 #define SHT_PROGBITS	1//程序、代码、数据都是此种类型 此节区包含程序定义的信息，其格式和含义都由程序来解释释
 #define SHT_SYMTAB	2  //此节区包含一个符号表
 #define SHT_STRTAB	3  //此节区包含字符串表。目标文件可能包含多个字符串表节区。
-#define SHT_RELA	4  //重定位表，该段包含了重定位信息
+#define SHT_RELA	4  //重定位节，包含relocation入口，参见Elf32_Rela。一个文件可能有多个Relocation Section。比如.rela.text，.rela.dyn。
 #define SHT_HASH	5 //此节区包含符号哈希表。所有参与动态链接的目标都必须包含一个符号哈希表
 #define SHT_DYNAMIC	6  //动态链接信息
 #define SHT_NOTE	7 //提示性信息
@@ -378,8 +393,12 @@ typedef struct elf64_phdr {
 #define SHT_SHLIB	10//该节区保留
 #define SHT_DYNSYM	11 //动态链接的符号表
 #define SHT_NUM		12
+
+//为特定于处理器的语义保留 
 #define SHT_LOPROC	0x70000000
 #define SHT_HIPROC	0x7fffffff
+
+//指定了为应用程序保留的索引的下界和上界，这个范围内的索引可以被应用程序使用
 #define SHT_LOUSER	0x80000000
 #define SHT_HIUSER	0xffffffff
 

@@ -19,29 +19,46 @@
 #ifdef CONFIG_GENERIC_FIND_NEXT_BIT
 /*
  * Find the next set bit in a memory region.
+ * 在内存区域中寻从offset开始找位为0的位置
+   寻找long型数据中 从offset开始 没有被置位1的位置
+   比如:
+      0x01   如果从偏移值offset=0开始查找, 则返回的是1  ,因为位0已经被置位了1  ，位1还没被置位1
+      0x02   如果从偏移值offset=0开始查找, 则返回的是0,因为位1被置位1,但位0还没有置1 
+      0x03   如果从偏移值offset=0开始查找, 则返回的是2  ,因为位0,位1已经被置位了1  ，位2还没被置位1 
  */
-unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
-			    unsigned long offset)
+unsigned long find_next_bit(const unsigned long *addr,//区域的地址, 可以支持数组 
+                                unsigned long size,   //区域的最大长度
+			                    unsigned long offset) //从offset开始查找第一个未被设置1的位
 {
-	const unsigned long *p = addr + BITOP_WORD(offset);
-	unsigned long result = offset & ~(BITS_PER_LONG-1);
+	
 	unsigned long tmp;
+	const unsigned long *p = addr + BITOP_WORD(offset);
+	unsigned long result = offset & ~(BITS_PER_LONG-1);  //在offset 小于BITS_PER_LONG的时候 result都会是0
 
+
+	//如果位的偏移大于最大的位数,则返回最大位数
 	if (offset >= size)
 		return size;
-	size -= result;
+	
+	size -= result; 
 	offset %= BITS_PER_LONG;
-	if (offset) {
-		tmp = *(p++);
+
+	if (offset) 
+	{
+		tmp = *(p++);  //取得第一个long的数据
 		tmp &= (~0UL << offset);
+
 		if (size < BITS_PER_LONG)
 			goto found_first;
+		
 		if (tmp)
 			goto found_middle;
+
 		size -= BITS_PER_LONG;
 		result += BITS_PER_LONG;
 	}
-	while (size & ~(BITS_PER_LONG-1)) {
+	while (size & ~(BITS_PER_LONG-1)) 
+	{
 		if ((tmp = *(p++)))
 			goto found_middle;
 		result += BITS_PER_LONG;
@@ -55,6 +72,7 @@ found_first:
 	tmp &= (~0UL >> (BITS_PER_LONG - size));
 	if (tmp == 0UL)		/* Are any bits set? */
 		return result + size;	/* Nope. */
+	
 found_middle:
 	return result + __ffs(tmp);
 }

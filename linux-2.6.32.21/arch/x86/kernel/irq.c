@@ -121,6 +121,8 @@ static int show_other_interrupts(struct seq_file *p, int prec)
 	return 0;
 }
 
+// 在/proc/interrupts中显示中断信息
+//系统可用的中断数量主要由架构决定，x86 的具体数量可以参考以下定义
 int show_interrupts(struct seq_file *p, void *v)
 {
 	unsigned long flags, any_count = 0;
@@ -131,38 +133,63 @@ int show_interrupts(struct seq_file *p, void *v)
 	if (i > nr_irqs)
 		return 0;
 
+	//计算第一列的宽度prec
+	//如果最大中断号小于1000，则 prec 为3，如果最大中断号大于1000小于10000，则 prec 为4，以此类推,最大宽度为10
 	for (prec = 3, j = 1000; prec < 10 && j <= nr_irqs; ++prec)
 		j *= 10;
 
+	//如果外部中断都打印完毕
 	if (i == nr_irqs)
 		return show_other_interrupts(p, prec);
 
 	/* print header */
-	if (i == 0) {
+	//打印头 主要是打印出 cpuX,有几个cpu打印几个
+	if (i == 0) 
+	{
+	    //前面加 prec+8个空格
 		seq_printf(p, "%*s", prec + 8, "");
+
+       
 		for_each_online_cpu(j)
-			seq_printf(p, "CPU%-8d", j);
+			seq_printf(p, "CPU%-8d", j);//数字的右边保持8位 不足的在右边用空格填充
+
 		seq_putc(p, '\n');
 	}
 
+	//根据中断号来获得中断描述符
 	desc = irq_to_desc(i);
 	if (!desc)
 		return 0;
-
+    
 	spin_lock_irqsave(&desc->lock, flags);
+
 	for_each_online_cpu(j)
-		any_count |= kstat_irqs_cpu(i, j);
+		any_count |= kstat_irqs_cpu(i, j);//打印每个 CPU 对应的统计数量 .
+
 	action = desc->action;
+	
 	if (!action && !any_count)
 		goto out;
-
+    
+	//逻辑中断号
+	//<逻辑中断号>
 	seq_printf(p, "%*d: ", prec, i);
+
+	//打印每个各个cpu的统计信息,中断在各CPU发生的次数
+	//<中断次数percpu>
 	for_each_online_cpu(j)
 		seq_printf(p, "%10u ", kstat_irqs_cpu(i, j));
+
+    //<中断控制器名称>
 	seq_printf(p, " %8s", desc->chip->name);
+
+	//<中断描述符的名>
 	seq_printf(p, "-%-8s", desc->name);
 
-	if (action) {
+    //[中断源1,中断源2]
+	//该中断号上的所有用户注册的中断名
+	if (action) 
+	{
 		seq_printf(p, "  %s", action->name);
 		while ((action = action->next) != NULL)
 			seq_printf(p, ", %s", action->name);
@@ -171,6 +198,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	seq_putc(p, '\n');
 out:
 	spin_unlock_irqrestore(&desc->lock, flags);
+	
 	return 0;
 }
 

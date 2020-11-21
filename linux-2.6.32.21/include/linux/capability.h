@@ -336,6 +336,7 @@ struct cpu_vfs_cap_data {
 
 #define CAP_AUDIT_WRITE      29
 
+
 #define CAP_AUDIT_CONTROL    30
 
 #define CAP_SETFCAP	     31

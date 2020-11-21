@@ -91,14 +91,15 @@ void cn_queue_wrapper(struct work_struct *work)
 	kfree(d->free);
 }
 
-static struct cn_callback_entry *
-cn_queue_alloc_callback_entry(char *name, struct cb_id *id,
-			      void (*callback)(struct cn_msg *, struct netlink_skb_parms *))
+static struct cn_callback_entry * cn_queue_alloc_callback_entry(char *name, 
+                                                                        struct cb_id *id,
+			                                                            void (*callback)(struct cn_msg *, struct netlink_skb_parms *))
 {
 	struct cn_callback_entry *cbq;
 
 	cbq = kzalloc(sizeof(*cbq), GFP_KERNEL);
-	if (!cbq) {
+	if ( !cbq ) 
+	{
 		printk(KERN_ERR "Failed to create new callback queue.\n");
 		return NULL;
 	}
@@ -127,12 +128,14 @@ int cn_cb_equal(struct cb_id *i1, struct cb_id *i2)
 	return ((i1->idx == i2->idx) && (i1->val == i2->val));
 }
 
-int cn_queue_add_callback(struct cn_queue_dev *dev, char *name, struct cb_id *id,
-			  void (*callback)(struct cn_msg *, struct netlink_skb_parms *))
+int cn_queue_add_callback(struct cn_queue_dev *dev, 
+                                char *name, 
+                                struct cb_id *id,
+			                    void (*callback)(struct cn_msg *, struct netlink_skb_parms *))
 {
 	struct cn_callback_entry *cbq, *__cbq;
 	int found = 0;
-
+    
 	cbq = cn_queue_alloc_callback_entry(name, id, callback);
 	if (!cbq)
 		return -ENOMEM;
@@ -143,8 +146,10 @@ int cn_queue_add_callback(struct cn_queue_dev *dev, char *name, struct cb_id *id
 	spin_lock_bh(&dev->queue_lock);
 
 	//查看此回调是否已经加入到链表中
-	list_for_each_entry(__cbq, &dev->queue_list, callback_entry) {
-		if (cn_cb_equal(&__cbq->id.id, id)) {
+	list_for_each_entry(__cbq, &dev->queue_list, callback_entry) 
+    {
+		if (cn_cb_equal(&__cbq->id.id, id)) 
+		{
 			found = 1;
 			break;
 		}
@@ -155,6 +160,7 @@ int cn_queue_add_callback(struct cn_queue_dev *dev, char *name, struct cb_id *id
 		list_add_tail(&cbq->callback_entry, &dev->queue_list);
 	spin_unlock_bh(&dev->queue_lock);
 
+	//表示此组号已经在链表中了
 	if (found) 
 	{
 		cn_queue_free_callback(cbq);
@@ -162,6 +168,7 @@ int cn_queue_add_callback(struct cn_queue_dev *dev, char *name, struct cb_id *id
 		return -EINVAL;
 	}
 
+	//将组号设置为 idx
 	cbq->seq = 0;
 	cbq->group = cbq->id.id.idx;
 

@@ -914,6 +914,7 @@ NORET_TYPE void do_exit(long code)
 	struct task_struct *tsk = current;
 	int group_dead;
 
+    //往通知连发送进程结束的通知, 对进程结束事件感兴趣的可以得到进程退出的信息
 	profile_task_exit(tsk);
 
 	WARN_ON(atomic_read(&tsk->fs_excl));
@@ -1047,12 +1048,15 @@ NORET_TYPE void do_exit(long code)
 
 	validate_creds_for_do_exit(tsk);
 
+    //禁止内核抢占
 	preempt_disable();
+	
 	exit_rcu();
 	/* causes final put_task_struct in finish_task_switch(). */
 	tsk->state = TASK_DEAD;
 
 	//切换到新的进程  
+	//重新调度，因为该进程已经被设置成了僵死状态，因此永远都不会再把它调度回来运行了，也就实现了do_exit不会有返回的目标
 	schedule();
 	BUG();
 	/* Avoid "noreturn function does return".  */

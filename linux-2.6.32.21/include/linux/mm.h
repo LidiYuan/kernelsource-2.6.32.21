@@ -264,7 +264,7 @@ struct inode;
 
 /*
  * Drop a ref, return true if the refcount fell to zero (the page has no users)
- */
+ *//* 检查页框是否还有进程在使用，就是检查_count变量的值是否为0 */
 static inline int put_page_testzero(struct page *page)
 {
 	VM_BUG_ON(atomic_read(&page->_count) == 0);

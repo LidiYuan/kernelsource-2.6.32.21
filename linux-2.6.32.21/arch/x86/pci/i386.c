@@ -221,7 +221,8 @@ static int __init pcibios_assign_resources(void)
 		 * pci_assign_unassigned_resources() allocate the new
 		 * addresses.
 		 */
-		for_each_pci_dev(dev) {
+		for_each_pci_dev(dev) 
+	    {
 			r = &dev->resource[PCI_ROM_RESOURCE];
 			if (!r->flags || !r->start)
 				continue;

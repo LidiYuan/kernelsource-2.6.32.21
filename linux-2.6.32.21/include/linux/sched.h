@@ -1536,7 +1536,7 @@ struct task_struct
 	struct audit_context *audit_context;//审计上下文记录进程上下文的审计信息
 	                                  //当进程从进入系统调用和退出系统调用时，使用审计上下文结构audit_context记录系统调用进入和退出的各种属性数据
 #ifdef CONFIG_AUDITSYSCALL
-	uid_t loginuid;  //用户登录的uid
+	uid_t loginuid;           //用户登录的uid
 	unsigned int sessionid;  //用户登录的会话id
 #endif
 	seccomp_t seccomp;
@@ -1582,10 +1582,12 @@ struct task_struct
 	int hardirq_context;
 	int softirq_context;
 #endif
+
+//鐢ㄤ簬姝婚攣鐨勬娴?
 #ifdef CONFIG_LOCKDEP
 # define MAX_LOCK_DEPTH 48UL
 	u64 curr_chain_key;
-	int lockdep_depth;
+	int lockdep_depth; 
 	unsigned int lockdep_recursion;
 	struct held_lock held_locks[MAX_LOCK_DEPTH];
 	gfp_t lockdep_reclaim_gfp;
@@ -1880,7 +1882,7 @@ extern void free_task(struct task_struct *tsk);
 
 extern void __put_task_struct(struct task_struct *t);
 
-//释放内核栈和thread_info占用的页
+//释放内核栈和 thread_info 占用的页
 static inline void put_task_struct(struct task_struct *t)
 {
 	if (atomic_dec_and_test(&t->usage))

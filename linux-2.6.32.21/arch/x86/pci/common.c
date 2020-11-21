@@ -16,8 +16,7 @@
 #include <asm/smp.h>
 #include <asm/pci_x86.h>
 
-unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2 |
-				PCI_PROBE_MMCONF;
+unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2 | PCI_PROBE_MMCONF;
 
 unsigned int pci_early_dump_regs;
 static int pci_bf_sort;
@@ -29,7 +28,7 @@ int noioapicreroute = 0;
 int noioapicreroute = 1;
 #endif
 int pcibios_last_bus = -1;
-unsigned long pirq_table_addr;
+unsigned long pirq_table_addr;//保存pci中断路由表的地址
 struct pci_bus *pci_root_bus;
 
 //负责原生pci配置空间的访问 赋值是在pci_arch_init()
@@ -431,6 +430,7 @@ struct pci_bus * __devinit pcibios_scan_root(int busnum)
 
 extern u8 pci_cache_line_size;
 
+
 int __init pcibios_init(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -463,45 +463,65 @@ int __init pcibios_init(void)
 	return 0;
 }
 
+//对内核启动时候的参数进行解析
 char * __devinit  pcibios_setup(char *str)
-{
-	if (!strcmp(str, "off")) {
-		pci_probe = 0;
+{  
+    //off选项意味着内核启动时就不会再有总线枚举这个过程了，也就是说你机子里挂在PCI总线上的那些设备就都游离于内核之外了，什么后果自己想想吧，所以使用起来要慎重，没事儿的时候最好不要设置它
+	if (!strcmp(str, "off")) 
+	{
+		pci_probe = 0; //方式pci配置空间的方式清0  即不使用任何方式访问pci配置空间
 		return NULL;
-	} else if (!strcmp(str, "bfsort")) {
+	} 
+	else if (!strcmp(str, "bfsort")) //如果用户指定了bfsort，则枚举最后得到的PCI设备链表里就是按照广度优先的顺序排列
+	{
 		pci_bf_sort = pci_force_bf;
 		return NULL;
-	} else if (!strcmp(str, "nobfsort")) {
+	} 
+	else if (!strcmp(str, "nobfsort")) 
+	{
 		pci_bf_sort = pci_force_nobf;
 		return NULL;
 	}
+
+	//内核配置了可以通过BIOS访问PCI设备
 #ifdef CONFIG_PCI_BIOS
-	else if (!strcmp(str, "bios")) {
+	else if (!strcmp(str, "bios"))  //内核参数指定了通过BIOS方式访问PCI配置空间
+	{
 		pci_probe = PCI_PROBE_BIOS;
 		return NULL;
-	} else if (!strcmp(str, "nobios")) {
+		
+	} else if (!strcmp(str, "nobios")) //内核参数指定了不能通过BIOS方式访问PCI配置空间
+	{
 		pci_probe &= ~PCI_PROBE_BIOS;
 		return NULL;
-	} else if (!strcmp(str, "biosirq")) {
+		
+	} else if (!strcmp(str, "biosirq")) { //牵涉到PCI的中断机制,那么这个biosirq就是告诉内核通过PCI BIOS去获取一个名叫中断路由表（PCI Interrupt routing table）的东东，从而达到对中断路由情况的了然于胸。不得不说的是，中断路由器只有在中断控制器为PIC的时候才用得着，如果为APIC，就不用麻烦他老人家了
 		pci_probe |= PCI_BIOS_IRQ_SCAN;
 		return NULL;
-	} else if (!strncmp(str, "pirqaddr=", 9)) {
+	} 
+    else if (!strncmp(str, "pirqaddr=", 9)) //pirqaddr允许你去告诉内核中断路由表保存在哪个地方，这样的话，内核可以直接检测这个地址来获得中断路由表，而不用再去在0xF0000h~0xFFFFF之间挖地三尺进行大范围的搜索
+	{
 		pirq_table_addr = simple_strtoul(str+9, NULL, 0);
 		return NULL;
 	}
 #endif
+
+//内核配置了直接访问pci 配置空间的方式
 #ifdef CONFIG_PCI_DIRECT
-	else if (!strcmp(str, "conf1")) {
+	else if (!strcmp(str, "conf1"))  //明确告诉内核使用conf1方式 
+	{
 		pci_probe = PCI_PROBE_CONF1 | PCI_NO_CHECKS;
 		return NULL;
 	}
-	else if (!strcmp(str, "conf2")) {
+	else if (!strcmp(str, "conf2")) {//明确告诉内核使用conf2方式
 		pci_probe = PCI_PROBE_CONF2 | PCI_NO_CHECKS;
 		return NULL;
 	}
 #endif
+
+//内核配置了mmconfig访问pci配置空间方式
 #ifdef CONFIG_PCI_MMCONFIG
-	else if (!strcmp(str, "nommconf")) {
+	else if (!strcmp(str, "nommconf")) {//告诉内核不要使用MMConfig方式访问设备
 		pci_probe &= ~PCI_PROBE_MMCONF;
 		return NULL;
 	}
@@ -510,11 +530,14 @@ char * __devinit  pcibios_setup(char *str)
 		return NULL;
 	}
 #endif
-	else if (!strcmp(str, "noacpi")) {
+	else if (!strcmp(str, "noacpi")) {//用来禁止使用ACPI处理任何PCI相关的内容,包括PCI总线的枚举和PCI设备中断路由
+	                                  /*
+	                                   咱们已经习惯于将ACPI和电源管理牢牢的联系在一起，所以很难会理解它和PCI这边儿的关系。其实仔细瞅瞅ACPI的全称the Advanced Configuration & Power Interface，里边儿不仅有Power，还有Configuration，你就应该能够悟出点儿道了。ACPI出现的目的是在咱们的OS和硬件平台之间隔出个抽象层，这样OS和平台就可以各自发展各自的，新的OS可以控制老的平台，老的OS也可以控制新的平台而不需要额外的修改。ACPI这个抽象层里包含了很多寄存器和配置信息，绝大部分OS需要从BIOS得到的信息都可以从ACPI得到，并且趋势是未来的任何新的特性相关的信息都只能从ACPI得到，这些信息里当然也包括PCI设备的中断路由情况等
+	                                  */
 		acpi_noirq_set();
 		return NULL;
 	}
-	else if (!strcmp(str, "noearly")) {
+	else if (!strcmp(str, "noearly")) {//你可以使用noearly选项来禁止这个早期的扫描
 		pci_probe |= PCI_PROBE_NOEARLY;
 		return NULL;
 	}
@@ -530,13 +553,13 @@ char * __devinit  pcibios_setup(char *str)
 		return NULL;
 	}
 #endif
-	else if (!strcmp(str, "rom")) {
+	else if (!strcmp(str, "rom")) {//PCI设备可以携带一个扩展ROM，并将与自己有关的初始化代码放到它里边儿，内核通执行这些代码来完成与设备有关的初始化。同时，PCI Spec还规定了，这些代码不能在设备的ROM里执行，必须得拷贝到系统的RAM里再执行，于是ROM与RAM这两个本来不搭嘎的东东就产生了联系，这个联系就是行话所谓的映射。这里的选项rom就是告诉内核将设备的ROM映射到系统的RAM里
 		pci_probe |= PCI_ASSIGN_ROMS;
 		return NULL;
 	} else if (!strcmp(str, "norom")) {
 		pci_probe |= PCI_NOASSIGN_ROMS;
 		return NULL;
-	} else if (!strcmp(str, "assign-busses")) {
+	} else if (!strcmp(str, "assign-busses")) {//表示内核将无视PCI BIOS分配的总线号，自己重新分配
 		pci_probe |= PCI_ASSIGN_ALL_BUSSES;
 		return NULL;
 	} else if (!strcmp(str, "use_crs")) {
@@ -545,7 +568,7 @@ char * __devinit  pcibios_setup(char *str)
 	} else if (!strcmp(str, "earlydump")) {
 		pci_early_dump_regs = 1;
 		return NULL;
-	} else if (!strcmp(str, "routeirq")) {
+	} else if (!strcmp(str, "routeirq")) {//routeirq，它清楚明白的告诉内核不要信任那些写PCI驱动的，得自己为所有的PCI设备做中断路由
 		pci_routeirq = 1;
 		return NULL;
 	} else if (!strcmp(str, "skip_isa_align")) {

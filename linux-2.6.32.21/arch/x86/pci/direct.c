@@ -17,12 +17,17 @@
 	(0x80000000 | ((reg & 0xF00) << 16) | (bus << 16) \
 	| (devfn << 8) | (reg & 0xFC))
 
-static int pci_conf1_read(unsigned int seg, unsigned int bus,
-			  unsigned int devfn, int reg, int len, u32 *value)
+static int pci_conf1_read(unsigned int seg, 
+                              unsigned int bus,
+			                  unsigned int devfn, 
+			                  int reg, 
+			                  int len, 
+			                  u32 *value)
 {
 	unsigned long flags;
 
-	if ((bus > 255) || (devfn > 255) || (reg > 4095)) {
+	if ((bus > 255) || (devfn > 255) || (reg > 4095)) 
+	{
 		*value = -1;
 		return -EINVAL;
 	}
@@ -31,7 +36,8 @@ static int pci_conf1_read(unsigned int seg, unsigned int bus,
 
 	outl(PCI_CONF1_ADDRESS(bus, devfn, reg), 0xCF8);
 
-	switch (len) {
+	switch (len) 
+	{
 	case 1:
 		*value = inb(0xCFC + (reg & 3));
 		break;
@@ -273,8 +279,8 @@ void __init pci_direct_init(int type)
 {
 	if (type == 0)
 		return;
-	printk(KERN_INFO "PCI: Using configuration type %d for base access\n",
-		 type);
+	
+	printk(KERN_INFO "PCI: Using configuration type %d for base access\n",type);
 	if (type == 1) 
 	{
 		raw_pci_ops = &pci_direct_conf1;
@@ -289,6 +295,9 @@ void __init pci_direct_init(int type)
 	}
 	raw_pci_ops = &pci_direct_conf2;
 }
+
+
+//探测读取pci配置空间的方式 使用方式1 还是方式2
 
 int __init pci_direct_probe(void)
 {
@@ -318,6 +327,7 @@ int __init pci_direct_probe(void)
 	//在不使用机制#1的情况下 对机制#2进行检测
 	if ((pci_probe & PCI_PROBE_CONF2) == 0)
 		return 0;
+	
 	region = request_region(0xCF8, 4, "PCI conf2");
 	if (!region)
 		return 0;

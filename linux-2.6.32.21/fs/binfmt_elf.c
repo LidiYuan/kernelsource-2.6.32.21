@@ -134,9 +134,10 @@ static int padzero(unsigned long elf_bss)
 #define ELF_BASE_PLATFORM NULL
 #endif
 
-static int
-create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
-		unsigned long load_addr, unsigned long interp_load_addr)
+static int create_elf_tables(struct linux_binprm *bprm, 
+                                  struct elfhdr *exec,
+		                          unsigned long load_addr, 
+		                          unsigned long interp_load_addr)
 {
 	unsigned long p = bprm->p;
 	int argc = bprm->argc;
@@ -151,8 +152,12 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 	const char *k_base_platform = ELF_BASE_PLATFORM;
 	unsigned char k_rand_bytes[16];
 	int items;
+
+	
 	elf_addr_t *elf_info;
 	int ei_index = 0;
+
+	
 	const struct cred *cred = current_cred();
 	struct vm_area_struct *vma;
 
@@ -171,7 +176,8 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 	 * merely difficult.
 	 */
 	u_platform = NULL;
-	if (k_platform) {
+	if (k_platform) 
+	{
 		size_t len = strlen(k_platform) + 1;
 
 		u_platform = (elf_addr_t __user *)STACK_ALLOC(p, len);
@@ -201,8 +207,9 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 	if (__copy_to_user(u_rand_bytes, k_rand_bytes, sizeof(k_rand_bytes)))
 		return -EFAULT;
 
-	/* Create the ELF interpreter info */
+	/* Create the ELF interpreter info*/
 	elf_info = (elf_addr_t *)current->mm->saved_auxv;
+
 	/* update AT_VECTOR_SIZE_BASE if the number of NEW_AUX_ENT() changes */
 #define NEW_AUX_ENT(id, val) \
 	do { \
@@ -219,6 +226,9 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 	 */
 	ARCH_DLINFO;
 #endif
+
+
+    //开始填充辅助向量
 	NEW_AUX_ENT(AT_HWCAP, ELF_HWCAP);
 	NEW_AUX_ENT(AT_PAGESZ, ELF_EXEC_PAGESIZE);
 	NEW_AUX_ENT(AT_CLKTCK, CLOCKS_PER_SEC);
@@ -235,7 +245,9 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
  	NEW_AUX_ENT(AT_SECURE, security_bprm_secureexec(bprm));
 	NEW_AUX_ENT(AT_RANDOM, (elf_addr_t)(unsigned long)u_rand_bytes);
 	NEW_AUX_ENT(AT_EXECFN, bprm->exec);
-	if (k_platform) {
+	
+	if (k_platform) 
+	{
 		NEW_AUX_ENT(AT_PLATFORM,
 			    (elf_addr_t)(unsigned long)u_platform);
 	}
@@ -986,8 +998,10 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 
 	install_exec_creds(bprm);
 	current->flags &= ~PF_FORKNOEXEC;
-	retval = create_elf_tables(bprm, &loc->elf_ex,
-			  load_addr, interp_load_addr);
+
+	//在里面会填充 辅助变量
+	retval = create_elf_tables(bprm, &loc->elf_ex,load_addr, interp_load_addr);
+
 	if (retval < 0) {
 		send_sig(SIGKILL, current, 0);
 		goto out;

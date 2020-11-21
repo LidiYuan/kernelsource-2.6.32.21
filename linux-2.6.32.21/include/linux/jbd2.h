@@ -212,7 +212,7 @@ typedef struct jbd2_journal_revoke_header_s
 typedef struct journal_superblock_s
 {
 /* 0x0000 */
-	journal_header_t s_header;
+	journal_header_t s_header; // 用于表示本块是一个超级块
 
 /* 0x000C */
 	/* Static information describing the journal */
@@ -418,6 +418,9 @@ struct jbd2_inode {
 struct jbd2_revoke_table_s;
 
 /**
+
+ jbd中用handle来表示。一个handle代表针对文件系统的一次原子操作。这个原子操作要么成功，要么失败，不会出现中间状态。
+ 在一个handle中，可能会修改若干个缓冲区，即buffer_head
  * struct handle_s - The handle_s type is the concrete type associated with
  *     handle_t.
  * @h_transaction: Which compound transaction is this update a part of?
@@ -436,13 +439,13 @@ struct jbd2_revoke_table_s;
 struct handle_s
 {
 	/* Which compound transaction is this update a part of? */
-	transaction_t		*h_transaction;
+	transaction_t		*h_transaction;// 本原子操作属于哪个transaction
 
 	/* Number of remaining buffers we are allowed to dirty: */
-	int			h_buffer_credits;
+	int			h_buffer_credits;// 本原子操作的额度，即可以包含的磁盘块数
 
 	/* Reference count on this handle */
-	int			h_ref;
+	int			h_ref; // 引用计数
 
 	/* Field for caller's use to track errors through large fs */
 	/* operations */
@@ -451,8 +454,8 @@ struct handle_s
 	/* Flags [no locking] */
 	unsigned int	h_sync:		1;	/* sync-on-close */
 	unsigned int	h_jdata:	1;	/* force data journaling */
-	unsigned int	h_aborted:	1;	/* fatal error on handle */
-
+	unsigned int	h_aborted:	1;	/* fatal error on handle */ 
+    // h_sync表示同步，意思是处理完该原子操作后，立即将所属的transaction提交
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
 	struct lockdep_map	h_lockdep_map;
 #endif
@@ -508,10 +511,10 @@ struct transaction_chp_stats_s {
 struct transaction_s
 {
 	/* Pointer to the journal for this transaction. [no locking] */
-	journal_t		*t_journal;
+	journal_t		*t_journal;// 指向所属的jounal
 
 	/* Sequence number for this transaction [no locking] */
-	tid_t			t_tid;
+	tid_t			t_tid;// 本事务的序号
 
 	/*
 	 * Transaction's current state
@@ -532,22 +535,24 @@ struct transaction_s
 
 	/*
 	 * Where in the log does this transaction's commit start? [no locking]
-	 */
+	 */// log中本transaction_t从日志中哪个块开始
 	unsigned long		t_log_start;
 
 	/* Number of buffers on the t_buffers list [j_list_lock] */
+	// 本transaction_t中缓冲区的个数
 	int			t_nr_buffers;
 
 	/*
 	 * Doubly-linked circular list of all buffers reserved but not yet
 	 * modified by this transaction [j_list_lock]
 	 */
+	// 被本transaction保留，但是并未修改的缓冲区组成的双向循环队列。
 	struct journal_head	*t_reserved_list;
 
 	/*
 	 * Doubly-linked circular list of all metadata buffers owned by this
 	 * transaction [j_list_lock]
-	 */
+	 */// 这里面可都是宝贵的元数据啊，对文件系统的一致性至关重要！
 	struct journal_head	*t_buffers;
 
 	/*
@@ -763,7 +768,7 @@ jbd2_time_diff(unsigned long start, unsigned long end)
 struct journal_s
 {
 	/* General journaling state flags [j_state_lock] */
-	unsigned long		j_flags;
+	unsigned long		j_flags;// journal的状态
 
 	/*
 	 * Is there an outstanding uncleared error on the journal (from a prior
@@ -772,7 +777,7 @@ struct journal_s
 	int			j_errno;
 
 	/* The superblock buffer */
-	struct buffer_head	*j_sb_buffer;
+	struct buffer_head	*j_sb_buffer;// 指向日志超级块缓冲区
 	journal_superblock_t	*j_superblock;
 
 	/* Version of the superblock format */
@@ -818,6 +823,7 @@ struct journal_s
 	/* Wait queue for waiting for checkpointing to complete */
 	wait_queue_head_t	j_wait_logspace;
 
+    //等待队列  在等待提交的完成
 	/* Wait queue for waiting for commit to complete */
 	wait_queue_head_t	j_wait_done_commit;
 
@@ -925,6 +931,7 @@ struct journal_s
 	__u8			j_uuid[16];
 
 	/* Pointer to the current commit thread for this journal */
+	//指向当前日志提交的线程
 	struct task_struct	*j_task;
 
 	/*
@@ -938,6 +945,7 @@ struct journal_s
 	 */
 	unsigned long		j_commit_interval;
 
+	//定时器 为了唤醒提交线程
 	/* The timer used to wakeup the commit thread: */
 	struct timer_list	j_commit_timer;
 

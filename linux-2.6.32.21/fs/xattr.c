@@ -25,14 +25,19 @@
  * Check permissions for extended attribute access.  This is a bit complicated
  * because different namespaces have very different rules.
  */
-static int
-xattr_permission(struct inode *inode, const char *name, int mask)
+
+/*
+检查扩展属性的访问权限, 这有点复杂,因为不同的命名空间有不同的规则
+*/
+static int xattr_permission(struct inode *inode, const char *name, int mask)
 {
 	/*
 	 * We can never set or remove an extended attribute on a read-only
 	 * filesystem  or on an immutable / append-only inode.
 	 */
-	if (mask & MAY_WRITE) {
+	if (mask & MAY_WRITE) 
+	{   
+        //用chattr设置了 文件不可变属性, 或者设置了只能追加追加打开文件的属性
 		if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
 			return -EPERM;
 	}
@@ -41,6 +46,8 @@ xattr_permission(struct inode *inode, const char *name, int mask)
 	 * No restriction for security.* and system.* from the VFS.  Decision
 	 * on these is left to the underlying filesystem / security module.
 	 */
+	//对于  security或者system命名空间的扩展属性 在此处不做决定, 
+    //这些问题的决定权留给底层的文件系统/安全模块
 	if (!strncmp(name, XATTR_SECURITY_PREFIX, XATTR_SECURITY_PREFIX_LEN) ||
 	    !strncmp(name, XATTR_SYSTEM_PREFIX, XATTR_SYSTEM_PREFIX_LEN))
 		return 0;
@@ -48,6 +55,7 @@ xattr_permission(struct inode *inode, const char *name, int mask)
 	/*
 	 * The trusted.* namespace can only be accessed by a privileged user.
 	 */
+	 //对于trusted 命名空间 只能被有权限的用户访问 有(CAP_SYS_ADMIN)的权能
 	if (!strncmp(name, XATTR_TRUSTED_PREFIX, XATTR_TRUSTED_PREFIX_LEN))
 		return (capable(CAP_SYS_ADMIN) ? 0 : -EPERM);
 
@@ -55,14 +63,21 @@ xattr_permission(struct inode *inode, const char *name, int mask)
 	 * extended attributes. For sticky directories, only the owner and
 	 * privileged user can write attributes.
 	 */
-	if (!strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN)) {
+	//对于命名空间user,只有普通文件和目录可以有扩展属性, 对于sticky目录, 只有拥有者和
+	//特权用户可以写入属性
+	if (!strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN)) 
+	{
+	    //判断是否为普通文件或者目录
 		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode))
 			return -EPERM;
+
+		//对于目录 设置了striky 那么 要写入属性，必须是拥有者或者特权用户
 		if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
 		    (mask & MAY_WRITE) && !is_owner_or_cap(inode))
 			return -EPERM;
 	}
 
+	//继续对访问权限检测 此处是针对user的扩展属性, 检测文件rw属性
 	return inode_permission(inode, mask);
 }
 
@@ -82,24 +97,35 @@ xattr_permission(struct inode *inode, const char *name, int mask)
  *  is executed. It also assumes that the caller will make the appropriate
  *  permission checks.
  */
-int __vfs_setxattr_noperm(struct dentry *dentry, const char *name,
-		const void *value, size_t size, int flags)
+int __vfs_setxattr_noperm(struct dentry *dentry, //要设置扩展属性的对象
+                                const char *name,   //属性名字
+		                        const void *value,  //属性的值
+		                        size_t size,        //属性值的长度
+		                        int flags)          //标志位  
 {
 	struct inode *inode = dentry->d_inode;
 	int error = -EOPNOTSUPP;
 
-	if (inode->i_op->setxattr) {
+
+	//调用具体文件系统对此函数的实现方式, 
+	if (inode->i_op->setxattr) 
+	{
+        //如ext4执行的是 generic_setxattr
 		error = inode->i_op->setxattr(dentry, name, value, size, flags);
-		if (!error) {
+		if (!error) 
+		{
+		    //设置正常
+		    //通知扩展属性事件
 			fsnotify_xattr(dentry);
-			security_inode_post_setxattr(dentry, name, value,
-						     size, flags);
+
+			//和lsm有关的安全机制
+			security_inode_post_setxattr(dentry, name, value,size, flags);
 		}
-	} else if (!strncmp(name, XATTR_SECURITY_PREFIX,
-				XATTR_SECURITY_PREFIX_LEN)) {
+	} 
+	else if (!strncmp(name, XATTR_SECURITY_PREFIX,XATTR_SECURITY_PREFIX_LEN)) 
+	{
 		const char *suffix = name + XATTR_SECURITY_PREFIX_LEN;
-		error = security_inode_setsecurity(inode, suffix, value,
-						   size, flags);
+		error = security_inode_setsecurity(inode, suffix, value,size, flags);
 		if (!error)
 			fsnotify_xattr(dentry);
 	}
@@ -108,25 +134,31 @@ int __vfs_setxattr_noperm(struct dentry *dentry, const char *name,
 }
 
 
-int
-vfs_setxattr(struct dentry *dentry, const char *name, const void *value,
+int vfs_setxattr(struct dentry *dentry, const char *name, const void *value,
 		size_t size, int flags)
 {
 	struct inode *inode = dentry->d_inode;
 	int error;
 
+	//检查扩展属性是否有写权限
 	error = xattr_permission(inode, name, MAY_WRITE);
 	if (error)
 		return error;
 
+    //将文件的inode锁定,要对inode进行修改
 	mutex_lock(&inode->i_mutex);
+
+	//和selinux有关的回调函数
 	error = security_inode_setxattr(dentry, name, value, size, flags);
 	if (error)
 		goto out;
 
+	//当前进程能够修改文件的扩展属性,此函数内部不会做权限检查
 	error = __vfs_setxattr_noperm(dentry, name, value, size, flags);
 
 out:
+
+	//将文件的inode解锁
 	mutex_unlock(&inode->i_mutex);
 	return error;
 }
@@ -246,52 +278,78 @@ EXPORT_SYMBOL_GPL(vfs_removexattr);
 /*
  * Extended attribute SET operations
  */
-static long
-setxattr(struct dentry *d, const char __user *name, const void __user *value,
-	 size_t size, int flags)
+//扩展属性 设置操作 
+static long  setxattr(struct dentry *d, 
+                        const char __user *name, const void __user *value,
+	                    size_t size, int flags)
 {
 	int error;
 	void *kvalue = NULL;
 	char kname[XATTR_NAME_MAX + 1];
 
+
+	//falgs设置的参数不正确,只能设置XATTR_CREATE或者XATTR_REPLACE
 	if (flags & ~(XATTR_CREATE|XATTR_REPLACE))
 		return -EINVAL;
 
+	//检查传入的name参数是否空
 	error = strncpy_from_user(kname, name, sizeof(kname));
 	if (error == 0 || error == sizeof(kname))
 		error = -ERANGE;
+	
 	if (error < 0)
 		return error;
 
-	if (size) {
+    //如果value的长不为0
+	if (size) 
+	{
+	     //扩展属性值的最大长度
 		if (size > XATTR_SIZE_MAX)
 			return -E2BIG;
+
+		//将用户层传递过来的value复制到内核层
 		kvalue = memdup_user(value, size);
+
+		//复制错误
 		if (IS_ERR(kvalue))
 			return PTR_ERR(kvalue);
 	}
 
 	error = vfs_setxattr(d, kname, kvalue, size, flags);
+
 	kfree(kvalue);
 	return error;
 }
 
+
 SYSCALL_DEFINE5(setxattr, const char __user *, pathname,
-		const char __user *, name, const void __user *, value,
-		size_t, size, int, flags)
+		            const char __user *, name, 
+		            const void __user *, value,
+		            size_t, size, 
+		            int, flags)
 {
 	struct path path;
 	int error;
 
+	//根据用户层提供的文件名获得内核path结构
 	error = user_path(pathname, &path);
 	if (error)
 		return error;
+
+	//获得mnt的写权限
 	error = mnt_want_write(path.mnt);
-	if (!error) {
+	if (!error) 
+	{
+	    //获得成功 ,设置扩展属性
 		error = setxattr(path.dentry, name, value, size, flags);
+
+		//将mnt写的引用计数减一
 		mnt_drop_write(path.mnt);
 	}
+	
 	path_put(&path);
+
+
 	return error;
 }
 
@@ -598,7 +656,9 @@ xattr_resolve_name(struct xattr_handler **handlers, const char **name)
 	if (!*name)
 		return NULL;
 
-	for_each_xattr_handler(handlers, handler) {
+	// 表中 ext4_xattr_handlers 根据命名空间前缀来得到 扩展属性操作结构体
+	for_each_xattr_handler(handlers, handler) 
+   {
 		const char *n = strcmp_prefix(*name, handler->prefix);
 		if (n) {
 			*name = n;
@@ -655,17 +715,20 @@ generic_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
 /*
  * Find the handler for the prefix and dispatch its set() operation.
  */
-int
-generic_setxattr(struct dentry *dentry, const char *name, const void *value, size_t size, int flags)
+int generic_setxattr(struct dentry *dentry, const char *name, const void *value, size_t size, int flags)
 {
 	struct xattr_handler *handler;
 	struct inode *inode = dentry->d_inode;
 
 	if (size == 0)
 		value = "";  /* empty EA, do not remove */
+
+	/* 查找 ext4_xattr_handlers 指定命名空间中扩展属性的处理函数 */
 	handler = xattr_resolve_name(inode->i_sb->s_xattr, &name);
 	if (!handler)
 		return -EOPNOTSUPP;
+
+	//在表   中的某一个
 	return handler->set(inode, name, value, size, flags);
 }
 

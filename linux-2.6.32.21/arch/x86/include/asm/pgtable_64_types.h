@@ -24,25 +24,25 @@ typedef struct { pteval_t pte; } pte_t;
  * PGDIR_SHIFT determines what a top-level page table entry can map
  */
 #define PGDIR_SHIFT	39
-#define PTRS_PER_PGD	512
+#define PTRS_PER_PGD	512  //PGD表项的个数  一共2^9个 即PGD在线性表中占9位  一共有512个数组元素每个元素是个unsigned long类型
 
 /*
  * 3rd level page
  */
 #define PUD_SHIFT	30
-#define PTRS_PER_PUD	512
+#define PTRS_PER_PUD	512 //PUD表项的个数  一共2^9个 即PGD在线性表中占9位  一共有512个数组元素每个元素是个unsigned long类型
 
 /*
  * PMD_SHIFT determines the size of the area a middle-level
  * page table can map
  */
 #define PMD_SHIFT	21
-#define PTRS_PER_PMD	512
+#define PTRS_PER_PMD	512 //PMD表项的个数  一共2^9个 即PGD在线性表中占9位  一共有512个数组元素每个元素是个unsigned long类型
 
 /*
  * entries per page directory level
- */
-#define PTRS_PER_PTE	512
+ */ 
+#define PTRS_PER_PTE	512 //PTE表项的个数  一共2^9个 即PGD在线性表中占9位  一共有512个数组元素每个元素是个unsigned long类型
 
 #define PMD_SIZE	(_AC(1, UL) << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE - 1))

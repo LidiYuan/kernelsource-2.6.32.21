@@ -152,7 +152,7 @@ void unpin_inotify_watch(struct inotify_watch *watch)
  * Callers must hold ih->mutex.  This function can sleep.
  */
 static int inotify_handle_get_wd(struct inotify_handle *ih,
-				 struct inotify_watch *watch)
+				                       struct inotify_watch *watch)
 {
 	int ret;
 

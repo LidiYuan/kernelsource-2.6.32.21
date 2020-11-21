@@ -264,7 +264,8 @@ static handle_t *new_handle(int nblocks)
 	return handle;
 }
 
-/**
+
+/**  0635-7235555 
  * handle_t *jbd2_journal_start() - Obtain a new handle.
  * @journal: Journal to start transaction on.
  * @nblocks: number of block buffer we might modify
@@ -278,28 +279,38 @@ static handle_t *new_handle(int nblocks)
  *
  * Return a pointer to a newly allocated handle, or NULL on failure
  */
+// 取得一个原子操作描述符handle_t,如果当前进程已经有一个，则直接返回，否则，需要新创建一个
+ //来实现这个日志记录的功能的
 handle_t *jbd2_journal_start(journal_t *journal, int nblocks)
 {
+    //从当前运行的进程中取得日志句柄
 	handle_t *handle = journal_current_handle();
 	int err;
 
+
+     // 如果日志的指针是空，那么就直接返回 
 	if (!journal)
 		return ERR_PTR(-EROFS);
 
-	if (handle) {
+   //// 如果当前提交的事务已经在当前的日志上了，就把事务的引用加1，表示再提交一次了。
+	if (handle) 
+	{
 		J_ASSERT(handle->h_transaction->t_journal == journal);
 		handle->h_ref++;
 		return handle;
 	}
 
+    // 如果当前进程没有日志事务句柄，那么我创建一个。
 	handle = new_handle(nblocks);
 	if (!handle)
 		return ERR_PTR(-ENOMEM);
 
 	current->journal_info = handle;
 
+   // 开始提交事务。
 	err = start_this_handle(journal, handle);
-	if (err < 0) {
+	if (err < 0) 
+	{
 		jbd2_free_handle(handle);
 		current->journal_info = NULL;
 		handle = ERR_PTR(err);
@@ -1233,7 +1244,9 @@ drop:
  */
 int jbd2_journal_stop(handle_t *handle)
 {
+    //获得当前事务
 	transaction_t *transaction = handle->h_transaction;
+    
 	journal_t *journal = transaction->t_journal;
 	int err;
 	pid_t pid;
@@ -1283,7 +1296,8 @@ int jbd2_journal_stop(handle_t *handle)
 	 * writes.  No point in waiting for joiners in that case.
 	 */
 	pid = current->pid;
-	if (handle->h_sync && journal->j_last_sync_writer != pid) {
+	if (handle->h_sync && journal->j_last_sync_writer != pid) 
+	{
 		u64 commit_time, trans_time;
 
 		journal->j_last_sync_writer = pid;
@@ -1349,7 +1363,9 @@ int jbd2_journal_stop(handle_t *handle)
 		 */
 		if (handle->h_sync && !(current->flags & PF_MEMALLOC))
 			err = jbd2_log_wait_commit(journal, tid);
-	} else {
+	}
+	else 
+	{
 		spin_unlock(&transaction->t_handle_lock);
 		spin_unlock(&journal->j_state_lock);
 	}
@@ -1357,6 +1373,7 @@ int jbd2_journal_stop(handle_t *handle)
 	lock_map_release(&handle->h_lockdep_map);
 
 	jbd2_free_handle(handle);
+
 	return err;
 }
 

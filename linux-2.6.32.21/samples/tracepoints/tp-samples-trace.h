@@ -4,10 +4,6 @@
 #include <linux/proc_fs.h>	/* for struct inode and struct file */
 #include <linux/tracepoint.h>
 
-DECLARE_TRACE(subsys_event,
-	TP_PROTO(struct inode *inode, struct file *file),
-	TP_ARGS(inode, file));
-DECLARE_TRACE(subsys_eventb,
-	TP_PROTO(void),
-	TP_ARGS());
+DECLARE_TRACE(subsys_event,TP_PROTO(struct inode *inode, struct file *file),TP_ARGS(inode, file));
+DECLARE_TRACE(subsys_eventb,TP_PROTO(void),TP_ARGS());
 #endif

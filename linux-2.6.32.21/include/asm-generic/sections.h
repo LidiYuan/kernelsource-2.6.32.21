@@ -4,6 +4,7 @@
 /* References to section boundaries */
 
 extern char _text[], _stext[], _etext[];
+
 extern char _data[], _sdata[], _edata[];
 extern char __bss_start[], __bss_stop[];
 extern char __init_begin[], __init_end[];

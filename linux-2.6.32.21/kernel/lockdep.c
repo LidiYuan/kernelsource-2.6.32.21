@@ -537,7 +537,9 @@ static void lockdep_print_held_locks(struct task_struct *curr)
 {
 	int i, depth = curr->lockdep_depth;
 
-	if (!depth) {
+    //锁的深度
+	if (!depth) 
+	{
 		printk("no locks held by %s/%d.\n", curr->comm, task_pid_nr(curr));
 		return;
 	}
@@ -2364,7 +2366,8 @@ void trace_hardirqs_off_caller(unsigned long ip)
 	if (DEBUG_LOCKS_WARN_ON(!irqs_disabled()))
 		return;
 
-	if (curr->hardirqs_enabled) {
+	if (curr->hardirqs_enabled) 
+	{
 		/*
 		 * We have done an ON -> OFF transition:
 		 */
@@ -3789,14 +3792,14 @@ void lockdep_sys_exit(void)
 {
 	struct task_struct *curr = current;
 
-	if (unlikely(curr->lockdep_depth)) {
+	if (unlikely(curr->lockdep_depth)) 
+	{
 		if (!debug_locks_off())
 			return;
 		printk("\n================================================\n");
 		printk(  "[ BUG: lock held when returning to user space! ]\n");
 		printk(  "------------------------------------------------\n");
-		printk("%s/%d is leaving the kernel with locks still held!\n",
-				curr->comm, curr->pid);
+		printk("%s/%d is leaving the kernel with locks still held!\n",curr->comm, curr->pid);
 		lockdep_print_held_locks(curr);
 	}
 }

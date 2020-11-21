@@ -578,9 +578,9 @@ static int __init ip_queue_init(void)
 	struct proc_dir_entry *proc __maybe_unused;
 
 	netlink_register_notifier(&ipq_nl_notifier);
-	ipqnl = netlink_kernel_create(&init_net, NETLINK_FIREWALL, 0,
-				      ipq_rcv_skb, NULL, THIS_MODULE);
-	if (ipqnl == NULL) {
+	ipqnl = netlink_kernel_create(&init_net, NETLINK_FIREWALL, 0,ipq_rcv_skb, NULL, THIS_MODULE);
+	if (ipqnl == NULL) 
+	{
 		printk(KERN_ERR "ip_queue: failed to create netlink socket\n");
 		goto cleanup_netlink_notifier;
 	}

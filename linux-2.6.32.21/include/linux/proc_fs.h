@@ -277,7 +277,8 @@ union proc_op {
 struct ctl_table_header;
 struct ctl_table;
 
-struct proc_inode {
+struct proc_inode 
+{
 	struct pid *pid;
 	int fd;
 	union proc_op op;

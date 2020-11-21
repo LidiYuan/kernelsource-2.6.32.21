@@ -332,8 +332,9 @@ struct mm_struct {
 		          env_start,//环境变量起始地址 
 		          env_end;//环境变量结束地址
 
-	unsigned long saved_auxv[AT_VECTOR_SIZE]; /* for /proc/PID/auxv */
-
+    //辅助向量
+	unsigned long saved_auxv[AT_VECTOR_SIZE];  /*  proc_pid_auxv  for /proc/PID/auxv */
+    \
 	struct linux_binfmt *binfmt;
 
 	cpumask_t cpu_vm_mask;

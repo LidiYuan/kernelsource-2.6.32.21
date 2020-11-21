@@ -2345,26 +2345,32 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i, int *len)
 	__u16 destp = ntohs(inet->dport);
 	__u16 srcp = ntohs(inet->sport);
 
-	if (icsk->icsk_pending == ICSK_TIME_RETRANS) {
+       //决策定时器类型
+	if (icsk->icsk_pending == ICSK_TIME_RETRANS) 
+	{
 		timer_active	= 1;
 		timer_expires	= icsk->icsk_timeout;
-	} else if (icsk->icsk_pending == ICSK_TIME_PROBE0) {
+	} 
+	else if (icsk->icsk_pending == ICSK_TIME_PROBE0) 
+	{
 		timer_active	= 4;
 		timer_expires	= icsk->icsk_timeout;
-	} else if (timer_pending(&sk->sk_timer)) {
+	} 
+	else if (timer_pending(&sk->sk_timer)) 
+	{
 		timer_active	= 2;
 		timer_expires	= sk->sk_timer.expires;
-	} else {
+	} 
+	else 
+	{
 		timer_active	= 0;
 		timer_expires = jiffies;
 	}
     
-	seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX "
-			"%08X %5d %8d %lu %d %p %lu %lu %u %u %d%n",
+	seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p %lu %lu %u %u %d%n",
 		i, src, srcp, dest, destp, sk->sk_state,
 		tp->write_seq - tp->snd_una,
-		sk->sk_state == TCP_LISTEN ? sk->sk_ack_backlog :
-					     (tp->rcv_nxt - tp->copied_seq),
+		sk->sk_state == TCP_LISTEN ? sk->sk_ack_backlog :(tp->rcv_nxt - tp->copied_seq),
 		timer_active,
 		jiffies_to_clock_t(timer_expires - jiffies),
 		icsk->icsk_retransmits,
@@ -2380,8 +2386,7 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i, int *len)
 		len);
 }
 
-static void get_timewait4_sock(struct inet_timewait_sock *tw,
-			       struct seq_file *f, int i, int *len)
+static void get_timewait4_sock(struct inet_timewait_sock *tw, struct seq_file *f, int i, int *len)
 {
 	__be32 dest, src;
 	__u16 destp, srcp;
@@ -2409,7 +2414,8 @@ static int tcp4_seq_show(struct seq_file *seq, void *v)
 	struct tcp_iter_state *st;
 	int len;
 
-	if (v == SEQ_START_TOKEN) {
+	if (v == SEQ_START_TOKEN) 
+	{
 		seq_printf(seq, "%-*s\n", TMPSZ - 1,
 			   "  sl  local_address rem_address   st tx_queue "
 			   "rx_queue tr tm->when retrnsmt   uid  timeout "
@@ -2418,7 +2424,8 @@ static int tcp4_seq_show(struct seq_file *seq, void *v)
 	}
 	st = seq->private;
 
-	switch (st->state) {
+	switch (st->state) 
+	{
 	case TCP_SEQ_STATE_LISTENING:
 	case TCP_SEQ_STATE_ESTABLISHED:
 		get_tcp4_sock(v, seq, st->num, &len);

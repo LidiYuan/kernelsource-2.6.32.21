@@ -1214,9 +1214,12 @@ void mark_free_pages(struct zone *zone)
 /*
  * Free a 0-order page  释放单个页面
  */
+ //热页冷页的意思就是：当一个页被释放时，默认设置为热页，因为该页可能有些地址的数据还处于映射到CPUcache的情况，当该CPU上有进程申请单个页框时，优先把这些热页分配出去，这样能提高cache命中率，提高效率。而实现方法也很简单，如果是热页，则把它加入到CPU页框高速缓存链表的链表头，如果是冷页，则加入到链表尾
 static void free_hot_cold_page(struct page *page, int cold)
 {
-	struct zone *zone = page_zone(page);
+    ///* 页框所处管理区 */
+	struct zone *zone = page_zone(page)
+	;
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 	int migratetype;
@@ -1257,7 +1260,9 @@ static void free_hot_cold_page(struct page *page, int cold)
 	 * areas back if necessary. Otherwise, we may have to free
 	 * excessively into the page allocator
 	 */
-	if (migratetype >= MIGRATE_PCPTYPES) {
+	if (migratetype >= MIGRATE_PCPTYPES) 
+	{
+		/* 如果不是高速缓存类型，则放回伙伴系统 */
 		if (unlikely(migratetype == MIGRATE_ISOLATE)) {
 			free_one_page(zone, page, 0, migratetype);
 			goto out;
@@ -1288,6 +1293,7 @@ out:
 void free_hot_page(struct page *page)
 {
 	trace_mm_page_free_direct(page, 0);
+	//热页冷页的意思就是：当一个页被释放时，默认设置为热页，因为该页可能有些地址的数据还处于映射到CPUcache的情况，当该CPU上有进程申请单个页框时，优先把这些热页分配出去，这样能提高cache命中率，提高效率。而实现方法也很简单，如果是热页，则把它加入到CPU页框高速缓存链表的链表头，如果是冷页，则加入到链表尾
 	free_hot_cold_page(page, 0);
 }
 	
@@ -2239,12 +2245,15 @@ void __pagevec_free(struct pagevec *pvec)
 	}
 }
 
+
+/* 释放页框 */
 void __free_pages(struct page *page, unsigned int order)
 {
-    //页的引用计数是否为0
+    /* 检查页框是否还有进程在使用，就是检查_count变量的值是否为0 */
 	if (put_page_testzero(page)) 
 	{
 		trace_mm_page_free_direct(page, order);
+		/* 如果是1个页框，则放回每CPU高速缓存中，如果是多个页框，则放回伙伴系统，放回CPU高速缓存中优先把其设置为热页，而不是冷页 */
 		if (order == 0)//是否为单页
 			free_hot_page(page);//将单页至于per-cpu高速缓存中 
 		else 

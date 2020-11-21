@@ -287,18 +287,26 @@ out:
 	return res;
 }
 
+//用于处理/proc/pid/auxv 辅助向量
 static int proc_pid_auxv(struct task_struct *task, char *buffer)
 {
 	int res = 0;
 	struct mm_struct *mm = get_task_mm(task);
-	if (mm) {
+	if (mm) 
+	{
 		unsigned int nwords = 0;
+
+		//读出元素的个数
 		do {
 			nwords += 2;
 		} while (mm->saved_auxv[nwords - 2] != 0); /* AT_NULL */
+
 		res = nwords * sizeof(mm->saved_auxv[0]);
+
 		if (res > PAGE_SIZE)
 			res = PAGE_SIZE;
+
+		//将其拷贝到用户空间
 		memcpy(buffer, mm->saved_auxv, res);
 		mmput(mm);
 	}

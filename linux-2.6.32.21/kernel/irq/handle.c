@@ -189,6 +189,7 @@ int __init early_irq_init(void)
 	return arch_early_irq_init();
 }
 
+//通过IRQ number获取对应的中断描述符
 struct irq_desc *irq_to_desc(unsigned int irq)
 {
 	if (irq_desc_ptrs && irq < nr_irqs)
@@ -274,6 +275,7 @@ int __init early_irq_init(void)
 	return arch_early_irq_init();
 }
 
+//通过IRQ number获取对应的中断描述符
 struct irq_desc *irq_to_desc(unsigned int irq)
 {
 	return (irq < NR_IRQS) ? irq_desc + irq : NULL;
@@ -561,6 +563,7 @@ void early_init_irq_lock_class(void)
 unsigned int kstat_irqs_cpu(unsigned int irq, int cpu)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
+	
 	return desc ? desc->kstat_irqs[cpu] : 0;
 }
 EXPORT_SYMBOL(kstat_irqs_cpu);

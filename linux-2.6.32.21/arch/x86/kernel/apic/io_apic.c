@@ -1344,26 +1344,26 @@ static void ioapic_register_intr(int irq, struct irq_desc *desc, unsigned long t
 	else
 		desc->status &= ~IRQ_LEVEL;
 
-	if (irq_remapped(irq)) {
+	if (irq_remapped(irq)) 
+	{
 		desc->status |= IRQ_MOVE_PCNTXT;
 		if (trigger)
-			set_irq_chip_and_handler_name(irq, &ir_ioapic_chip,
-						      handle_fasteoi_irq,
-						     "fasteoi");
+			set_irq_chip_and_handler_name(irq, &ir_ioapic_chip,handle_fasteoi_irq,"fasteoi");
 		else
-			set_irq_chip_and_handler_name(irq, &ir_ioapic_chip,
-						      handle_edge_irq, "edge");
+			set_irq_chip_and_handler_name(irq, &ir_ioapic_chip,handle_edge_irq, "edge");
 		return;
 	}
 
-	if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
-	    trigger == IOAPIC_LEVEL)
-		set_irq_chip_and_handler_name(irq, &ioapic_chip,
-					      handle_fasteoi_irq,
-					      "fasteoi");
+	if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) || trigger == IOAPIC_LEVEL)
+		set_irq_chip_and_handler_name(irq, 
+		                              &ioapic_chip,
+					                  handle_fasteoi_irq,
+					                  "fasteoi");
 	else
-		set_irq_chip_and_handler_name(irq, &ioapic_chip,
-					      handle_edge_irq, "edge");
+		set_irq_chip_and_handler_name(irq, 
+		                              &ioapic_chip,
+					                  handle_edge_irq, 
+					                  "edge");
 }
 
 int setup_ioapic_entry(int apic_id, int irq,
@@ -2753,6 +2753,7 @@ static void ack_lapic_irq(unsigned int irq)
 	ack_APIC_irq();
 }
 
+static struct irq_chip lapic_chip={0};//self
 static struct irq_chip lapic_chip __read_mostly = {
 	.name		= "local-APIC",
 	.mask		= mask_lapic_irq,
@@ -3588,8 +3589,7 @@ int arch_setup_dmar_msi(unsigned int irq)
 	if (ret < 0)
 		return ret;
 	dmar_msi_write(irq, &msg);
-	set_irq_chip_and_handler_name(irq, &dmar_msi_type, handle_edge_irq,
-		"edge");
+	set_irq_chip_and_handler_name(irq, &dmar_msi_type, handle_edge_irq,"edge");
 	return 0;
 }
 #endif
@@ -3740,8 +3740,7 @@ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
 
 		write_ht_irq_msg(irq, &msg);
 
-		set_irq_chip_and_handler_name(irq, &ht_irq_chip,
-					      handle_edge_irq, "edge");
+		set_irq_chip_and_handler_name(irq, &ht_irq_chip,handle_edge_irq, "edge");
 
 		dev_printk(KERN_DEBUG, &dev->dev, "irq %d for HT\n", irq);
 	}
@@ -3755,7 +3754,7 @@ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
  * on the specified blade to allow the sending of MSIs to the specified CPU.
  */
 int arch_enable_uv_irq(char *irq_name, unsigned int irq, int cpu, int mmr_blade,
-		       unsigned long mmr_offset)
+		                    unsigned long mmr_offset)
 {
 	const struct cpumask *eligible_cpu = cpumask_of(cpu);
 	struct irq_cfg *cfg;
@@ -3774,8 +3773,7 @@ int arch_enable_uv_irq(char *irq_name, unsigned int irq, int cpu, int mmr_blade,
 		return err;
 
 	spin_lock_irqsave(&vector_lock, flags);
-	set_irq_chip_and_handler_name(irq, &uv_irq_chip, handle_percpu_irq,
-				      irq_name);
+	set_irq_chip_and_handler_name(irq, &uv_irq_chip, handle_percpu_irq,irq_name);
 	spin_unlock_irqrestore(&vector_lock, flags);
 
 	mmr_value = 0;

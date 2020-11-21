@@ -108,18 +108,23 @@ struct msi_desc;
  * @release:		release function solely used by UML
  * @typename:		obsoleted by name, kept as migration helper
  */
- //中断控制器描述
+ //Linux中描述中断控制器的数据结构
+ /*
+因为不同芯片的中断控制器对其挂接的IRQ有不同的控制方法，因而这个结构体主要是由一组用于回调(callback)，指向系统实际的中断控制器所使用的控制方法的函数指针构成
+*/
 struct irq_chip {
-	const char	*name;
+	const char	*name; //在/proc/interrupts下的名字,是中断控制器的名称,如IO-APIC
 	unsigned int	(*startup)(unsigned int irq);
 	void		(*shutdown)(unsigned int irq);
-	void		(*enable)(unsigned int irq);
-	void		(*disable)(unsigned int irq);
+
+	void		(*enable)(unsigned int irq);//用于中断使能,在中断注册或使能时调用，一般在使能中断前需要清除中断状态
+	
+	void		(*disable)(unsigned int irq);//用于中断屏蔽,在中断注销或关闭时调用，一般在关闭中断前不清除中断状态
 
 	void		(*ack)(unsigned int irq);
 	void		(*mask)(unsigned int irq);
-	void		(*mask_ack)(unsigned int irq);
-	void		(*unmask)(unsigned int irq);
+	void		(*mask_ack)(unsigned int irq);//在进入中断处理函数前调用，一般在屏蔽中断前需要清除中断源信号
+	void		(*unmask)(unsigned int irq);//在退出中断处理函数后调用，一般在去屏蔽中断前不清除清除中断源信号
 	void		(*eoi)(unsigned int irq);
 
 	void		(*end)(unsigned int irq);
@@ -152,7 +157,7 @@ struct irq_2_iommu;
  * @kstat_irqs:		irq stats per cpu
  * @irq_2_iommu:	iommu with this irq
  * @handle_irq:		highlevel irq-events handler [if NULL, __do_IRQ()]
- * @chip:		low level interrupt hardware access
+ * @chip:		    low level interrupt hardware access
  * @msi_desc:		MSI descriptor
  * @handler_data:	per-IRQ data for the irq_chip methods
  * @chip_data:		platform-specific per-chip private data for the chip
@@ -164,7 +169,7 @@ struct irq_2_iommu;
  * @irq_count:		stats field to detect stalled irqs
  * @last_unhandled:	aging timer for unhandled count
  * @irqs_unhandled:	stats field for spurious unhandled interrupts
- * @lock:		locking for SMP
+ * @lock:		    locking for SMP
  * @affinity:		IRQ affinity on SMP
  * @node:		node index useful for balancing
  * @pending_mask:	pending rebalanced interrupts
@@ -173,22 +178,25 @@ struct irq_2_iommu;
  * @dir:		/proc/irq/ procfs entry
  * @name:		flow handler name for /proc/interrupts output
  */
+ 
+ /* 对于每一个外设的IRQ都用struct irq_desc来描述,中断描述符*/
 struct irq_desc {
 	unsigned int		irq;
 	struct timer_rand_state *timer_rand_state;
-	unsigned int            *kstat_irqs;
+	unsigned int            *kstat_irqs;//每个cpu的 irq status
+	
 #ifdef CONFIG_INTR_REMAP
 	struct irq_2_iommu      *irq_2_iommu;
 #endif
 	irq_flow_handler_t	handle_irq;/* handle_level_irq 当前中断的处理函数入口 */
-	struct irq_chip		*chip; /*irq_set_chip设置此值 低层的硬件访问 包含了这个中断的清除、屏蔽或者使能等底层函数 比如8259a的禁止 允许 查找名字XT-PIC*/
+	struct irq_chip		*chip; /*  irq_set_chip设置此值 低层的硬件访问 包含了这个中断的清除、屏蔽或者使能等底层函数 比如8259a的禁止 允许 查找名字XT-PIC*/
 	struct msi_desc		*msi_desc;
-	void			*handler_data;
-	void			*chip_data;//irq_set_chip_data设置此数据
+	void			    *handler_data;
+	void			    *chip_data;//irq_set_chip_data设置此数据
 	struct irqaction	*action;	/* IRQ action list *//* 用户提供的中断处理函数链表 记录了用户注册的中断处理函数、中断标志等等内容*/
 	unsigned int		status;		/* IRQ status *//* IRQ状态 irq_set_type设置*/
 
-	unsigned int		depth;		/* nested irq disables */
+	unsigned int		depth;		/* nested irq disables 中断嵌套深度*/
 	unsigned int		wake_depth;	/* nested wake enables */
 	unsigned int		irq_count;	/* For detecting broken IRQs */
 	unsigned long		last_unhandled;	/* Aging timer for unhandled count */
@@ -220,8 +228,34 @@ linux内核将所有的中断统一编号，使用一个irq_desc[NR_IRQS]的结构体数组来描述这些中
 （中断清除、屏蔽、使能）。另外，通过这个结构体数组项成员action，能够找到用户注册的中断处理函数
 */
 #ifndef CONFIG_SPARSE_IRQ
+//保存了关于所有IRQ的中断描述符信息
 extern struct irq_desc irq_desc[NR_IRQS];//
 #endif
+/*
+
+----------------------------------------------------------           
+|  中断号0 |     中断号1 | 中断号2 | ... | 中断号NR_IRQS-1  |
+----------------------------------------------------------
+     | 
+     |
+	 |__________>struct irq_desc
+	            -------------	
+                |           |   
+                |handle_irq |------------------------------------------>此中断号的入口函数
+                |           |                                                 |
+                |chip       |------------->函数集,中断的底层硬件访问函数                    |
+                |           |                                                 |
+                |action     | <-----------------------------------------------| 
+                |           |  | 
+                               |
+                               |_______________>struct irqaction             struct irqaction  
+                                                ----------------------       ----------------------
+                                                |  用户的中断处理函数|  ---->         |  用户的中断处理函数| ---------->
+                                                |                    |       |                    |
+                                                |____________________|       |____________________|
+*/ 
+
+
 
 #ifdef CONFIG_NUMA_IRQ_DESC
 extern struct irq_desc *move_irq_desc(struct irq_desc *old_desc, int node);
@@ -291,12 +325,26 @@ extern irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action);
  * Built-in IRQ handlers for various IRQ types,
  * callable via desc->chip->handle_irq()
  */
+ //用于电平触发中断的流控处理
 extern void handle_level_irq(unsigned int irq, struct irq_desc *desc);
+
+
+//用于需要响应eoi的中断控制器
 extern void handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc);
+
+//用于边沿触发中断的流控处理
 extern void handle_edge_irq(unsigned int irq, struct irq_desc *desc);
+
+
 extern void handle_simple_irq(unsigned int irq, struct irq_desc *desc);
+
+
+//用于只在单一cpu响应的中断
 extern void handle_percpu_irq(unsigned int irq, struct irq_desc *desc);
+
 extern void handle_bad_irq(unsigned int irq, struct irq_desc *desc);
+
+//用于处理使用线程的嵌套中断；
 extern void handle_nested_irq(unsigned int irq);
 
 /*

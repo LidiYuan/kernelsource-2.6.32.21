@@ -256,7 +256,7 @@ struct tracer_flags {
  */
 struct tracer {
 	const char		*name;
-	int			(*init)(struct trace_array *tr);
+	int			    (*init)(struct trace_array *tr);
 	void			(*reset)(struct trace_array *tr);
 	void			(*start)(struct trace_array *tr);
 	void			(*stop)(struct trace_array *tr);

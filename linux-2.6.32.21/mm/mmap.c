@@ -269,6 +269,8 @@ asmlinkage long sys_brk(unsigned long brk)
 #else
 	min_brk = mm->start_brk;
 #endif
+
+    //代码非法访问
 	if (brk < min_brk)
 		goto out;
 
@@ -304,7 +306,7 @@ asmlinkage long sys_brk(unsigned long brk)
 	if (find_vma_intersection(mm, oldbrk, newbrk+PAGE_SIZE))
 		goto out;
 
-	/* Ok, looks good - let it rip. */
+	/* Ok, looks good - let it rip. 进行伸长操作*/
 	if (do_brk(oldbrk, newbrk-oldbrk) != oldbrk)
 		goto out;
 set_brk:

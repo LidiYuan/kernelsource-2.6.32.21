@@ -60,22 +60,29 @@ struct arch_specific_insn {
 struct kprobe;
 struct pt_regs;
 struct kretprobe;
+
+//被探测函数的返回地址保存在类型为 kretprobe_instance的变量中
 struct kretprobe_instance;
-typedef int (*kprobe_pre_handler_t) (struct kprobe *, struct pt_regs *);
+
+typedef int (*kprobe_pre_handler_t) (struct kprobe *,  //是注册的struct kprobe探测实例
+	                                      struct pt_regs *);//保存的触发断点前的寄存器状态
+
 typedef int (*kprobe_break_handler_t) (struct kprobe *, struct pt_regs *);
-typedef void (*kprobe_post_handler_t) (struct kprobe *, struct pt_regs *,
-				       unsigned long flags);
+typedef void (*kprobe_post_handler_t) (struct kprobe *, 
+	                                         struct pt_regs *,
+				                             unsigned long flags);
 typedef int (*kprobe_fault_handler_t) (struct kprobe *, struct pt_regs *,
 				       int trapnr);
-typedef int (*kretprobe_handler_t) (struct kretprobe_instance *,
-				    struct pt_regs *);
+typedef int (*kretprobe_handler_t) ( struct kretprobe_instance *,
+				                           struct pt_regs *);
 
-struct kprobe {
-	
-	 /*用于保存kprobe的全局hash表，以被探测的addr为key*/
+struct kprobe 
+{	
+	/*用于保存kprobe的全局hash表，以被探测的addr为key*/
 	struct hlist_node hlist;
 
     /*当对同一个探测点存在多个探测函数时，所有的函数挂在这条链上*/
+	//用于链接同一被探测点的不同探测kprobe
 	/* list of kprobes for multi-handler support */
 	struct list_head list;
 
@@ -96,7 +103,7 @@ struct kprobe {
 
      /*探测函数，在目标探测点执行之前调用*/
 	/* Called before addr is executed. */
-	kprobe_pre_handler_t pre_handler;
+	kprobe_pre_handler_t pre_handler;// pre_handler_kretprobe
 
      /*探测函数，在目标探测点执行之后调用*/
 	/* Called after addr is executed, unless... */
@@ -178,33 +185,48 @@ struct jprobe {
  *
  */
 struct kretprobe {
-	struct kprobe kp;
-	kretprobe_handler_t handler;
-	kretprobe_handler_t entry_handler;
-	int maxactive;
-	int nmissed;
-	size_t data_size;
-	struct hlist_head free_instances;
+	struct kprobe kp; //该成员是kretprobe内嵌的struct kprobe结构
+	kretprobe_handler_t handler;//该成员是调试者定义的回调函数,handler在被探测函数返回后被调用
+	kretprobe_handler_t entry_handler;//entry_handler会在被探测函数执行之前被调用
+
+             /*******************
+               maxactive表示同时支持并行探测的上限，因为kretprobe会跟踪一个函数从开始到结束，因此对于一些调用比较频繁的被探测函数，在探测的时间段内重入的概率比较高，这个maxactive字段值表示在重入情况发生时，
+               支持同时检测的进程数（执行流数）的上限，若并行触发的数量超过了这个上限，
+               则kretprobe不会进行跟踪探测，仅仅增加nmissed字段的值以作提示
+	        ****************************/
+	int maxactive;//指定了被探测函数可以被同时探测的实例数
+	
+	int nmissed;//missed字段将记录被丢失 的探测点执行数
+	size_t data_size;//表示kretprobe私有数据的大小,在注册kretprobe时会根据该大小预留空间
+	struct hlist_head free_instances;//用于链接未使用的返回地址实例，在注册时初始化,空闲的kretprobe运行实例链表,空闲实例struct kretprobe_instance结构体表示
 	spinlock_t lock;
 };
 
+//该结构表示一个返回地址实例
+/*
+因为函数每次被调用的地方不同，这造成了返回地址不同，因此需要为每一次发生的调用记录在这样一个结构里面
+*/
+/********
+这个结构体表示kretprobe的运行实例，前文说过被探测函数在跟踪期间可能存在并发执行的现象，因此kretprobe使用一个kretprobe_instance来跟踪一个执行流，支持的上限为maxactive
+在没有触发探测时，所有的kretprobe_instance实例都保存在free_instances表中,每当有执行流触发一次kretprobe探测,都会从该表中取出一个空闲的kretprobe_instance实例用来跟踪
+*/
 struct kretprobe_instance {
-	struct hlist_node hlist;
-	struct kretprobe *rp;
-	kprobe_opcode_t *ret_addr;
-	struct task_struct *task;
-	char data[0];
+	struct hlist_node hlist;  //该成员被链接入kretprobe的used_instances或是free_instances链表
+	struct kretprobe *rp;     //该成员指向所属的kretprobe结构
+	kprobe_opcode_t *ret_addr;//该成员用于记录被探测函数正真的返回地址
+	struct task_struct *task; //该成员记录当时运行的进程
+	char data[0];//最后data保存用户使用的kretprobe私有数据,它会在整个kretprobe探测运行期间在entry_handler和handler回调函数之间进行传递
 };
 
 struct kretprobe_blackpoint {
-	const char *name;
-	void *addr;
+	const char *name; //其中name字段表示函数名
+	void *addr;       //addr表示函数的运行地址
 };
 
 struct kprobe_blackpoint {
-	const char *name;
-	unsigned long start_addr;
-	unsigned long range;
+	const char *name;   //符号名 
+	unsigned long start_addr; //符号的起始地址
+	unsigned long range;  //符号的范围
 };
 
 #ifdef CONFIG_KPROBES

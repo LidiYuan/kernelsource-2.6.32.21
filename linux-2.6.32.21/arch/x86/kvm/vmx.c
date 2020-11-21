@@ -1645,9 +1645,7 @@ static void ept_save_pdptrs(struct kvm_vcpu *vcpu)
 
 static void vmx_set_cr4(struct kvm_vcpu *vcpu, unsigned long cr4);
 
-static void ept_update_paging_mode_cr0(unsigned long *hw_cr0,
-					unsigned long cr0,
-					struct kvm_vcpu *vcpu)
+static void ept_update_paging_mode_cr0(unsigned long *hw_cr0,unsigned long cr0,struct kvm_vcpu *vcpu)
 {
 	if (!(cr0 & X86_CR0_PG)) {
 		/* From paging/starting to nonpaging */
@@ -1667,7 +1665,7 @@ static void ept_update_paging_mode_cr0(unsigned long *hw_cr0,
 		vmx_set_cr4(vcpu, vcpu->arch.cr4);
 	}
 
-	if (!(cr0 & X86_CR0_WP))
+	if ( !(cr0 & X86_CR0_WP) )
 		*hw_cr0 &= ~X86_CR0_WP;
 }
 

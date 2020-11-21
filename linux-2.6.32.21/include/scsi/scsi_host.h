@@ -536,7 +536,7 @@ enum scsi_host_state {
 	SHOST_DEL_RECOVERY,
 };
 
-//主机适配器
+//主机适配器SCSI主机适配器
 struct Scsi_Host {
 	/*
 	 * __devices is protected by the host_lock, but you should
@@ -584,7 +584,7 @@ struct Scsi_Host {
 	unsigned int host_failed;	   /* commands that failed. */
 	unsigned int host_eh_scheduled;    /* EH scheduled without command */
     
-	unsigned int host_no;  /* Used for IOCTL_GET_IDLUN, /proc/scsi et al. */
+	unsigned int host_no;  /* 适配器号Used for IOCTL_GET_IDLUN, /proc/scsi et al. */
 	int resetting; /* if set, it means that last_reset is a valid value */
 	unsigned long last_reset;
 
@@ -594,9 +594,9 @@ struct Scsi_Host {
 	 * The first two should be set to 1 more than the actual max id
 	 * or lun (i.e. 8 for normal systems).
 	 */
-	unsigned int max_id;
-	unsigned int max_lun;
-	unsigned int max_channel;
+	unsigned int max_id;       /* 最大的scsi node数量 */
+	unsigned int max_lun;   /* 最大的lun数量 */
+	unsigned int max_channel;  /* 最大的channel数量一个scsi端口适配器可能拥有多个channel，每个channel拥有一条scsi总线 */
 
 	/*
 	 * This is a unique identifier that must be assigned so that we
@@ -722,7 +722,7 @@ struct Scsi_Host {
 	 * and also because some compilers (m68k) don't automatically force
 	 * alignment to a long boundary.
 	 */
-	unsigned long hostdata[0]  /* Used for storage of host specific stuff */
+	unsigned long hostdata[0]  /* Used for storage of host specific stuff 对于U盘指向struct us_data */
 		__attribute__ ((aligned (sizeof(unsigned long))));
 };
 

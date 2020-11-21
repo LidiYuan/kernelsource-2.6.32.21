@@ -221,6 +221,7 @@ int inet_listen(struct socket *sock, int backlog)
 		if (err)
 			goto out;
 	}
+	
 	//设置监听建立连接队列(以完成3次握手)的最大长度
 	sk->sk_max_ack_backlog = backlog;
 	err = 0;

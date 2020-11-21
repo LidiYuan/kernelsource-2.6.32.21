@@ -535,9 +535,10 @@ static inline unsigned int run_filter(struct sk_buff *skb, struct sock *sk,
    sequencially, so that if we return skb to original state on exit,
    we will not harm anyone.
  */
-
-static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
-		      struct packet_type *pt, struct net_device *orig_dev)
+static int packet_rcv(struct sk_buff *skb, 
+                         struct net_device *dev,
+		                 struct packet_type *pt, 
+		                 struct net_device *orig_dev)
 {
 	struct sock *sk;
 	struct sockaddr_ll *sll;
@@ -546,7 +547,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 	int skb_len = skb->len;
 	unsigned int snaplen, res;
 
-	//表示帧的类型，分类是由L2的目的地址来决定的
+	//表示此包是发送到loopback设备
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		goto drop;
 
@@ -558,7 +559,8 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	skb->dev = dev;
 
-	if (dev->header_ops) {
+	if (dev->header_ops) 
+	{
 		/* The device has an explicit notion of ll header,
 		   exported to higher levels.
 
@@ -566,9 +568,12 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 		   structure, so that corresponding packet head
 		   never delivered to user.
 		 */
+		//这个负责区分应用层SOCK_RAW和SOCK_DGRAM 
+		//SOCK_RAW包含L2的数据头，运行此packet_rcv函数时，skb->data指向L3层头，所以如果是SOCK_RAW需要重设skb->data
 		if (sk->sk_type != SOCK_DGRAM)
 			skb_push(skb, skb->data - skb_mac_header(skb));
-		else if (skb->pkt_type == PACKET_OUTGOING) {
+		else if (skb->pkt_type == PACKET_OUTGOING) 
+		{
 			/* Special case: outgoing packets have ll header at head */
 			skb_pull(skb, skb_network_offset(skb));
 		}
@@ -582,16 +587,17 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (snaplen > res)
 		snaplen = res;
 
-	if (atomic_read(&sk->sk_rmem_alloc) + skb->truesize >=
-	    (unsigned)sk->sk_rcvbuf)
+	if (atomic_read(&sk->sk_rmem_alloc) + skb->truesize >= (unsigned)sk->sk_rcvbuf)
 		goto drop_n_acct;
 
-	if (skb_shared(skb)) {
+	if (skb_shared(skb)) 
+	{
 		struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC);
 		if (nskb == NULL)
 			goto drop_n_acct;
 
-		if (skb_head != skb->data) {
+		if (skb_head != skb->data) 
+		{
 			skb->data = skb_head;
 			skb->len = skb_len;
 		}
@@ -599,8 +605,7 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 		skb = nskb;
 	}
 
-	BUILD_BUG_ON(sizeof(*PACKET_SKB_CB(skb)) + MAX_ADDR_LEN - 8 >
-		     sizeof(skb->cb));
+	BUILD_BUG_ON(sizeof(*PACKET_SKB_CB(skb)) + MAX_ADDR_LEN - 8 >sizeof(skb->cb));
 
 	sll = &PACKET_SKB_CB(skb)->sa.ll;
 	sll->sll_family = AF_PACKET;

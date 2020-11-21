@@ -220,10 +220,13 @@ static void ext4_put_nojournal(handle_t *handle)
  * that sync() will call the filesystem's write_super callback if
  * appropriate.
  */
+ //参数nblocks表示这次日志记录可能修改的块的数目
+ //这个函数是对 jbd2_journal_start 的封装
 handle_t *ext4_journal_start_sb(struct super_block *sb, int nblocks)
 {
 	journal_t *journal;
 
+    //* 如果文件系统是只读挂载的话，不支持日志，一般只读挂载都是出错了 */
 	if (sb->s_flags & MS_RDONLY)
 		return ERR_PTR(-EROFS);
 
@@ -231,14 +234,21 @@ handle_t *ext4_journal_start_sb(struct super_block *sb, int nblocks)
 	/* Special case here: if the journal has aborted behind our
 	 * backs (eg. EIO in the commit thread), then we still need to
 	 * take the FS itself readonly cleanly. */
+
+	// /* 获得文件系统的日志句柄*/
 	journal = EXT4_SB(sb)->s_journal;
-	if (journal) {
-		if (is_journal_aborted(journal)) {
+	if (journal) 
+	{  
+	    // 如果日志在其它地方被置为废除了，那就不会那傻劲了，直接返回
+		if (is_journal_aborted(journal)) 
+		{
 			ext4_abort(sb, __func__, "Detected aborted journal");
 			return ERR_PTR(-EROFS);
 		}
+		// 如果日志正常，那么就开记录日志了。这个函数是真正的日志开始记录的函数
 		return jbd2_journal_start(journal, nblocks);
 	}
+	// 如果系统没有日志为之服务，那就把当前进程的日志指针置为空
 	return ext4_get_nojournal();
 }
 
@@ -309,6 +319,7 @@ void ext4_journal_abort_handle(const char *caller, const char *err_fn,
 
 static void ext4_handle_error(struct super_block *sb)
 {
+    /* 首先从超级块结构体获得磁盘上存储的ext4超级块结构体 */
 	struct ext4_super_block *es = EXT4_SB(sb)->s_es;
 
 	EXT4_SB(sb)->s_mount_state |= EXT4_ERROR_FS;
@@ -2341,10 +2352,12 @@ static int ext4_feature_set_ok(struct super_block *sb, int readonly)
 	return 1;
 }
 
-static int ext4_fill_super(struct super_block *sb, void *data, int silent)
-				__releases(kernel_lock)
-				__acquires(kernel_lock)
-{
+//在ext4文件系统初始化分区的时候构造super block的时候使用
+static int ext4_fill_super(struct super_block *sb, 
+                               void *data, int silent)
+				               __releases(kernel_lock)
+				               __acquires(kernel_lock)
+{  
 	struct buffer_head *bh;
 	struct ext4_super_block *es = NULL;
 	struct ext4_sb_info *sbi;
@@ -2710,11 +2723,13 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	/*
 	 * set up enough so that it can read an inode
 	 */
-	if (!test_opt(sb, NOLOAD) &&
-	    EXT4_HAS_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_HAS_JOURNAL))
+    //EXT4_HAS_COMPAT_FEATURE 和 EXT4_FEATURE_COMPAT_HAS_JOURNAL在ext4.h中	 
+    //((EXT4_SB(sb)->s_es->s_feature_compat & cpu_to_le32(mask)) != 0)
+	if (!test_opt(sb, NOLOAD) &&EXT4_HAS_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_HAS_JOURNAL))
 		sb->s_op = &ext4_sops;
 	else
 		sb->s_op = &ext4_nojournal_sops;
+	
 	sb->s_export_op = &ext4_export_ops;
 	sb->s_xattr = ext4_xattr_handlers;
 #ifdef CONFIG_QUOTA
@@ -2728,17 +2743,18 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_root = NULL;
 
 	needs_recovery = (es->s_last_orphan != 0 ||
-			  EXT4_HAS_INCOMPAT_FEATURE(sb,
-				    EXT4_FEATURE_INCOMPAT_RECOVER));
+			         EXT4_HAS_INCOMPAT_FEATURE(sb,EXT4_FEATURE_INCOMPAT_RECOVER));
 
 	/*
 	 * The first inode we look at is the journal inode.  Don't try
 	 * root first: it may be modified in the journal!
 	 */
-	if (!test_opt(sb, NOLOAD) &&
-	    EXT4_HAS_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_HAS_JOURNAL)) {
+	if (!test_opt(sb, NOLOAD) && EXT4_HAS_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_HAS_JOURNAL)) 
+	{
+	    //对jbd2 日志块设备初始化 用于数据的一致性
 		if (ext4_load_journal(sb, es, journal_devnum))
 			goto failed_mount3;
+		
 		if (!(sb->s_flags & MS_RDONLY) &&
 		    EXT4_SB(sb)->s_journal->j_failed_commit) {
 			ext4_msg(sb, KERN_CRIT, "error: "
@@ -2764,7 +2780,9 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		ext4_msg(sb, KERN_ERR, "required journal recovery "
 		       "suppressed and not mounted read-only");
 		goto failed_mount4;
-	} else {
+	} 
+	else
+	{
 		clear_opt(sbi->s_mount_opt, DATA_FLAGS);
 		set_opt(sbi->s_mount_opt, WRITEBACK_DATA);
 		sbi->s_journal = NULL;
@@ -3027,8 +3045,9 @@ static void ext4_init_journal_params(struct super_block *sb, journal_t *journal)
 	spin_unlock(&journal->j_state_lock);
 }
 
+//在分区里建一个.journal目录来记录日志
 static journal_t *ext4_get_journal(struct super_block *sb,
-				   unsigned int journal_inum)
+				                        unsigned int journal_inum)
 {
 	struct inode *journal_inode;
 	journal_t *journal;
@@ -3069,7 +3088,8 @@ static journal_t *ext4_get_journal(struct super_block *sb,
 	ext4_init_journal_params(sb, journal);
 	return journal;
 }
-
+										
+//jbd2的日志系统 用独立的分区
 static journal_t *ext4_get_dev_journal(struct super_block *sb,
 				       dev_t j_dev)
 {
@@ -3083,20 +3103,26 @@ static journal_t *ext4_get_dev_journal(struct super_block *sb,
 	struct ext4_super_block *es;
 	struct block_device *bdev;
 
+	 //检查这个分区是不是有兼容功能，如果没有，并且有日志，那就报错。 
 	BUG_ON(!EXT4_HAS_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_HAS_JOURNAL));
 
+	// 这个函数是根据设备号获得设备
 	bdev = ext4_blkdev_get(j_dev, sb);
 	if (bdev == NULL)
 		return NULL;
 
-	if (bd_claim(bdev, sb)) {
+	if (bd_claim(bdev, sb)) 
+	{
 		ext4_msg(sb, KERN_ERR,
 			"failed to claim external journal device");
 		blkdev_put(bdev, FMODE_READ|FMODE_WRITE);
 		return NULL;
 	}
 
+	//设备分区文件系统块大小
 	blocksize = sb->s_blocksize;
+
+	//设备的物理块大小
 	hblock = bdev_logical_block_size(bdev);
 	if (blocksize < hblock) {
 		ext4_msg(sb, KERN_ERR,
@@ -3133,26 +3159,41 @@ static journal_t *ext4_get_dev_journal(struct super_block *sb,
 	start = sb_block + 1;
 	brelse(bh);	/* we're done with the superblock */
 
+
+   
 	journal = jbd2_journal_init_dev(bdev, sb->s_bdev,
 					start, len, blocksize);
+	//如果初始没有得到一个真正的journal，那么我们也是返回去了。
 	if (!journal) {
 		ext4_msg(sb, KERN_ERR, "failed to create device journal");
 		goto out_bdev;
 	}
 	journal->j_private = sb;
 	ll_rw_block(READ, 1, &journal->j_sb_buffer);
+
+	// 数据读完到断续执行。
 	wait_on_buffer(journal->j_sb_buffer);
-	if (!buffer_uptodate(journal->j_sb_buffer)) {
+
+	// 如果等待超时，或是读取有错，那j_sb_buffer就不会把b_state置位BH_Uptodate，说明出错了，
+	if (!buffer_uptodate(journal->j_sb_buffer)) 
+	{
 		ext4_msg(sb, KERN_ERR, "I/O error on journal device");
 		goto out_journal;
 	}
-	if (be32_to_cpu(journal->j_superblock->s_nr_users) != 1) {
+
+	// 还要检查是不是只当前进程在用，如果其它进程也在用，或是根本没进程用，那么就出错了，
+	if (be32_to_cpu(journal->j_superblock->s_nr_users) != 1) 
+	{
 		ext4_msg(sb, KERN_ERR, "External journal has more than one "
 					"user (unsupported) - %d",
 			be32_to_cpu(journal->j_superblock->s_nr_users));
 		goto out_journal;
 	}
+
+	// 设置当前分区的日志分区设备描述符。
 	EXT4_SB(sb)->journal_bdev = bdev;
+    
+	// 初始化journal的参数，主要把 journal通过这个分区的super_block与这个分区关系起来。 
 	ext4_init_journal_params(sb, journal);
 	return journal;
 
@@ -3164,25 +3205,35 @@ out_bdev:
 }
 
 static int ext4_load_journal(struct super_block *sb,
-			     struct ext4_super_block *es,
-			     unsigned long journal_devnum)
+			                      struct ext4_super_block *es,
+			                      unsigned long journal_devnum)
 {
 	journal_t *journal;
+
+	//将小端转换成cpu的端格式
 	unsigned int journal_inum = le32_to_cpu(es->s_journal_inum);
 	dev_t journal_dev;
 	int err = 0;
 	int really_read_only;
 
+    
 	BUG_ON(!EXT4_HAS_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_HAS_JOURNAL));
 
+
+	//根据分区号创建一个日志设备
+	//实际上日志设备并不是一个真正的设备，在通常情况下，它只是硬盘分区里的一个目录
 	if (journal_devnum &&
-	    journal_devnum != le32_to_cpu(es->s_journal_dev)) {
+	    journal_devnum != le32_to_cpu(es->s_journal_dev)) 
+	{
+	   //表示要挂载的分区号和在分区里在放的分区号不一样，当然以现在的分区号为准
 		ext4_msg(sb, KERN_INFO, "external journal device major/minor "
 			"numbers have changed");
 		journal_dev = new_decode_dev(journal_devnum);
-	} else
+	} 
+	else
 		journal_dev = new_decode_dev(le32_to_cpu(es->s_journal_dev));
 
+	//检查分区是不是只读分区，如果是只读分区，那就没有必要加载日志系统，你不能写，要日志来做什么
 	really_read_only = bdev_read_only(sb->s_bdev);
 
 	/*
@@ -3190,11 +3241,14 @@ static int ext4_load_journal(struct super_block *sb,
 	 * crash?  For recovery, we need to check in advance whether we
 	 * can get read-write access to the device.
 	 */
-	if (EXT4_HAS_INCOMPAT_FEATURE(sb, EXT4_FEATURE_INCOMPAT_RECOVER)) {
-		if (sb->s_flags & MS_RDONLY) {
+	if (EXT4_HAS_INCOMPAT_FEATURE(sb, EXT4_FEATURE_INCOMPAT_RECOVER)) 
+	{
+		if (sb->s_flags & MS_RDONLY) 
+		{
 			ext4_msg(sb, KERN_INFO, "INFO: recovery "
 					"required on readonly filesystem");
-			if (really_read_only) {
+			if (really_read_only) 
+			{
 				ext4_msg(sb, KERN_ERR, "write access "
 					"unavailable, cannot proceed");
 				return -EROFS;
@@ -3204,24 +3258,30 @@ static int ext4_load_journal(struct super_block *sb,
 		}
 	}
 
-	if (journal_inum && journal_dev) {
-		ext4_msg(sb, KERN_ERR, "filesystem has both journal "
-		       "and inode journals!");
+	if (journal_inum && journal_dev) 
+	{
+		ext4_msg(sb, KERN_ERR, "filesystem has both journal and inode journals!");
 		return -EINVAL;
 	}
 
-	if (journal_inum) {
+	if (journal_inum) 
+	{
 		if (!(journal = ext4_get_journal(sb, journal_inum)))
 			return -EINVAL;
-	} else {
+	}
+	else 
+    {
 		if (!(journal = ext4_get_dev_journal(sb, journal_dev)))
 			return -EINVAL;
 	}
 
+    //这个硬盘是不是开启了硬盘屏障 IDE Barrier是指有些硬盘有很大的容量，但是有些主板不支持那么大的
 	if (!(journal->j_flags & JBD2_BARRIER))
 		ext4_msg(sb, KERN_INFO, "barriers disabled");
 
-	if (!really_read_only && test_opt(sb, UPDATE_JOURNAL)) {
+    //如果分区不是只读，并且需要更新日志，那么就更新,有两种情况，一是日志一到性更新，还有就是把日志的版本更新
+	if (!really_read_only && test_opt(sb, UPDATE_JOURNAL)) 
+	{
 		err = jbd2_journal_update_format(journal);
 		if (err)  {
 			ext4_msg(sb, KERN_ERR, "error updating journal");
@@ -3232,10 +3292,13 @@ static int ext4_load_journal(struct super_block *sb,
 
 	if (!EXT4_HAS_INCOMPAT_FEATURE(sb, EXT4_FEATURE_INCOMPAT_RECOVER))
 		err = jbd2_journal_wipe(journal, !really_read_only);
+
+    //对日志进行加载 会启动Kjournald线程 
 	if (!err)
 		err = jbd2_journal_load(journal);
 
-	if (err) {
+	if (err) 
+	{
 		ext4_msg(sb, KERN_ERR, "error loading journal");
 		jbd2_journal_destroy(journal);
 		return err;

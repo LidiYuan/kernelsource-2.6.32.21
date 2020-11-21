@@ -213,17 +213,22 @@ struct usb_descriptor_header {
 
 /*-------------------------------------------------------------------------*/
 
-//设备描述符
+//设备描述符 关于设备的通用信息，如供货商ID及适用的协议等
 /* USB_DT_DEVICE: Device descriptor */
 struct usb_device_descriptor {
-	__u8  bLength;            //设备描述符字节大小
-	__u8  bDescriptorType;	  //设备描述符类型编号
+	__u8  bLength;            //设备描述符字节大小 USB_DT_DEVICE_SIZE
+	__u8  bDescriptorType;	  //设备描述符类型编号 USB_DT_DEVICE
 	
-	__le16 bcdUSB;			  //usb版本号
-	__u8  bDeviceClass;       //USB_CLASS_HUB  设备类代码
+	__le16 bcdUSB;			  //usb版本号  如果是2.0版本 值为0x0200 如果版本为1.1 则值为0x0110
+
+
+    //每个设备属于一个class 然后class下有分subclass,下面又根据各个设备不同的通信协议进行细分
+	__u8  bDeviceClass;       //USB_CLASS_HUB  设备类代码 对于u盘此处是 USB_CLASS_MASS_STORAGE
 	__u8  bDeviceSubClass;    // 设备子类代码
 	__u8  bDeviceProtocol;    //设备协议代码
-	__u8  bMaxPacketSize0;    //端点0的最大包大小
+
+
+	__u8  bMaxPacketSize0;    //端点0的一次可处理的最大包大小,这个值只能是 8 16 32 64这四个值之一,高速模式值为64 低速模式值为8,中速模式值为8 16 32或64
 
 	__le16 idVendor;	      //厂商编号
 	__le16 idProduct;	      //产品编号
@@ -231,9 +236,9 @@ struct usb_device_descriptor {
 	__le16 bcdDevice;	      //设备出厂编号
 	__u8  iManufacturer;      /* 描述厂商字符串的索引 */
 	__u8  iProduct;			  /* 描述产品字符串的索引 */
-	__u8  iSerialNumber;      ///* 描述设备序列号字符串的索引 */
+	__u8  iSerialNumber;      /* 描述设备序列号字符串的索引 */
 	
-	__u8  bNumConfigurations;////包含的配置数目(每个USB设备会对应多个配置)  usb_config_descriptor
+	__u8  bNumConfigurations;//设备当前速度下包含的配置数目(每个USB设备会对应多个配置)  usb_config_descriptor
 } __attribute__ ((packed));
 
 #define USB_DT_DEVICE_SIZE		18
@@ -244,23 +249,29 @@ struct usb_device_descriptor {
  * as found in bDeviceClass or bInterfaceClass
  * and defined by www.usb.org documents
  */
-#define USB_CLASS_PER_INTERFACE		0	/* for DeviceClass 使用接口描述符中的累*/
-#define USB_CLASS_AUDIO			1 //声音设备
-#define USB_CLASS_COMM			2 //网卡
-#define USB_CLASS_HID			3 //鼠标 键盘
-#define USB_CLASS_PHYSICAL		5 //物理设备
-#define USB_CLASS_STILL_IMAGE		6 //静止图像捕捉设备
-#define USB_CLASS_PRINTER		7  //打印机
-#define USB_CLASS_MASS_STORAGE		8 //批量存储设备
-#define USB_CLASS_HUB			9  //表示是一个hub
-#define USB_CLASS_CDC_DATA		0x0a
+#define USB_CLASS_PER_INTERFACE		0	/* for DeviceClass 种类信息定义在接口描述符中*/
+#define USB_CLASS_AUDIO			1 //Audio 音频设备 
+#define USB_CLASS_COMM			2 //网卡 通信类 通信设备（手机，Class_02&SubClass_02&Prot_01）
+#define USB_CLASS_HID			3 //鼠标 键盘 人机接口设备
+#define USB_CLASS_PHYSICAL		5 //物理设备 
+#define USB_CLASS_STILL_IMAGE	6 //静止图像捕捉设备 图像设备（可能是IPhone手机，Class_06&SubClass_01&Prot_01）
+#define USB_CLASS_PRINTER		7 //打印机
+#define USB_CLASS_MASS_STORAGE	8 //批量存储设备
+#define USB_CLASS_HUB			9 //集线器类
+								/*包含的subclass
+	                              00h Full speed Hub
+								  01h Hi-speed hub with single TT
+								  02h Hi-speed hub with multiple TTs
+								*/
+							
+#define USB_CLASS_CDC_DATA		0x0a    //CDC data device
 #define USB_CLASS_CSCID			0x0b	//智能卡/* chip+ smart card */
-#define USB_CLASS_CONTENT_SEC		0x0d	/* content security */
-#define USB_CLASS_VIDEO			0x0e
-#define USB_CLASS_WIRELESS_CONTROLLER	0xe0
+#define USB_CLASS_CONTENT_SEC		0x0d	/*Content Security device 内容安全设备*/
+#define USB_CLASS_VIDEO			0x0e   //Video device 视频设备（摄像头，Class_0e&SubClass_03&Prot_00）
+#define USB_CLASS_WIRELESS_CONTROLLER	0xe0 //无线通信设备类
 #define USB_CLASS_MISC			0xef
 #define USB_CLASS_APP_SPEC		0xfe
-#define USB_CLASS_VENDOR_SPEC		0xff
+#define USB_CLASS_VENDOR_SPEC		0xff  //厂商定义的设备类
 
 #define USB_SUBCLASS_VENDOR_SPEC	0xff
 
@@ -274,10 +285,10 @@ struct usb_device_descriptor {
  * devices with a USB_DT_DEVICE_QUALIFIER have any OTHER_SPEED_CONFIG
  * descriptors.
  */
- ///USB 配置描述符
+ ///USB 配置描述符 一个USB设备可以包含一个或多个配置，如USB设备的低功耗模式和高功耗模式可分别对应一个配置。在使用USB设备前，必须为其选择一个合适的配置。配置描述符用于说明USB设备中各个配置的特性
 struct usb_config_descriptor {
-	__u8  bLength; /* 描述符长度 */
-	__u8  bDescriptorType;/* 描述符类型 配置描述符类型值是2 */
+	__u8  bLength; /* 描述符长度 USB_DT_CONFIG_SIZE */
+	__u8  bDescriptorType;/* 描述符类型 配置描述符类型值是2          , USB_DT_CONFIG */
 
 	__le16 wTotalLength;
 	__u8  bNumInterfaces; //接口数目(每个接口代表一种功能)
@@ -300,7 +311,7 @@ struct usb_config_descriptor {
 /* USB_DT_STRING: String descriptor */
 struct usb_string_descriptor {
 	__u8  bLength;
-	__u8  bDescriptorType;
+	__u8  bDescriptorType;//USB_DT_STRING
 
 	__le16 wData[1];		/* UTF-16LE encoded */
 } __attribute__ ((packed));

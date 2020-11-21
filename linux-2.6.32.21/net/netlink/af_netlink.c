@@ -117,7 +117,7 @@ struct nl_pid_hash {
 };
 
 struct netlink_table {
-	struct nl_pid_hash hash;// 根据pid进行HASH的netlink sock链表, 相当于客户端链表
+	struct nl_pid_hash hash;   //根据pid进行HASH的netlink sock链表, 相当于客户端链表
 	struct hlist_head mc_list; // 多播的sock链表
 	unsigned long *listeners;
 	unsigned int nl_nonroot; // 监听者标志

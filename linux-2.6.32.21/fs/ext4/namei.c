@@ -1758,20 +1758,21 @@ static int ext4_add_nondir(handle_t *handle,
  * the directory cache entry for the new file, but it
  * is so far negative - it has no inode.
  *
+
+ 
  * If the create succeeds, we fill in the inode information
  * with d_instantiate().
  */
 static int ext4_create(struct inode *dir, struct dentry *dentry, int mode,
-		       struct nameidata *nd)
+		                  struct nameidata *nd)
 {
 	handle_t *handle;
 	struct inode *inode;
 	int err, retries = 0;
 
 retry:
-	handle = ext4_journal_start(dir, EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
-					EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3 +
-					EXT4_MAXQUOTAS_INIT_BLOCKS(dir->i_sb));
+	 
+	handle = ext4_journal_start(dir, EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3 +EXT4_MAXQUOTAS_INIT_BLOCKS(dir->i_sb));
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
 
@@ -2525,7 +2526,7 @@ end_rename:
  * directories can handle most operations...
  */
 const struct inode_operations ext4_dir_inode_operations = {
-	.create		= ext4_create,
+	.create		= ext4_create, //创建文件
 	.lookup		= ext4_lookup,
 	.link		= ext4_link,
 	.unlink		= ext4_unlink,

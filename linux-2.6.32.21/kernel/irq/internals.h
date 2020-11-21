@@ -21,9 +21,13 @@ extern void clear_kstat_irqs(struct irq_desc *desc);
 extern spinlock_t sparse_irq_lock;
 
 #ifdef CONFIG_SPARSE_IRQ
+//中断描述符数组,大小是在启动的时候分配
 /* irq_desc_ptrs allocated at boot time */
 extern struct irq_desc **irq_desc_ptrs;
+
 #else
+
+//中断描述符的个数是固定的注意和上面的区别
 /* irq_desc_ptrs is a fixed size array */
 extern struct irq_desc *irq_desc_ptrs[NR_IRQS];
 #endif

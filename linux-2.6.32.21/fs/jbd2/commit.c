@@ -347,6 +347,7 @@ static void write_tag_block(int tag_bytes, journal_block_tag_t *tag,
  * The primary function for committing a transaction to the log.  This
  * function is called by the journal thread to begin a complete commit.
  */
+ //对事务进行提交
 void jbd2_journal_commit_transaction(journal_t *journal)
 {
 	struct transaction_stats_s stats;
@@ -383,7 +384,8 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 #endif
 
 	/* Do we need to erase the effects of a prior jbd2_journal_flush? */
-	if (journal->j_flags & JBD2_FLUSHED) {
+	if (journal->j_flags & JBD2_FLUSHED) 
+	{
 		jbd_debug(3, "super block updated\n");
 		jbd2_journal_update_superblock(journal, 1);
 	} else {

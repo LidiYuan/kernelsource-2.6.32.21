@@ -1461,8 +1461,7 @@ struct security_operations {
 	int (*sb_kern_mount) (struct super_block *sb, int flags, void *data);
 	int (*sb_show_options) (struct seq_file *m, struct super_block *sb);
 	int (*sb_statfs) (struct dentry *dentry);
-	int (*sb_mount) (char *dev_name, struct path *path,
-			 char *type, unsigned long flags, void *data);
+	int (*sb_mount) (char *dev_name, struct path *path,char *type, unsigned long flags, void *data);
 	int (*sb_check_sb) (struct vfsmount *mnt, struct path *path);
 	int (*sb_umount) (struct vfsmount *mnt, int flags);
 	void (*sb_umount_close) (struct vfsmount *mnt);
@@ -1642,18 +1641,13 @@ struct security_operations {
 	int (*unix_may_send) (struct socket *sock, struct socket *other);
 
 	int (*socket_create) (int family, int type, int protocol, int kern);
-	int (*socket_post_create) (struct socket *sock, int family,
-				   int type, int protocol, int kern);
-	int (*socket_bind) (struct socket *sock,
-			    struct sockaddr *address, int addrlen);
-	int (*socket_connect) (struct socket *sock,
-			       struct sockaddr *address, int addrlen);
+	int (*socket_post_create) (struct socket *sock, int family,int type, int protocol, int kern);
+	int (*socket_bind) (struct socket *sock,struct sockaddr *address, int addrlen);
+	int (*socket_connect) (struct socket *sock,struct sockaddr *address, int addrlen);
 	int (*socket_listen) (struct socket *sock, int backlog);
 	int (*socket_accept) (struct socket *sock, struct socket *newsock);
-	int (*socket_sendmsg) (struct socket *sock,
-			       struct msghdr *msg, int size);
-	int (*socket_recvmsg) (struct socket *sock,
-			       struct msghdr *msg, int size, int flags);
+	int (*socket_sendmsg) (struct socket *sock,struct msghdr *msg, int size);
+	int (*socket_recvmsg) (struct socket *sock,struct msghdr *msg, int size, int flags);
 	int (*socket_getsockname) (struct socket *sock);
 	int (*socket_getpeername) (struct socket *sock);
 	int (*socket_getsockopt) (struct socket *sock, int level, int optname);

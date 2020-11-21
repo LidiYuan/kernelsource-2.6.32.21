@@ -44,9 +44,11 @@
 
 /* Leave the possibility of an incomplete final layer */
 #define MAX_LEVEL (MAX_ID_SHIFT + IDR_BITS - 1) / IDR_BITS
+//                    (31        +  5) / 6 = 6
 
 /* Number of id_layer structs to leave in free list */
 #define IDR_FREE_MAX MAX_LEVEL + MAX_LEVEL
+                       //12
 
 struct idr_layer {
 	unsigned long		 bitmap; /* A zero bit means "space here" */
@@ -54,7 +56,7 @@ struct idr_layer {
 	//该数组用于保存具体的指针数据或者指向子idr_layer结构，大小为1<<8=256项
 	struct idr_layer	*ary[1<<IDR_BITS];
 	int			 count;	 /* When zero, we can release it  //ary数组使用计数*/
-	int			 layer;	 /* distance from leaf //层号*/
+	int			 layer;	 /* distance from leaf 和叶子节点的距离*/
 	struct rcu_head		 rcu_head;
 };
 
@@ -69,6 +71,7 @@ struct idr {
 	spinlock_t	  lock;
 };
 
+//对idr进行静态初始化
 #define IDR_INIT(name)						\
 {								\
 	.top		= NULL,					\
@@ -77,6 +80,7 @@ struct idr {
 	.id_free_cnt	= 0,					\
 	.lock		= __SPIN_LOCK_UNLOCKED(name.lock),	\
 }
+//声明一个idr
 #define DEFINE_IDR(name)	struct idr name = IDR_INIT(name)
 
 /* Actions to be taken after a call to _idr_sub_alloc */

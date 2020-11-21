@@ -172,7 +172,8 @@ trap_signal:
 	return;
 
 kernel_trap:
-	if (!fixup_exception(regs)) {
+	if (!fixup_exception(regs)) 
+	{
 		tsk->thread.error_code = error_code;
 		tsk->thread.trap_no = trapnr;
 		die(str, regs, error_code);
@@ -461,6 +462,8 @@ void restart_nmi(void)
 dotraplinkage void __kprobes do_int3(struct pt_regs *regs, long error_code)
 {
 #ifdef CONFIG_KPROBES
+    //通过通知连将int3发生的DIE_INT3消息给krobe
+    //kprobe的通知链式在 init_kprobes->register_die_notifier 中注册的
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
 			== NOTIFY_STOP)
 		return;

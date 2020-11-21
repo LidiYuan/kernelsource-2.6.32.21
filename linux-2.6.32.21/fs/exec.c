@@ -632,7 +632,8 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	BUG_ON(prev != vma);
 
 	/* Move stack pages down in memory. */
-	if (stack_shift) {
+	if (stack_shift) 
+	{
 		ret = shift_arg_pages(vma, stack_shift);
 		if (ret)
 			goto out_unlock;

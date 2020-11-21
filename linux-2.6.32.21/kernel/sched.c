@@ -2936,9 +2936,9 @@ asmlinkage void schedule_tail(struct task_struct *prev)
  * thread's register state.
  */
  //进行上下文切换  从一个进程切换到另一个进程
-static inline void
-context_switch(struct rq *rq, struct task_struct *prev,
-	       struct task_struct *next)
+static inline void context_switch(struct rq *rq, 
+                                      struct task_struct *prev,
+	                                  struct task_struct *next)
 {
 	struct mm_struct *mm, *oldmm;
 
@@ -2953,11 +2953,13 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	 */
 	arch_start_context_switch(prev);
 
-	if (unlikely(!mm)) {
+	if (unlikely(!mm)) 
+	{
 		next->active_mm = oldmm;
 		atomic_inc(&oldmm->mm_count);
 		enter_lazy_tlb(oldmm, next);
-	} else
+	} 
+	else
 	    //把虚拟内存从上一个进程映射切换到新进程
 		switch_mm(oldmm, mm, next);
 

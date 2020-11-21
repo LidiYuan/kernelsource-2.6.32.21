@@ -81,30 +81,36 @@ EXPORT_SYMBOL_GPL(module_mutex);
 static LIST_HEAD(modules);
 
 /* Block module loading/unloading? */
-int modules_disabled = 0;
+int modules_disabled = 0; //阻塞模块的加载和卸载
 
 /* Waiting for a module to finish initializing? */
 static DECLARE_WAIT_QUEUE_HEAD(module_wq);
 
+//定义模块加载的通知连
 static BLOCKING_NOTIFIER_HEAD(module_notify_list);
 
 /* Bounds of module allocation, for speeding __module_address */
 static unsigned long module_addr_min = -1UL, module_addr_max = 0;
 
+//注册模块加载的通知连侦听点
 int register_module_notifier(struct notifier_block * nb)
 {
 	return blocking_notifier_chain_register(&module_notify_list, nb);
 }
 EXPORT_SYMBOL(register_module_notifier);
 
+
+//反注册模块加载的通知连侦听点
 int unregister_module_notifier(struct notifier_block * nb)
 {
 	return blocking_notifier_chain_unregister(&module_notify_list, nb);
 }
+
 EXPORT_SYMBOL(unregister_module_notifier);
 
 /* We require a truly strong try_module_get(): 0 means failure due to
    ongoing or failed initialization etc. */
+   
 static inline int strong_try_module_get(struct module *mod)
 {
 	if (mod && mod->state == MODULE_STATE_COMING)
@@ -133,18 +139,23 @@ void __module_put_and_exit(struct module *mod, long code)
 EXPORT_SYMBOL(__module_put_and_exit);
 
 /* Find a module section: 0 means not found. */
-static unsigned int find_sec(Elf_Ehdr *hdr,
-			     Elf_Shdr *sechdrs,
-			     const char *secstrings,
-			     const char *name)
+//根据节名，查找一个节是否存在，并返回节表项的索引
+static unsigned int find_sec(Elf_Ehdr *hdr,  //Elf header起始地址
+			     Elf_Shdr *sechdrs,            //节表头的起始地址
+			     const char *secstrings,       //节名表的起始地址
+			     const char *name)             //要查找的节的名字
 {
 	unsigned int i;
 
 	for (i = 1; i < hdr->e_shnum; i++)
+	{
 		/* Alloc bit cleared means "ignore it." */
-		if ((sechdrs[i].sh_flags & SHF_ALLOC)
-		    && strcmp(secstrings+sechdrs[i].sh_name, name) == 0)
+		if ((sechdrs[i].sh_flags & SHF_ALLOC) &&  //表示此节在内存中是要分配内存的
+			 strcmp(secstrings+sechdrs[i].sh_name, name) == 0)//进行名字比较
 			return i;
+	}
+
+	//表示没有找到
 	return 0;
 }
 
@@ -819,23 +830,23 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 		goto out_stop;
 	}
 
-	mod = find_module(name);//����ģ��������ģ��ṹ��
+	mod = find_module(name);//根据模块名查找模块结构体
 	if (!mod) {
 		ret = -ENOENT;
 		goto out;
 	}
 
 	/*
-	*��������Ƿ����ж��
+	*检查驱动是否可以卸载
 	*/
-	//����ģ��������ģ�飬��ɾ��
+	//其他模块依赖此模块，不删除
 	if (!list_empty(&mod->modules_which_use_me)) {
 		/* Other modules depend on us: get rid of them first. */
 		ret = -EWOULDBLOCK;
 		goto out;
 	}
 
-	//���ģ�鲻��LIVE״̬����ô���޷�������ȥ�ˣ��õ��Ľ����busy
+	//如果模块不是LIVE状态，那么就无法进行下去了，得到的结果是busy
 	/* Doing init or already dying? */
 	if (mod->state != MODULE_STATE_LIVE) {
 		/* FIXME: if (force), slam module count and wake up
@@ -845,8 +856,8 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 		goto out;
 	}
 
-	 //  ����ģ�������exit�������˳�
-    //  ���û�����޷��˳�, ��ʾ����busy
+	//  驱动模块必须有exit函数来退出
+    //  如果没有则无法退出, 提示驱动busy
 	/* If it has an init func, it must have an exit func to unload */
 	if (mod->init && !mod->exit) 
 	{
@@ -861,15 +872,15 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 	/* Set this up before setting mod->state */
 	mod->waiter = current;
 
-	//  ȷ��ģ����������(�Ƿ����豸��ʹ�õ�ǰ����ģ��)
-    //  �����ں��޷�ֹͣһ������ʹ�õ��ں�ģ��
+	//  确认模块正在运行(是否有设备在使用当前驱动模块)
+    //  否则内核无法停止一个正在使用的内核模块
 	/* Stop the machine so refcounts can't move and disable module. */
 	ret = try_stop_module(mod, flags, &forced);
 	if (ret != 0)
 		goto out;
 
 	/* Never wait if forced. */
-	if (!forced && module_refcount(mod) != 0)//������ü�������0����ȴ���Ϊ0
+	if (!forced && module_refcount(mod) != 0)//如果引用计数不是0，则等待其为0
 		wait_for_zero_refcount(mod);
 
 	mutex_unlock(&module_mutex);
@@ -900,12 +911,17 @@ static inline void print_unload_info(struct seq_file *m, struct module *mod)
 
 	/* Always include a trailing , so userspace can differentiate
            between this and the old multi-field proc format. */
-	list_for_each_entry(use, &mod->modules_which_use_me, list) {
+
+    //打印处所有依赖我的模块名
+	list_for_each_entry(use, &mod->modules_which_use_me, list) 
+    {
 		printed_something = 1;
 		seq_printf(m, "%s,", use->module_which_uses->name);
 	}
 
-	if (mod->init != NULL && mod->exit == NULL) {
+	
+	if (mod->init != NULL && mod->exit == NULL) 
+	{
 		printed_something = 1;
 		seq_printf(m, "[permanent],");
 	}
@@ -1027,6 +1043,7 @@ static struct module_attribute *modinfo_attrs[] = {
 
 static const char vermagic[] = VERMAGIC_STRING;
 
+/*尝试强制加载模块 */
 static int try_to_force_load(struct module *mod, const char *reason)
 {
 #ifdef CONFIG_MODULE_FORCE_LOAD
@@ -1153,12 +1170,14 @@ static const struct kernel_symbol *resolve_symbol(Elf_Shdr *sechdrs,
 	const struct kernel_symbol *sym;
 	const unsigned long *crc;
 
+	 ////返回符号对应的符号表，所属模块，crc
 	sym = find_symbol(name, &owner, &crc,
 			  !(mod->taints & (1 << TAINT_PROPRIETARY_MODULE)), true);
 	/* use_module can fail due to OOM,
 	   or module initialization or unloading */
 	if (sym) 
-	{
+	{   
+	 //检测内核中当前符号的crc和新模块中的记录的crc是否相符
 		if (!check_version(sechdrs, versindex, name, mod, crc, owner)
 		    || !use_module(mod, owner))
 			sym = NULL;
@@ -1630,21 +1649,27 @@ static int verify_export_symbols(struct module *mod)
 
 /* Change all symbols so that st_value encodes the pointer directly. */
 static int simplify_symbols(Elf_Shdr *sechdrs,
-			    unsigned int symindex,
-			    const char *strtab,
-			    unsigned int versindex,
-			    unsigned int pcpuindex,
-			    struct module *mod)
+			                     unsigned int symindex,
+			                     const char *strtab,
+			                     unsigned int versindex,
+			                     unsigned int pcpuindex,
+			                     struct module *mod)
 {
 	Elf_Sym *sym = (void *)sechdrs[symindex].sh_addr;
 	unsigned long secbase;
+	
 	unsigned int i, n = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
 	int ret = 0;
 	const struct kernel_symbol *ksym;
 
-	for (i = 1; i < n; i++) {
-		switch (sym[i].st_shndx) {
+	//循环所有符号 
+	for (i = 1; i < n; i++) 
+	{
+		switch (sym[i].st_shndx) 
+		{
 		case SHN_COMMON:
+			  //一般来说，未初始化的全局符号是这种类型，在ko文件中
+            //不应该出现这种类型的符号,出现则直接返回错误了 
 			/* We compiled with -fno-common.  These are not
 			   supposed to happen.  */
 			DEBUGP("Common symbol: %s\n", strtab + sym[i].st_name);
@@ -1654,16 +1679,22 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			break;
 
 		case SHN_ABS:
+			//包含一个绝对值，不受重定位的影响，可能是节索引编号
 			/* Don't need to do anything */
 			DEBUGP("Absolute symbol: 0x%08lx\n",
 			       (long)sym[i].st_value);
 			break;
 
 		case SHN_UNDEF:
+			 //这是一个未定义符号，需要内核来找这个符号的定义
+            //内核会查找自身+所有模块，如果找到，返回ksym，
+            //指向这个符号。
 			ksym = resolve_symbol(sechdrs, versindex,
 					      strtab + sym[i].st_name, mod);
 			/* Ok if resolved.  */
-			if (ksym) {
+			if (ksym) 
+			{
+			     //符号表的这个st_value，指向这个符号的内存地址
 				sym[i].st_value = ksym->value;
 				break;
 			}
@@ -1679,10 +1710,12 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 
 		default:
 			/* Divert to percpu allocation if a percpu var. */
+		    //其他的st_shndex，都认为是指向节区索引，则找到节区起始地址（内存映像中的）
 			if (sym[i].st_shndx == pcpuindex)
 				secbase = (unsigned long)mod->percpu;
 			else
 				secbase = sechdrs[sym[i].st_shndx].sh_addr;
+			  //st_value是偏移，这里加上节区起始地址（内存映像中的），为符号真正的地址。
 			sym[i].st_value += secbase;
 			break;
 		}
@@ -1716,35 +1749,46 @@ static long get_offset(struct module *mod, unsigned int *size,
    sizes, and place the offsets into sh_entsize fields: high bit means it
    belongs in init. */
 static void layout_sections(struct module *mod,
-			    const Elf_Ehdr *hdr,
-			    Elf_Shdr *sechdrs,
-			    const char *secstrings)
+			                     const Elf_Ehdr *hdr,
+			                     Elf_Shdr *sechdrs,
+			                     const char *secstrings)
 {
-	static unsigned long const masks[][2] = {
+     //这个数组中的所有项，都有SHF_ALLOC属性，但只有第一行这种是可执行的
+	static unsigned long const masks[][2] = 
+	{
 		/* NOTE: all executable code must be the first section
 		 * in this array; otherwise modify the text_size
 		 * finder in the two loops below */
-		{ SHF_EXECINSTR | SHF_ALLOC, ARCH_SHF_SMALL },
-		{ SHF_ALLOC, SHF_WRITE | ARCH_SHF_SMALL },
-		{ SHF_WRITE | SHF_ALLOC, ARCH_SHF_SMALL },
+		{ SHF_EXECINSTR | SHF_ALLOC,  ARCH_SHF_SMALL },
+		{ SHF_ALLOC                ,  SHF_WRITE | ARCH_SHF_SMALL },
+		{ SHF_WRITE | SHF_ALLOC,      ARCH_SHF_SMALL },
 		{ ARCH_SHF_SMALL | SHF_ALLOC, 0 }
 	};
 	unsigned int m, i;
 
+     //e_shnum为节区头部表中的表项数
 	for (i = 0; i < hdr->e_shnum; i++)
-		sechdrs[i].sh_entsize = ~0UL;
+ 		sechdrs[i].sh_entsize = ~0UL; //将每个节区的元素长度设为0xffff 后面会重新设置
 
 	DEBUGP("Core section allocation order:\n");
-	for (m = 0; m < ARRAY_SIZE(masks); ++m) {
-		for (i = 0; i < hdr->e_shnum; ++i) {
+
+	//对masks数组中的每种节属性组合，执行以下操作
+	for (m = 0; m < ARRAY_SIZE(masks); ++m) 
+	{
+		for (i = 0; i < hdr->e_shnum; ++i) 
+		{
+		    //获取第i个节表的头部表
 			Elf_Shdr *s = &sechdrs[i];
 
-			if ((s->sh_flags & masks[m][0]) != masks[m][0]
-			    || (s->sh_flags & masks[m][1])
-			    || s->sh_entsize != ~0UL
-			    || strstarts(secstrings + s->sh_name, ".init"))
+			if ((s->sh_flags & masks[m][0]) != masks[m][0] //如果节区与masks掩码不匹配
+			    || (s->sh_flags & masks[m][1]) //节区flag不匹配
+			    || s->sh_entsize != ~0UL       //或者节区元素长度不匹配
+			    || strstarts(secstrings + s->sh_name, ".init")) //者是初始化段
 				continue;
-			s->sh_entsize = get_offset(mod, &mod->core_size, s, i);
+			
+			//重新得到表项的大小
+			//这里剩下的主要是有SHF_ALLOC的非初始化段了，这样的段最终会被放到module.module_core,也就是内存映像中去，这里重用s->sh_entsize，来记录当前段在内存映像中的偏移。core_size为最终内存映像的大小，get_offset的时候会加上当前这个节的大小
+			s->sh_entsize = get_offset(mod, &mod->core_size, s, i); 
 			DEBUGP("\t%s\n", secstrings + s->sh_name);
 		}
 		if (m == 0)
@@ -1752,17 +1796,18 @@ static void layout_sections(struct module *mod,
 	}
 
 	DEBUGP("Init section allocation order:\n");
-	for (m = 0; m < ARRAY_SIZE(masks); ++m) {
+
+	for (m = 0; m < ARRAY_SIZE(masks); ++m) 
+	{
 		for (i = 0; i < hdr->e_shnum; ++i) {
 			Elf_Shdr *s = &sechdrs[i];
 
 			if ((s->sh_flags & masks[m][0]) != masks[m][0]
 			    || (s->sh_flags & masks[m][1])
-			    || s->sh_entsize != ~0UL
-			    || !strstarts(secstrings + s->sh_name, ".init"))
+			    || s->sh_entsize != ~0UL   //上面设置过属于init的在此处就会continue  不会执行下面的
+			    || !strstarts(secstrings + s->sh_name, ".init")) //寻找.init中开头的节
 				continue;
-			s->sh_entsize = (get_offset(mod, &mod->init_size, s, i)
-					 | INIT_OFFSET_MASK);
+			s->sh_entsize = (get_offset(mod, &mod->init_size, s, i) | INIT_OFFSET_MASK);
 			DEBUGP("\t%s\n", secstrings + s->sh_name);
 		}
 		if (m == 0)
@@ -1774,20 +1819,25 @@ static void set_license(struct module *mod, const char *license)
 {
 	if (!license)
 		license = "unspecified";
-
-	if (!license_is_gpl_compatible(license)) {
+	
+    //比较gpl  如果不在这预定义的几个值之内 则打印警告污染内核，并设置内核标志TAINT_PROPRIETARY_MODULE
+	if (!license_is_gpl_compatible(license)) 
+	{
 		if (!test_taint(TAINT_PROPRIETARY_MODULE))
-			printk(KERN_WARNING "%s: module license '%s' taints "
-				"kernel.\n", mod->name, license);
+			printk(KERN_WARNING "%s: module license '%s' taints ""kernel.\n", mod->name, license);
 		add_taint_module(mod, TAINT_PROPRIETARY_MODULE);
 	}
 }
 
-/* Parse tag=value strings from .modinfo section */
+/* Parse tag=value strings from .modinfo section 
+从.modinfo节中解析 \0分隔的key=value的类型
+*/
 static char *next_string(char *string, unsigned long *secsize)
 {
 	/* Skip non-zero chars */
-	while (string[0]) {
+   
+	while (string[0]) 
+	{
 		string++;
 		if ((*secsize)-- <= 1)
 			return NULL;
@@ -1802,18 +1852,23 @@ static char *next_string(char *string, unsigned long *secsize)
 	return string;
 }
 
-static char *get_modinfo(Elf_Shdr *sechdrs,
-			 unsigned int info,
-			 const char *tag)
+static char *get_modinfo(Elf_Shdr *sechdrs,  //节表头地址
+			                unsigned int info,  //节的索引 
+			                const char *tag)    //查找的标记
 {
 	char *p;
-	unsigned int taglen = strlen(tag);
-	unsigned long size = sechdrs[info].sh_size;
-
-	for (p = (char *)sechdrs[info].sh_addr; p; p = next_string(p, &size)) {
+	unsigned int taglen = strlen(tag); //查找符号的长度
+	unsigned long size = sechdrs[info].sh_size; //下标为info 节的大小
+	                                            //
+	//.modinfo 节的内容为 key=value格式
+	//在.modinfo节的起始处 查找key是tag的值
+	for (p = (char *)sechdrs[info].sh_addr; p; p = next_string(p, &size)) 
+	{
 		if (strncmp(p, tag, taglen) == 0 && p[taglen] == '=')
 			return p + taglen + 1;
 	}
+	
+	//没有找到
 	return NULL;
 }
 
@@ -1846,25 +1901,37 @@ static void free_modinfo(struct module *mod)
 #ifdef CONFIG_KALLSYMS
 
 /* lookup symbol in given range of kernel_symbols */
-static const struct kernel_symbol *lookup_symbol(const char *name,
-	const struct kernel_symbol *start,
-	const struct kernel_symbol *stop)
+/*在给定的一个地址空间中查找符号*/
+static const struct kernel_symbol *lookup_symbol(const char *name,   //符号名
+	                                                 const struct kernel_symbol *start, //查找的起始地址
+	                                                 const struct kernel_symbol *stop)  //查找的结束地址
 {
 	const struct kernel_symbol *ks = start;
+    //每个符号是以kernel_symbol结构保存的
 	for (; ks < stop; ks++)
-		if (strcmp(ks->name, name) == 0)
+		if (strcmp(ks->name, name) == 0)//比较符号名是否相等
 			return ks;
+		
 	return NULL;
 }
 
+/*
+判断符号是否导出的
+*/
 static int is_exported(const char *name, unsigned long value,
 		       const struct module *mod)
 {
 	const struct kernel_symbol *ks;
+
+    //可见kernel的导出符号保存放在两个地方，如果不是模块的话，保存在__start___ksymtab ~ __stop___ksymtab之间
+    //如果是模块的化  则地址保存在模块的内部,为mod->syms ~ (mod->syms + mod->num_syms) 之间
 	if (!mod)
 		ks = lookup_symbol(name, __start___ksymtab, __stop___ksymtab);
 	else
 		ks = lookup_symbol(name, mod->syms, mod->syms + mod->num_syms);
+
+
+	//看是否在导出的符号中找到了对应的符号和值
 	return ks != NULL && ks->value == value;
 }
 
@@ -1946,16 +2013,19 @@ static unsigned long layout_symtab(struct module *mod,
 	unsigned int i, nsrc, ndst;
 
 	/* Put symbol section at end of init part of module. */
+	//给符号表加上SHF_ALLOC属性
 	symsect->sh_flags |= SHF_ALLOC;
-	symsect->sh_entsize = get_offset(mod, &mod->init_size, symsect,
-					 symindex) | INIT_OFFSET_MASK;
+	
+	symsect->sh_entsize = get_offset(mod, &mod->init_size, symsect,symindex) | INIT_OFFSET_MASK;
 	DEBUGP("\t%s\n", secstrings + symsect->sh_name);
 
 	src = (void *)hdr + symsect->sh_offset;
 	nsrc = symsect->sh_size / sizeof(*src);
 	strtab = (void *)hdr + strsect->sh_offset;
+	//计算所有核心符号字符串的总大小
 	for (ndst = i = 1; i < nsrc; ++i, ++src)
-		if (is_core_symbol(src, sechdrs, hdr->e_shnum)) {
+		if (is_core_symbol(src, sechdrs, hdr->e_shnum)) 
+		{
 			unsigned int j = src->st_name;
 
 			while(!__test_and_set_bit(j, strmap) && strtab[j])
@@ -1965,9 +2035,12 @@ static unsigned long layout_symtab(struct module *mod,
 
 	/* Append room for core symbols at end of core part. */
 	symoffs = ALIGN(mod->core_size, symsect->sh_addralign ?: 1);
+
+	 //在core_size的末尾增加这两个表的空间,符号表和其字符串表
 	mod->core_size = symoffs + ndst * sizeof(Elf_Sym);
 
 	/* Put string table section at end of init part of module. */
+    //给字符串表加上SHF_ALLOC属性，并算到module_init中。
 	strsect->sh_flags |= SHF_ALLOC;
 	strsect->sh_entsize = get_offset(mod, &mod->init_size, strsect,
 					 strindex) | INIT_OFFSET_MASK;
@@ -2102,10 +2175,12 @@ static inline void kmemleak_load_module(struct module *mod, Elf_Ehdr *hdr,
 #endif
 
 /* Allocate and load the module: note that size of section 0 is always
-   zero, and we rely on this for optional sections. */
-static noinline struct module *load_module(void __user *umod,
-				  unsigned long len,
-				  const char __user *uargs)
+   zero, and we rely on this for optional sections. 
+分配加载内核模块
+ */
+static noinline struct module *load_module(void __user *umod,//文件映像的用户态指针
+				                              unsigned long len,//文件映像长度
+				                              const char __user *uargs)//加载参数
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
@@ -2114,16 +2189,25 @@ static noinline struct module *load_module(void __user *umod,
 	unsigned int i;
 	unsigned int symindex = 0;
 	unsigned int strindex = 0;
-	unsigned int modindex, versindex, infoindex, pcpuindex;
+	unsigned int modindex, 
+		         versindex, 
+		         infoindex, 
+		         pcpuindex;
+	
 	struct module *mod;
 	long err = 0;
-	void *percpu = NULL, *ptr = NULL; /* Stops spurious gcc warning */
-	unsigned long symoffs, stroffs, *strmap;
+	void *percpu = NULL, 
+		 *ptr = NULL; /* Stops spurious gcc warning */
+	
+	unsigned long symoffs, 
+		          stroffs, 
+		          *strmap;
 
 	mm_segment_t old_fs;
 
-	DEBUGP("load_module: umod=%p, len=%lu, uargs=%p\n",
-	       umod, len, uargs);
+	DEBUGP("load_module: umod=%p, len=%lu, uargs=%p\n",umod, len, uargs);
+
+	//被加载elf的长度不正确,非elf格式
 	if (len < sizeof(*hdr))
 		return ERR_PTR(-ENOEXEC);
 
@@ -2132,136 +2216,216 @@ static noinline struct module *load_module(void __user *umod,
 	if (len > 64 * 1024 * 1024 || (hdr = vmalloc(len)) == NULL)
 		return ERR_PTR(-ENOMEM);
 
-	if (copy_from_user(hdr, umod, len) != 0) {
+    //将影响拷贝到内核中
+	if (copy_from_user(hdr, umod, len) != 0) 
+	{
 		err = -EFAULT;
 		goto free_hdr;
 	}
 
-	/* Sanity checks against insmoding binaries or wrong arch,
-           weird elf version */
-	if (memcmp(hdr->e_ident, ELFMAG, SELFMAG) != 0
-	    || hdr->e_type != ET_REL
-	    || !elf_check_arch(hdr)
-	    || hdr->e_shentsize != sizeof(*sechdrs)) {
-		err = -ENOEXEC;
+	//主要用来检查是否为ELF格式
+	/* Sanity checks against insmoding binaries or wrong arch,weird elf version */
+	if (memcmp(hdr->e_ident, ELFMAG, SELFMAG) != 0  //检查elf魔数
+	    || hdr->e_type != ET_REL                    //检测elf类型是否为重定向类型 
+	    || !elf_check_arch(hdr)                     //检查体系类型 
+	    || hdr->e_shentsize != sizeof(*sechdrs))    //检查节表项的大小
+	{
+		err = -ENOEXEC;  
 		goto free_hdr;
 	}
 
-	if (len < hdr->e_shoff + hdr->e_shnum * sizeof(Elf_Shdr))
+    //判断总长度 是否小于 节表的偏移 + 节表的大小,  即判断节表是否完整的在文件中
+    //hdr->e_shnum * sizeof(Elf_Shdr) 计算节表的总大小
+	if (len <  hdr->e_shoff + hdr->e_shnum * sizeof(Elf_Shdr))
 		goto truncated;
 
 	/* Convenience variables */
+	//计算节表的偏移位置
 	sechdrs = (void *)hdr + hdr->e_shoff;
+
+	//节名字表的表项在节区头部表的索引此节的名字为shstrtab 注意与strtab的区别
 	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+
+    //将第一个节在进程地址空间中的虚拟地址地址设置为0
 	sechdrs[0].sh_addr = 0;
 
-	for (i = 1; i < hdr->e_shnum; i++) {
-		if (sechdrs[i].sh_type != SHT_NOBITS
-		    && len < sechdrs[i].sh_offset + sechdrs[i].sh_size)
-			goto truncated;
+	for (i = 1; i < hdr->e_shnum; i++) 
+	{
+	
+		if (sechdrs[i].sh_type != SHT_NOBITS &&               //节的类型不是SHT_NOBITS(文件中不保存内容如bss)
+			len < sechdrs[i].sh_offset + sechdrs[i].sh_size)  //节的数据偏移+节的总大小  超过读取的总长度,  即该节不完整
+			goto truncated;                                  //该文件被截断了 
 
 		/* Mark all sections sh_addr with their address in the
 		   temporary image. */
+		//先设置所有节的虚拟地址为 相对于现在镜像内存的地址  内存基地址+文件中偏移 
 		sechdrs[i].sh_addr = (size_t)hdr + sechdrs[i].sh_offset;
 
 		/* Internal symbols and strings. */
-		if (sechdrs[i].sh_type == SHT_SYMTAB) {
+		//如果此节表头是一个符号表
+		if (sechdrs[i].sh_type == SHT_SYMTAB) 
+		{
 			symindex = i;
+
+			//得到字符串表咋节表项中的索引
 			strindex = sechdrs[i].sh_link;
+
+			//得到字符串表的偏移
 			strtab = (char *)hdr + sechdrs[strindex].sh_offset;
 		}
 #ifndef CONFIG_MODULE_UNLOAD
-		/* Don't load .exit sections */
+		/* Don't load .exit sections 
+              不加载.exit节  
+        */
 		if (strstarts(secstrings+sechdrs[i].sh_name, ".exit"))
-			sechdrs[i].sh_flags &= ~(unsigned long)SHF_ALLOC;
+			sechdrs[i].sh_flags &= ~(unsigned long)SHF_ALLOC; //设置节名为.exit开头的节 不分配内存 
 #endif
 	}
 
-	modindex = find_sec(hdr, sechdrs, secstrings,
-			    ".gnu.linkonce.this_module");
+	//查找是否存在一个节名为.gnu.linkonce.this_module的表项.并返回节表项的索引
+	//在scripts/mod/modpost.c 会生成xx.mod.c  在这个文件中有如下定义
+	/*
+	 __visible struct module __this_module  __section(.gnu.linkonce.this_module) = {
+	    .name = KBUILD_MODNAME,
+	    .init = init_module,
+#ifdef CONFIG_MODULE_UNLOAD
+	    .exit = cleanup_module,
+#endif
+	    .arch = MODULE_ARCH_INIT,
+	};
+   其中定义了一个__this_module变量 并将其放到.gnu.linkonce.this_module节中
+   其中对一些字段进行了初始化
+	*/
+	modindex = find_sec(hdr, sechdrs, secstrings,".gnu.linkonce.this_module");
 	if (!modindex) 
-	{
+	{   
+	    //如果没有此节 说明不是一个内核模块
 		printk(KERN_WARNING "No module found in object\n");
 		err = -ENOEXEC;
 		goto free_hdr;
 	}
-	/* This is temporary: point mod into copy of data. */
-	mod = (void *)sechdrs[modindex].sh_addr;
+	/* This is temporary: point mod into copy of data. 
+        .gnu.linkonce.this_module节描述的是一个module结构体?  
+	*/
+	mod = (void *)sechdrs[modindex].sh_addr;//得到.gnu.linkonce.this_module的地址
 
-	if (symindex == 0) {
-		printk(KERN_WARNING "%s: module has no symbols (stripped?)\n",
-		       mod->name);
+	//如果没有符号表
+	if (symindex == 0) 
+	{
+		printk(KERN_WARNING "%s: module has no symbols (stripped?)\n",mod->name);
 		err = -ENOEXEC;
 		goto free_hdr;
 	}
 
+	//查找节__versions
 	versindex = find_sec(hdr, sechdrs, secstrings, "__versions");
+
+	//查找节.modinfo
 	infoindex = find_sec(hdr, sechdrs, secstrings, ".modinfo");
 	pcpuindex = find_pcpusec(hdr, sechdrs, secstrings);
 
 	/* Don't keep modinfo and version sections. */
+	//infoindex 和version信息不必留在内存中
 	sechdrs[infoindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
-	sechdrs[versindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
+	sechdrs[versindex].sh_flags &= ~(unsigned long)SHF_ALLOC; 
 
 	/* Check module struct version now, before we try to use module. */
+	//如果没有设置CONFIG_MODVERSIONS  此处返回是0
 	if (!check_modstruct_version(sechdrs, versindex, mod)) 
 	{
 		err = -ENOEXEC;
 		goto free_hdr;
 	}
 
+    //在.modinfo节区查找vermagic = 开头的字符串(相当于作为key查找)，返回的是vermagic=后面的字符串
+    //如vermagic=5.4.0-42-generic SMP mod_unload
+    //返回"5.4.0-42-generic SMP mod_unload"
 	modmagic = get_modinfo(sechdrs, infoindex, "vermagic");
 	/* This is allowed: modprobe --force will invalidate it. */
-	if (!modmagic) {
+	if (!modmagic) 
+	{   
+	    //没找到版本信息
+        //如果配置了CONFIG_MODULE_FORCE_LOAD，则强制加载，标记taints，返回true，否则返回错误(-ENOEXEC)
 		err = try_to_force_load(mod, "bad vermagic");
 		if (err)
 			goto free_hdr;
-	} else if (!same_magic(modmagic, vermagic, versindex)) {
+	} 
+	else if (!same_magic(modmagic, vermagic, versindex)) 
+	{
+	    //字符串比较，如果有vers，则加上vers比较
+        //vermagic 是个全局变量，在最终导出的vmlinux中可以找到。
 		printk(KERN_ERR "%s: version magic '%s' should be '%s'\n",
 		       mod->name, modmagic, vermagic);
 		err = -ENOEXEC;
 		goto free_hdr;
 	}
 
+    /*
+    /*
+  * 从2.6.28版本起，内核代码的drivers下增加了一个staging目录，
+  * 这个目录也是用来存放驱动程序，只是这里的驱动程序
+  * 和上层目录不同，加载的时候内核日志会打印如下的语句:
+  * MODULE_NAME: module is from the staging directory, the quality is unknown, you have been warned.
+  * Greg KH于2008年6月10号在Linux内核邮件列表里发出一封信，宣布建
+  * 立了另外一棵kernel tree，这就是Linux staging tree。Greg解释到，staging tree
+  * 建立之目的是用来放置一些未充分测试或者因为一些其他原因
+  * 未能进入内核的新增驱动程序和新增文件系统。
+  */
+	
 	staging = get_modinfo(sechdrs, infoindex, "staging");
-	if (staging) {
+	if (staging) 
+	{
+	    
 		add_taint_module(mod, TAINT_CRAP);
-		printk(KERN_WARNING "%s: module is from the staging directory,"
-		       " the quality is unknown, you have been warned.\n",
+		printk(KERN_WARNING "%s: module is from the staging directory,"" the quality is unknown, you have been warned.\n",
 		       mod->name);
 	}
 
 	/* Now copy in args */
+	//拷贝用户的参数
 	args = strndup_user(uargs, ~0UL >> 1);
 	if (IS_ERR(args)) {
 		err = PTR_ERR(args);
 		goto free_hdr;
 	}
 
-	strmap = kzalloc(BITS_TO_LONGS(sechdrs[strindex].sh_size)
-			 * sizeof(long), GFP_KERNEL);
+	/*
+  * 为与符号表相关的字符串表段在内存中分配用于映射的空间。
+  * sechdrs[strindex].sh_size是与符号表相关的字符串表段的大小。
+  * 这里分配的是一个位图，用于符号表中的符号名称的
+  * 映射。
+  */
+	strmap = kzalloc(BITS_TO_LONGS(sechdrs[strindex].sh_size)* sizeof(long), GFP_KERNEL);
 	if (!strmap) {
 		err = -ENOMEM;
 		goto free_mod;
 	}
 
-	if (find_module(mod->name)) {
+	//根据模块名检查此模块是否加载过
+	if (find_module(mod->name)) 
+	{
 		err = -EEXIST;
 		goto free_mod;
 	}
 
+    //将模块状态设置为正在加载
 	mod->state = MODULE_STATE_COMING;
 
+	/*err总是为0*/
 	/* Allow arches to frob section contents and sizes.  */
 	err = module_frob_arch_sections(hdr, sechdrs, secstrings, mod);
 	if (err < 0)
 		goto free_mod;
 
-	if (pcpuindex) {
+	 /*
+  * 如果存在.data.percpu段，则为该段在内存中分配空间。
+  * 分配成功后，移除SHF_ALLOC标志，并且初始化module实例
+  * 的percpu成员。
+  */
+	if (pcpuindex) 
+	{
 		/* We have a special allocation for this section. */
-		percpu = percpu_modalloc(sechdrs[pcpuindex].sh_size,
-					 sechdrs[pcpuindex].sh_addralign,
-					 mod->name);
+		percpu = percpu_modalloc(sechdrs[pcpuindex].sh_size,sechdrs[pcpuindex].sh_addralign,mod->name);
 		if (!percpu) {
 			err = -ENOMEM;
 			goto free_mod;
@@ -2273,25 +2437,45 @@ static noinline struct module *load_module(void __user *umod,
 	/* Determine total sizes, and put offsets in sh_entsize.  For now
 	   this is done generically; there doesn't appear to be any
 	   special cases for the architectures. */
+    /*
+	 * 对core section和init section中的大小及代码段的信息进行
+	 * 统计
+	 */
 	layout_sections(mod, hdr, sechdrs, secstrings);
-	symoffs = layout_symtab(mod, sechdrs, symindex, strindex, hdr,
-				secstrings, &stroffs, strmap);
+
+    /*
+	 * 处理符号表中的符号，返回值是core section尾部的
+	 * 符号表的偏移。
+	 */
+	symoffs = layout_symtab(mod, sechdrs, symindex, strindex, hdr,secstrings, &stroffs, strmap);
 
 	/* Do the allocs. */
+	/*
+	 * 为core section分配内存，初始化后存储在module实例
+	 * 的module_core成员中。
+	 */
+	//为模块分配core_size大小的内存
 	ptr = module_alloc_update_bounds(mod->core_size);
 	/*
 	 * The pointer to this block is stored in the module structure
 	 * which is inside the block. Just mark it as not being a
 	 * leak.
 	 */
+	//标记到内存泄露检测里 
 	kmemleak_not_leak(ptr);
 	if (!ptr) {
 		err = -ENOMEM;
 		goto free_percpu;
 	}
+	//初始化
 	memset(ptr, 0, mod->core_size);
-	mod->module_core = ptr;
+	mod->module_core = ptr; //设置module.module_core指针
 
+    //为init分配空间
+    /*
+	 * 为init section分配内存，初始化后存储在module实例
+	 * 的module_init成员中。
+	 */
 	ptr = module_alloc_update_bounds(mod->init_size);
 	/*
 	 * The pointer to this block is stored in the module structure
@@ -2299,31 +2483,44 @@ static noinline struct module *load_module(void __user *umod,
 	 * scanned as it contains data and code that will be freed
 	 * after the module is initialized.
 	 */
+	// //当泄漏时不扫描或报告对象
 	kmemleak_ignore(ptr);
 	if (!ptr && mod->init_size) {
 		err = -ENOMEM;
 		goto free_core;
 	}
 	memset(ptr, 0, mod->init_size);
+	//设置module.module_init
 	mod->module_init = ptr;
 
 	/* Transfer each section which specifies SHF_ALLOC */
 	DEBUGP("final section addresses:\n");
-	for (i = 0; i < hdr->e_shnum; i++) {
+     //复制所有有SHF_ALLOC属性的节到新内核空间
+     /*
+	 * 遍历段首部表，拷贝需要占用内存的段到
+	 * init section 或core section，并且调整各个段的运行
+	 * 时地址。
+	 */
+	for (i = 0; i < hdr->e_shnum; i++) 
+	{
 		void *dest;
 
 		if (!(sechdrs[i].sh_flags & SHF_ALLOC))
 			continue;
 
+		//如果这个节区属于init的节区
 		if (sechdrs[i].sh_entsize & INIT_OFFSET_MASK)
-			dest = mod->module_init
-				+ (sechdrs[i].sh_entsize & ~INIT_OFFSET_MASK);
-		else
+			dest = mod->module_init + (sechdrs[i].sh_entsize & ~INIT_OFFSET_MASK);
+		else//如果这个节区属于core的节区
 			dest = mod->module_core + sechdrs[i].sh_entsize;
 
+		/*
+		 * 将当前段的内容从ELF文件头拷贝到指定的
+		 * 段(init section或core section)中
+		 */
 		if (sechdrs[i].sh_type != SHT_NOBITS)
-			memcpy(dest, (void *)sechdrs[i].sh_addr,
-			       sechdrs[i].sh_size);
+			memcpy(dest, (void *)sechdrs[i].sh_addr,sechdrs[i].sh_size);
+		
 		/* Update sh_addr to point to copy in image. */
 		sechdrs[i].sh_addr = (unsigned long)dest;
 		DEBUGP("\t0x%lx %s\n", sechdrs[i].sh_addr, secstrings + sechdrs[i].sh_name);
@@ -2344,10 +2541,12 @@ static noinline struct module *load_module(void __user *umod,
 	module_unload_init(mod);
 
 	/* add kobject, so we can reference it. */
+	//在/sys 下创建一些文件
 	err = mod_sysfs_init(mod);
 	if (err)
 		goto free_unload;
 
+	//检测MODULE_LICENSE("GPL") 是不是设置的GPL或之类的值  ,若没设置或随意设置则打印污染内核的警告
 	/* Set up license info based on the info section */
 	set_license(mod, get_modinfo(sechdrs, infoindex, "license"));
 
@@ -2364,9 +2563,16 @@ static noinline struct module *load_module(void __user *umod,
 		add_taint_module(mod, TAINT_PROPRIETARY_MODULE);
 
 	/* Set up MODINFO_ATTR fields */
+	/*
+	 * 根据.modinfo段设置模块信息。
+	 */
 	setup_modinfo(mod, sechdrs, infoindex);
 
 	/* Fix up syms, so that st_value is a pointer to location. */
+	/*
+	 * 解决当前模块对其他模块的符号引用问题，
+	 * 并找到符号对应的值的地址
+	 */
 	err = simplify_symbols(sechdrs, symindex, strtab, versindex, pcpuindex,
 			       mod);
 	if (err < 0)
@@ -2374,23 +2580,52 @@ static noinline struct module *load_module(void __user *umod,
 
 	/* Now we've got everything in the final locations, we can
 	 * find optional sections. */
-	mod->kp = section_objs(hdr, sechdrs, secstrings, "__param",
-			       sizeof(*mod->kp), &mod->num_kp);
+	 /*
+	 * 获取__param段的运行时地址，及其存储的
+	 * 对象的个数。
+	 */
+	mod->kp = section_objs(hdr, sechdrs, secstrings, "__param",sizeof(*mod->kp), &mod->num_kp);
+
+	/*
+		 * 获取__ksymtab段的运行时地址，及其存储的
+		 * 对象的个数。
+   */
 	mod->syms = section_objs(hdr, sechdrs, secstrings, "__ksymtab",
 				 sizeof(*mod->syms), &mod->num_syms);
+
+	/*
+	 * 获取__kcrctab段的运行时地址。
+	 */			 
 	mod->crcs = section_addr(hdr, sechdrs, secstrings, "__kcrctab");
+
+	/*
+	 * 获取__ksymtab_gpl段的运行时地址，及其存储的
+	 * 对象的个数。
+	 */
 	mod->gpl_syms = section_objs(hdr, sechdrs, secstrings, "__ksymtab_gpl",
 				     sizeof(*mod->gpl_syms),
 				     &mod->num_gpl_syms);
+
+	/*
+	 * 获取__kcrctab_gpl段的运行时地址。
+	 */				 
 	mod->gpl_crcs = section_addr(hdr, sechdrs, secstrings, "__kcrctab_gpl");
 	mod->gpl_future_syms = section_objs(hdr, sechdrs, secstrings,
 					    "__ksymtab_gpl_future",
 					    sizeof(*mod->gpl_future_syms),
 					    &mod->num_gpl_future_syms);
+	/*
+	 * 获取__ksymtab_gpl_future段的运行时地址，及其存储的
+	 * 对象的个数。
+	 */
 	mod->gpl_future_crcs = section_addr(hdr, sechdrs, secstrings,
 					    "__kcrctab_gpl_future");
 
 #ifdef CONFIG_UNUSED_SYMBOLS
+	/*
+		* 获取__ksymtab_unused段的运行时地址，及其存储的
+		* 对象的个数。
+		*/
 	mod->unused_syms = section_objs(hdr, sechdrs, secstrings,
 					"__ksymtab_unused",
 					sizeof(*mod->unused_syms),
@@ -2404,16 +2639,12 @@ static noinline struct module *load_module(void __user *umod,
 	mod->unused_gpl_crcs = section_addr(hdr, sechdrs, secstrings,
 					    "__kcrctab_unused_gpl");
 #endif
-#ifdef CONFIG_CONSTRUCTORS
-	mod->ctors = section_objs(hdr, sechdrs, secstrings, ".ctors",
-				  sizeof(*mod->ctors), &mod->num_ctors);
+#ifdef CONFIG_CONSTRUCTORS //得到.ctors中的构造函数
+	mod->ctors = section_objs(hdr, sechdrs, secstrings, ".ctors",sizeof(*mod->ctors), &mod->num_ctors);
 #endif
 
 #ifdef CONFIG_TRACEPOINTS
-	mod->tracepoints = section_objs(hdr, sechdrs, secstrings,
-					"__tracepoints",
-					sizeof(*mod->tracepoints),
-					&mod->num_tracepoints);
+	mod->tracepoints = section_objs(hdr, sechdrs, secstrings,"__tracepoints",sizeof(*mod->tracepoints),&mod->num_tracepoints);
 #endif
 #ifdef CONFIG_EVENT_TRACING
 	mod->trace_events = section_objs(hdr, sechdrs, secstrings,
@@ -2444,8 +2675,11 @@ static noinline struct module *load_module(void __user *umod,
 	}
 #endif
 
-	/* Now do relocations. */
-	for (i = 1; i < hdr->e_shnum; i++) {
+	/* Now do relocations. 
+     现在进行重定向的操作
+    */
+	for (i = 1; i < hdr->e_shnum; i++) 
+	{
 		const char *strtab = (char *)sechdrs[strindex].sh_addr;
 		unsigned int info = sechdrs[i].sh_info;
 
@@ -2467,10 +2701,18 @@ static noinline struct module *load_module(void __user *umod,
 	}
 
         /* Find duplicate symbols */
+	/*
+	 * 检查模块导出的符号在内核导出的或其他模块
+	 * 导出的符号是否有重复的。
+	 */
 	err = verify_export_symbols(mod);
 	if (err < 0)
 		goto cleanup;
 
+    /*
+	 * 获取__ex_table段的运行时地址，及其存储的
+	 * 对象的个数。
+	 */
   	/* Set up and sort exception table */
 	mod->extable = section_objs(hdr, sechdrs, secstrings, "__ex_table",
 				    sizeof(*mod->extable), &mod->num_exentries);
@@ -2479,13 +2721,17 @@ static noinline struct module *load_module(void __user *umod,
 	/* Finally, copy percpu area over. */
 	percpu_modcopy(mod->percpu, (void *)sechdrs[pcpuindex].sh_addr,
 		       sechdrs[pcpuindex].sh_size);
-
+	/*
+		 * 初始化模块中字符串表、符号表相关的成员，
+			* 初始化core section中的字符串表和符号表。
+		 */
 	add_kallsyms(mod, sechdrs, hdr->e_shnum, symindex, strindex,
 		     symoffs, stroffs, secstrings, strmap);
 	kfree(strmap);
 	strmap = NULL;
 
-	if (!mod->taints) {
+	if (!mod->taints) 
+	{
 		struct _ddebug *debug;
 		unsigned int num_debug;
 
@@ -2515,6 +2761,10 @@ static noinline struct module *load_module(void __user *umod,
 	flush_icache_range((unsigned long)mod->module_core,
 			   (unsigned long)mod->module_core + mod->core_size);
 
+    /*
+	 * get_fs是用来获取当前进程的地址限制，当当前的限制是
+	 * KERNEL_DS时，内核不会检查参数中的地址类型
+	 */
 	set_fs(old_fs);
 
 	mod->args = args;
@@ -2531,13 +2781,17 @@ static noinline struct module *load_module(void __user *umod,
 	 */
 	list_add_rcu(&mod->list, &modules);
 
+	 //解析参数到mod->kp 和mod->num_kp
 	err = parse_args(mod->name, mod->args, mod->kp, mod->num_kp, NULL);
 	if (err < 0)
 		goto unlink;
 
+
+	 //模块信息加入到sysfs中
 	err = mod_sysfs_setup(mod, mod->kp, mod->num_kp);
 	if (err < 0)
 		goto unlink;
+	
 	add_sect_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
 	add_notes_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
 
@@ -2587,33 +2841,47 @@ static noinline struct module *load_module(void __user *umod,
 /* Call module constructors. */
 static void do_mod_ctors(struct module *mod)
 {
+//支持构造函数
 #ifdef CONFIG_CONSTRUCTORS
 	unsigned long i;
 
+	//分别调用每个狗仔函数 即.ctor节中的函数
 	for (i = 0; i < mod->num_ctors; i++)
 		mod->ctors[i]();
 #endif
 }
 
 /* This is where the real work happens */
-SYSCALL_DEFINE3(init_module, void __user *, umod,
-		unsigned long, len, const char __user *, uargs)
+/*
+系统调用函数  insmod会调用此系统调用
+sys_init_module()
+模块的加载首先会在用户空间将模块的文件映射到内存(后面称之为文件映像)，然后调用sys_init_module,内核会将文件映像复制到内核态，然后根据各个节的属性，再重新分配模块的空间，重新分配的空间我们后面称之为内存映像
+*/
+SYSCALL_DEFINE3(init_module, 
+                    void __user *, umod,  //一个指向用户地址空间的指针，模块的二进制代码位于其中
+		            unsigned long, len,  //用户地址空间的长度
+		            const char __user *, uargs)//模块的参数
 {
-	struct module *mod;
+	struct module *mod;//内核用struct module来表示一个模块
 	int ret = 0;
 
-	/* Must have permission */
+	/* Must have permission 
+    权能检查 是否有权限加载模块
+	*/
 	if (!capable(CAP_SYS_MODULE) || modules_disabled)
 		return -EPERM;
 
-	/* Only one module load at a time, please */
+	/* Only one module load at a time, please 
+       在同一时刻只能有一个模块可以被加载  即不支持并发加载 
+	*/
 	if (mutex_lock_interruptible(&module_mutex) != 0)
 		return -EINTR;
 
-	/* Do all the hard work */
+	/*载入elf模块，返回初始化好的module结构体*/
 	mod = load_module(umod, len, uargs);
 	if (IS_ERR(mod)) 
 	{
+	    //加载出现错误
 		mutex_unlock(&module_mutex);
 		return PTR_ERR(mod);
 	}
@@ -2621,56 +2889,83 @@ SYSCALL_DEFINE3(init_module, void __user *, umod,
 	/* Drop lock so they can recurse */
 	mutex_unlock(&module_mutex);
 
-	blocking_notifier_call_chain(&module_notify_list,
-			MODULE_STATE_COMING, mod);
+    //利用内核通知链，告诉内核其他子系统，有模块将要装入
+	blocking_notifier_call_chain(&module_notify_list,MODULE_STATE_COMING, mod);
 
+    //调用mod中的所有构造函数 即.ctors节中的构造函数
 	do_mod_ctors(mod);
-	/* Start the module */
+	
+	/* Start the module  //调用模块的init函数*/
 	if (mod->init != NULL)
-		ret = do_one_initcall(mod->init);
+		ret = do_one_initcall(mod->init);//基本上等于直接调用mod->init
+
 	if (ret < 0) 
 	{
 		/* Init routine failed: abort.  Try to protect us from
                    buggy refcounters. */
+        //init函数运行失败，模块状态改为正在卸载中
 		mod->state = MODULE_STATE_GOING;
 		synchronize_sched();
-		module_put(mod);
-		blocking_notifier_call_chain(&module_notify_list,
-					     MODULE_STATE_GOING, mod);
+		
+		module_put(mod); //减小模块的使用计数
+
+		//调用内核通知连，通知模块正在卸载中
+		blocking_notifier_call_chain(&module_notify_list,MODULE_STATE_GOING, mod);
+
 		mutex_lock(&module_mutex);
+		//释放模块
 		free_module(mod);
 		mutex_unlock(&module_mutex);
+
+		//唤醒module_wq队列中的所有元素，由于内核的整个modules
+        //列表需要原子操作，如果有多个进程同时对modules列表进行
+        //操作，后来的就会进入这个module_wq队列
 		wake_up(&module_wq);
 		return ret;
 	}
-	if (ret > 0) {
+
+	if (ret > 0) 
+	{
 		printk(KERN_WARNING
 "%s: '%s'->init suspiciously returned %d, it should follow 0/-E convention\n"
 "%s: loading module anyway...\n",
 		       __func__, mod->name, ret,
 		       __func__);
-		dump_stack();
+		dump_stack(); //此函数可以打印当前cpu的堆栈信息
 	}
 
 	/* Now it's a first class citizen!  Wake up anyone waiting for it. */
+    //设置模块状态为加载成功，唤醒所有等待此模块加载完成的进程
 	mod->state = MODULE_STATE_LIVE;
+
 	wake_up(&module_wq);
+
+	//调用内核通知连，通知模块已加载
 	blocking_notifier_call_chain(&module_notify_list,
 				     MODULE_STATE_LIVE, mod);
 
+     //等待所有的异步函数调用完成  
 	/* We need to finish all async code before the module init sequence is done */
 	async_synchronize_full();
 
 	mutex_lock(&module_mutex);
 	/* Drop initial reference. */
-	module_put(mod);
+	module_put(mod);//减少引用计数
 	trim_init_extable(mod);
+	
 #ifdef CONFIG_KALLSYMS
+    //导出符号表，在/proc/kallsyms中能看到的应该是mod->symtab
 	mod->num_symtab = mod->core_num_syms;
+
+	//符号表的位置
 	mod->symtab = mod->core_symtab;
+    //字符串表的位置
 	mod->strtab = mod->core_strtab;
 #endif
+
+    //对init的空间进行释放
 	module_free(mod, mod->module_init);
+
 	mod->module_init = NULL;
 	mod->init_size = 0;
 	mod->init_text_size = 0;
@@ -2819,20 +3114,37 @@ out:
 	return -ERANGE;
 }
 
-int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
-			char *name, char *module_name, int *exported)
+int module_get_kallsym(unsigned int symnum, 
+                            unsigned long *value, 
+                            char *type,
+			                char *name, 
+			                char *module_name, 
+			                int *exported)
 {
 	struct module *mod;
 
 	preempt_disable();
-	list_for_each_entry_rcu(mod, &modules, list) {
-		if (symnum < mod->num_symtab) {
-			*value = mod->symtab[symnum].st_value;
-			*type = mod->symtab[symnum].st_info;
-			strlcpy(name, mod->strtab + mod->symtab[symnum].st_name,
-				KSYM_NAME_LEN);
+
+	//遍历所有的模块 modules是个模块的链表头
+	list_for_each_entry_rcu(mod, &modules, list) 
+	{
+
+	    ////如果当前模块的num_symtab 大于给定的symnum,则返回symnum 位置symbol的值value和type
+		if (symnum < mod->num_symtab) 
+		{
+			*value = mod->symtab[symnum].st_value; //符号值
+			*type = mod->symtab[symnum].st_info; //符号类型
+
+			//从字符串基址加上名字的偏移 获得符号的名
+			strlcpy(name, mod->strtab + mod->symtab[symnum].st_name,KSYM_NAME_LEN);
+
+			//获得模块的名
 			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
+
+			//检查这个模块中symbol为name的字符串是否导出 
 			*exported = is_exported(name, *value, mod);
+
+
 			preempt_enable();
 			return 0;
 		}
@@ -2952,18 +3264,21 @@ static int m_show(struct seq_file *m, void *p)
 	struct module *mod = list_entry(p, struct module, list);
 	char buf[8];
 
-	seq_printf(m, "%s %u",
-		   mod->name, mod->init_size + mod->core_size);
+    //模块名 占用内核空间的大小 
+	seq_printf(m, "%s %u",mod->name, mod->init_size + mod->core_size);
+
+	//被引用次数      依赖此模块的模块名          是否永久的 
 	print_unload_info(m, mod);
 
 	/* Informative for users. */
-	seq_printf(m, " %s",
-		   mod->state == MODULE_STATE_GOING ? "Unloading":
-		   mod->state == MODULE_STATE_COMING ? "Loading":
-		   "Live");
+	//模块状态
+	seq_printf(m, " %s",mod->state == MODULE_STATE_GOING ? "Unloading":mod->state == MODULE_STATE_COMING ? "Loading":"Live");
+
+    //模块占用内存的地址 
 	/* Used by oprofile and other similar tools. */
 	seq_printf(m, " 0x%p", mod->module_core);
 
+    //[污染标志]
 	/* Taints info */
 	if (mod->taints)
 		seq_printf(m, " %s", module_flags(mod, buf));
@@ -2996,12 +3311,14 @@ static const struct file_operations proc_modules_operations = {
 	.release	= seq_release,
 };
 
+//创建/proc/modules 文件 用于存放所有的内核加载的模块信息
 static int __init proc_modules_init(void)
 {
 	proc_create("modules", 0, NULL, &proc_modules_operations);
 	return 0;
 }
 module_init(proc_modules_init);
+
 #endif
 
 /* Given an address, look for it in the module exception tables. */

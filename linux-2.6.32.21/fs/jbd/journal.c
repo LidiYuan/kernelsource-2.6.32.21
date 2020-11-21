@@ -210,6 +210,7 @@ end_loop:
 	return 0;
 }
 
+//运行内核线程kjournald      ,线程保证运行中的日志事务会在一个特定间隔后被提交
 static int journal_start_thread(journal_t *journal)
 {
 	struct task_struct *t;

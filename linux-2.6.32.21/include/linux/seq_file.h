@@ -23,7 +23,7 @@ struct seq_file {
 	size_t from;//表示从缓冲区开始传的位置为偏移量 
 	size_t count;//缓冲区中存在的数据的长度
 	loff_t index;//数据记录索引值
-	loff_t read_pos;
+	loff_t read_pos;//在seq流中添加路径信息，路径字符都转换为8进制数。
 	u64 version;//版本号，是struct file的版本号的拷贝
 	struct mutex lock;//seq锁
 	const struct seq_operations *op;//seq操作结构，定义数据显示的操作函数
@@ -34,11 +34,23 @@ struct seq_operations {
 	/*是一个整型位置值，指示开始读取的位置。对于这个位置的意义完全取决于底层实现，不一定是字节为单位的位置，可能是一个元素的序列号*/
 	void * (*start) (struct seq_file *m, loff_t *pos);//start 方法会首先被调用，它的作用是在设置访问的起始点
 
-	
-	void (*stop) (struct seq_file *m, void *v);
-	void * (*next) (struct seq_file *m, void *v, loff_t *pos);
-	int (*show) (struct seq_file *m, void *v);
-};
+	void (*stop) (struct seq_file *m, 
+		          void *v   //用于自己的私有数据,在start中返回的
+		          ); 
+
+	/*如果此函数返回NULL 则将终止继续读取数据*/
+	void * (*next) (struct seq_file *m, 
+	                void *v,     //用户自己的私有数据 
+	                loff_t *pos);//记录的索引,用于传回下一次要读取的记录索引位置
+
+    /*如果此函数返回小于0的值将终止继续读取数据
+	  如果此函数返回大于0的值将会清空缓冲区中的数据  
+      返回0则表示成功执行
+	 */
+	int (*show) (struct seq_file *m,   //将数据填充到缓冲区
+		         void *v);             //用户自己的控制数据,比如自己读取记录的位置 
+
+};                                    
 
 #define SEQ_SKIP 1
 

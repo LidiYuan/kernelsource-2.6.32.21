@@ -130,13 +130,16 @@ static char bootup_tracer_buf[MAX_TRACER_SIZE] __initdata;
 static char *default_bootup_tracer;
 
 static int __init set_ftrace(char *str)
-{
+{   
+    //会将指定的tracer名称保存在bootp_tracer_buf中,
 	strncpy(bootup_tracer_buf, str, MAX_TRACER_SIZE);
 	default_bootup_tracer = bootup_tracer_buf;
 	/* We are using ftrace early, expand it */
 	ring_buffer_expanded = 1;
+	
 	return 1;
 }
+//设置内核参数 ftrace=
 __setup("ftrace=", set_ftrace);
 
 static int __init set_ftrace_dump_on_oops(char *str)
@@ -620,12 +623,16 @@ __acquires(kernel_lock)
 	struct tracer *t;
 	int ret = 0;
 
-	if (!type->name) {
+    //不允许tracer的名称，即tracer->name为空
+	if (!type->name) 
+	{
 		pr_info("Tracer must have a name\n");
 		return -1;
 	}
 
-	if (strlen(type->name) > MAX_TRACER_SIZE) {
+	//判断tracer的名字长度是否过长
+	if (strlen(type->name) > MAX_TRACER_SIZE) 
+	{
 		pr_info("Tracer has a name longer than %d\n", MAX_TRACER_SIZE);
 		return -1;
 	}
@@ -640,9 +647,13 @@ __acquires(kernel_lock)
 	mutex_lock(&trace_types_lock);
 
 	tracing_selftest_running = true;
-
-	for (t = trace_types; t; t = t->next) {
-		if (strcmp(type->name, t->name) == 0) {
+	
+    //遍历所有的tracer 看名字是否使用过
+	for (t = trace_types; t; t = t->next) 
+	{
+	    //名字相同  说明已经注册过
+		if (strcmp(type->name, t->name) == 0) 
+		{
 			/* already found */
 			pr_info("Tracer %s already registered\n",
 				type->name);
@@ -693,6 +704,7 @@ __acquires(kernel_lock)
 	}
 #endif
 
+    //将trace加入到链表中
 	type->next = trace_types;
 	trace_types = type;
 
@@ -755,6 +767,7 @@ static void __tracing_reset(struct ring_buffer *buffer, int cpu)
 	ftrace_enable_cpu();
 }
 
+//echo “” > debugfs/tracing/trace清除所有CPU ring buffer.
 void tracing_reset(struct trace_array *tr, int cpu)
 {
 	struct ring_buffer *buffer = tr->buffer;
@@ -1083,10 +1096,11 @@ void trace_current_buffer_discard_commit(struct ring_buffer *buffer,
 }
 EXPORT_SYMBOL_GPL(trace_current_buffer_discard_commit);
 
-void
-trace_function(struct trace_array *tr,
-	       unsigned long ip, unsigned long parent_ip, unsigned long flags,
-	       int pc)
+void trace_function(struct trace_array *tr,
+	                    unsigned long ip, 
+	                    unsigned long parent_ip, 
+	                    unsigned long flags,
+	                    int pc)
 {
 	struct ftrace_event_call *call = &event_function;
 	struct ring_buffer *buffer = tr->buffer;
@@ -1109,10 +1123,12 @@ trace_function(struct trace_array *tr,
 		ring_buffer_unlock_commit(buffer, event);
 }
 
-void
-ftrace(struct trace_array *tr, struct trace_array_cpu *data,
-       unsigned long ip, unsigned long parent_ip, unsigned long flags,
-       int pc)
+void ftrace(struct trace_array *tr, 
+              struct trace_array_cpu *data,
+              unsigned long ip, 
+              unsigned long parent_ip, 
+              unsigned long flags,
+              int pc)
 {
 	if (likely(!atomic_read(&data->disabled)))
 		trace_function(tr, ip, parent_ip, flags, pc);
@@ -3810,6 +3826,8 @@ static const struct file_operations tracing_dyn_info_fops = {
 
 static struct dentry *d_tracer;
 
+
+//在 /sys/kernel/debug/下创建 tracing目录
 struct dentry *tracing_init_dentry(void)
 {
 	static int once;
@@ -4397,16 +4415,21 @@ __init static int tracer_alloc_buffers(void)
 	int i;
 	int ret = -ENOMEM;
 
+	//表示系统中所有的CPU
 	if (!alloc_cpumask_var(&tracing_buffer_mask, GFP_KERNEL))
 		goto out;
 
+	//表示trace的cpu,只有在位图中的CPU才能允许被trace
 	if (!alloc_cpumask_var(&tracing_cpumask, GFP_KERNEL))
 		goto out_free_buffer_mask;
 
+    //用来记录当前哪一个CPU的ring buffer被pipe读,阻止cpu上并行pipe操作
 	if (!zalloc_cpumask_var(&tracing_reader_cpumask, GFP_KERNEL))
 		goto out_free_tracing_cpumask;
 
 	/* To save memory, keep the ring buffer size to its minimum */
+    //基本的原则是使用最小的缓存区
+    //set_ftrace()会更改ring_buffer_expanded
 	if (ring_buffer_expanded)
 		ring_buf_size = trace_buf_size;
 	else
@@ -4415,14 +4438,17 @@ __init static int tracer_alloc_buffers(void)
 	cpumask_copy(tracing_buffer_mask, cpu_possible_mask);
 	cpumask_copy(tracing_cpumask, cpu_all_mask);
 
+
+	//分配 ring buffer的大小
 	/* TODO: make the number of buffers hot pluggable with CPUS */
-	global_trace.buffer = ring_buffer_alloc(ring_buf_size,
-						   TRACE_BUFFER_FLAGS);
-	if (!global_trace.buffer) {
+	global_trace.buffer = ring_buffer_alloc(ring_buf_size, TRACE_BUFFER_FLAGS);
+	if (!global_trace.buffer) 
+	{
 		printk(KERN_ERR "tracer: failed to allocate ring buffer!\n");
 		WARN_ON(1);
 		goto out_free_cpumask;
 	}
+	
 	global_trace.entries = ring_buffer_size(global_trace.buffer);
 
 
@@ -4440,11 +4466,13 @@ __init static int tracer_alloc_buffers(void)
 #endif
 
 	/* Allocate the first page for all buffers */
-	for_each_tracing_cpu(i) {
+	for_each_tracing_cpu(i) 
+   {
 		global_trace.data[i] = &per_cpu(global_trace_cpu, i);
 		max_tr.data[i] = &per_cpu(max_data, i);
 	}
 
+	
 	trace_init_cmdlines();
 
 	register_tracer(&nop_trace);
@@ -4455,8 +4483,8 @@ __init static int tracer_alloc_buffers(void)
 	/* All seems OK, enable tracing */
 	tracing_disabled = 0;
 
-	atomic_notifier_chain_register(&panic_notifier_list,
-				       &trace_panic_notifier);
+	//注册了两个notifier,用来在内核发生panic或者是die的时候，将trace中的消息打印出来 
+	atomic_notifier_chain_register(&panic_notifier_list,&trace_panic_notifier);
 
 	register_die_notifier(&trace_die_notifier);
 
@@ -4491,6 +4519,8 @@ __init static int clear_boot_tracer(void)
 	return 0;
 }
 
-early_initcall(tracer_alloc_buffers);
+
+/*trace的初始化有三个函数组成  调用顺序如下*/
+early_initcall(tracer_alloc_buffers); //为trace 分配buffer
 fs_initcall(tracer_init_debugfs);
 late_initcall(clear_boot_tracer);

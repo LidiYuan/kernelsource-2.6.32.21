@@ -20,7 +20,8 @@ struct journal_head {
 	/*
 	 * Points back to our buffer_head. [jbd_lock_bh_journal_head()]
 	 */
-	struct buffer_head *b_bh;
+	
+	struct buffer_head *b_bh; 
 
 	/*
 	 * Reference count - see description in journal.c
@@ -28,9 +29,11 @@ struct journal_head {
 	 */
 	int b_jcount;
 
+
 	/*
 	 * Journalling list for this buffer [jbd_lock_bh_state()]
 	 */
+	 // 本journal_head在transaction_t的哪个链表上 
 	unsigned b_jlist;
 
 	/*
@@ -38,12 +41,13 @@ struct journal_head {
 	 * the currently running transaction
 	 * [jbd_lock_bh_state()]
 	 */
+	 // 标志该缓冲区是否以被当前正在运行的transaction修改过
 	unsigned b_modified;
 
 	/*
 	 * Copy of the buffer data frozen for writing to the log.
 	 * [jbd_lock_bh_state()]
-	 */
+	 */// 将buffer_head指向的缓冲区数据拷贝出来，冻结起来，供写入日志使用。
 	char *b_frozen_data;
 
 	/*
@@ -59,7 +63,7 @@ struct journal_head {
 	 * transaction (if there is one).  Only applies to buffers on a
 	 * transaction's data or metadata journaling list.
 	 * [j_list_lock] [jbd_lock_bh_state()]
-	 */
+	 */// 指向所属的transaction
 	transaction_t *b_transaction;
 
 	/*
@@ -67,7 +71,9 @@ struct journal_head {
 	 * modifying the buffer's metadata, if there was already a transaction
 	 * committing it when the new transaction touched it.
 	 * [t_list_lock] [jbd_lock_bh_state()]
-	 */
+	 */// 当有一个transaction正在提交本缓冲区，
+	// 但是另一个transaction要修改本元数据缓冲区的数据，
+	// 该指针就指向第二个缓冲区
 	transaction_t *b_next_transaction;
 
 	/*
@@ -81,13 +87,15 @@ struct journal_head {
 	 * is checkpointed.  Only dirty buffers can be checkpointed.
 	 * [j_list_lock]
 	 */
+	// 指向checkpoint本缓冲区的transaction。
+		// 只有脏的缓冲区可以被checkpointed。
 	transaction_t *b_cp_transaction;
 
 	/*
 	 * Doubly-linked list of buffers still remaining to be flushed
 	 * before an old transaction can be checkpointed.
 	 * [j_list_lock]
-	 */
+	 */// 在旧的transaction_t被checkpointed之前必须被刷新的缓冲区双向链表。
 	struct journal_head *b_cpnext, *b_cpprev;
 
 	/* Trigger type */

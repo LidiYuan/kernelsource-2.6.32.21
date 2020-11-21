@@ -667,7 +667,8 @@ static int __kprobes in_kprobes_functions(unsigned long addr)
 static kprobe_opcode_t __kprobes *kprobe_addr(struct kprobe *p)
 {
 	kprobe_opcode_t *addr = p->addr;
-	if (p->symbol_name) {
+	if (p->symbol_name) 
+	{
 		if (addr)
 			return NULL;
 		kprobe_lookup_name(p->symbol_name, addr);
@@ -861,6 +862,7 @@ static void __kprobes __unregister_kprobe_bottom(struct kprobe *p)
 	}
 }
 
+//注册探测函数向量，包含多个探测点
 int __kprobes register_kprobes(struct kprobe **kps, int num)
 {
 	int i, ret = 0;
@@ -879,12 +881,17 @@ int __kprobes register_kprobes(struct kprobe **kps, int num)
 }
 EXPORT_SYMBOL_GPL(register_kprobes);
 
+/* 卸载kprobe探测点*/
 void __kprobes unregister_kprobe(struct kprobe *p)
 {
 	unregister_kprobes(&p, 1);
 }
+
 EXPORT_SYMBOL_GPL(unregister_kprobe);
 
+/*
+//卸载探测函数向量，包含多个探测点
+*/
 void __kprobes unregister_kprobes(struct kprobe **kps, int num)
 {
 	int i;
@@ -981,42 +988,67 @@ EXPORT_SYMBOL_GPL(unregister_jprobes);
  * This kprobe pre_handler is registered with every kretprobe. When probe
  * hits it will set up the return probe.
  */
+//该函数在kretprobe探测点被执行到后，用于修改被探测函数的返回地址
 static int __kprobes pre_handler_kretprobe(struct kprobe *p,
-					   struct pt_regs *regs)
+					                             struct pt_regs *regs)
 {
 	struct kretprobe *rp = container_of(p, struct kretprobe, kp);
 	unsigned long hash, flags = 0;
 	struct kretprobe_instance *ri;
 
 	/*TODO: consider to only swap the RA after the last pre_handler fired */
+    //首先根据当前的进程描述符地址以及KPROBE_HASH_BITS值计算出hash索引值
 	hash = hash_ptr(current, KPROBE_HASH_BITS);
+
 	spin_lock_irqsave(&rp->lock, flags);
-	if (!hlist_empty(&rp->free_instances)) {
-		ri = hlist_entry(rp->free_instances.first,
-				struct kretprobe_instance, hlist);
+
+	//如果kretprobe的free_instances链表不为空
+	//则从中找到一个空闲的kretprobe_instance实例，然后对其中的rp和task字段赋值，表示将该探测实例和当前进程绑定
+	if (!hlist_empty(&rp->free_instances)) 
+	{
+		ri = hlist_entry(rp->free_instances.first,struct kretprobe_instance, hlist);
 		hlist_del(&ri->hlist);
 		spin_unlock_irqrestore(&rp->lock, flags);
 
+        //对其中的rp和task字段赋值，表示将该探测实例和当前进程绑定
 		ri->rp = rp;
 		ri->task = current;
 
+		//如果entry_handler中返回值不为0,则不进行下面的返回值替换
 		if (rp->entry_handler && rp->entry_handler(ri, regs))
 			return 0;
 
+       //接下来调用arch_prepare_kretprobe函数，该函数架构相关，用于保存并替换regs中的返回地址
 		arch_prepare_kretprobe(ri, regs);
 
 		/* XXX(hch): why is there no hlist_move_head? */
 		INIT_HLIST_NODE(&ri->hlist);
+		
 		kretprobe_table_lock(hash, &flags);
+        //接下来将本此使用的kretprobe_instance链接到全局kretprobe_inst_table哈希表中 
 		hlist_add_head(&ri->hlist, &kretprobe_inst_table[hash]);
+
 		kretprobe_table_unlock(hash, &flags);
-	} else {
+	} 
+	else 
+	{
 		rp->nmissed++;
 		spin_unlock_irqrestore(&rp->lock, flags);
 	}
 	return 0;
 }
 
+/*
+kretprobe探测方式是基于kprobe实现的又一种内核探测方式，该探测方式主要用于在函数返回时进行探测，获得内核函数的返回值，还可以用于计算函数执行时间等方面
+
+kretprobe触发是在刚进入被探测函数的第一条汇编指令时发生的，因为 kretprobe注册时把该地址修改位int3指令,
+CPU异常处理,执行 pre_handler_kretprobe() 函数,，该函数首先找到一个空闲的kretprobe_instance探测实例并将它和当前进程绑定，然后调用entry_handler回调函数,
+接着保存并替换被探测函数的返回地址，最后kprobe探测流程结束并回到正常的执行流程执行被探测函数，在函数返回后将跳转到被替换的 kretprobe_trampoline，该函数会获取被探测函数的寄存器信息并调用用户定义的回调函数输出其中的返回值，最后函数返回正常的执行流程
+
+
+
+
+*/
 int __kprobes register_kretprobe(struct kretprobe *rp)
 {
 	int ret = 0;
@@ -1024,33 +1056,47 @@ int __kprobes register_kretprobe(struct kretprobe *rp)
 	int i;
 	void *addr;
 
-	if (kretprobe_blacklist_size) {
-		addr = kprobe_addr(&rp->kp);
+    //函数的开头首先处理kretprobe所特有的blacklist，如果指定的被探测函数在这个blacklist中就直接返回EINVAL，表示不支持探测
+	if (kretprobe_blacklist_size) 
+	{
+		addr = kprobe_addr(&rp->kp);//先获得被探测函数的地址
 		if (!addr)
 			return -EINVAL;
 
-		for (i = 0; kretprobe_blacklist[i].name != NULL; i++) {
+		//如果指定的被探测函数在这个blacklist中就直接返回EINVAL，表示不支持探测
+		for (i = 0; kretprobe_blacklist[i].name != NULL; i++) 
+		{
 			if (kretprobe_blacklist[i].addr == addr)
 				return -EINVAL;
 		}
 	}
 
-	rp->kp.pre_handler = pre_handler_kretprobe;
+	rp->kp.pre_handler = pre_handler_kretprobe;//设置在探测点被触发的时候执行的函数
+
+	//不需要设置以下三个值
 	rp->kp.post_handler = NULL;
 	rp->kp.fault_handler = NULL;
 	rp->kp.break_handler = NULL;
 
+    //然后若用户没有指定最大并行探测数maxactive，这里会计算并设置一个默认的值
 	/* Pre-allocate memory for max kretprobe instances */
-	if (rp->maxactive <= 0) {
+	if (rp->maxactive <= 0) 
+	{
+		
 #ifdef CONFIG_PREEMPT
 		rp->maxactive = max(10, 2 * NR_CPUS);
 #else
 		rp->maxactive = NR_CPUS;
 #endif
+
 	}
 	spin_lock_init(&rp->lock);
+
+	//初始化链表
 	INIT_HLIST_HEAD(&rp->free_instances);
-	for (i = 0; i < rp->maxactive; i++) {
+
+	for (i = 0; i < rp->maxactive; i++) 
+	{
 		inst = kmalloc(sizeof(struct kretprobe_instance) +
 			       rp->data_size, GFP_KERNEL);
 		if (inst == NULL) {
@@ -1062,6 +1108,7 @@ int __kprobes register_kretprobe(struct kretprobe *rp)
 	}
 
 	rp->nmissed = 0;
+
 	/* Establish function entry probe point */
 	ret = register_kprobe(&rp->kp);
 	if (ret != 0)
@@ -1214,6 +1261,7 @@ static struct notifier_block kprobe_module_nb = {
 	.priority = 0
 };
 
+/*对kprobe进行初始化*/
 static int __init init_kprobes(void)
 {
 	int i, err = 0;
@@ -1225,10 +1273,12 @@ static int __init init_kprobes(void)
 
 	/* FIXME allocate the probe table, currently defined statically */
 	/* initialize all list heads */
-	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
+	//初始化hash表的各个链表头
+	for (i = 0; i < KPROBE_TABLE_SIZE; i++) 
+	{
 		INIT_HLIST_HEAD(&kprobe_table[i]);
 		INIT_HLIST_HEAD(&kretprobe_inst_table[i]);
-		spin_lock_init(&(kretprobe_table_locks[i].lock));
+		spin_lock_init(&(kretprobe_table_locks[i].lock));//初始化kretprobe用到的自旋锁
 	}
 
 	/*
@@ -1241,13 +1291,15 @@ static int __init init_kprobes(void)
 	 */
 	for (kb = kprobe_blacklist; kb->name != NULL; kb++) 
 	{
+	    //查找符号的地址
 		kprobe_lookup_name(kb->name, addr);
 		if (!addr)
 			continue;
 
 		kb->start_addr = (unsigned long)addr;
-		symbol_name = kallsyms_lookup(kb->start_addr,
-				&size, &offset, &modname, namebuf);
+
+		//查找符号的范围 并将范围保存到range中
+		symbol_name = kallsyms_lookup(kb->start_addr,&size, &offset, &modname, namebuf);
 		if (!symbol_name)
 			kb->range = 0;
 		else
@@ -1259,11 +1311,9 @@ static int __init init_kprobes(void)
 		/* lookup the function address from its name */
 		for (i = 0; kretprobe_blacklist[i].name != NULL; i++) 
 		{
-			kprobe_lookup_name(kretprobe_blacklist[i].name,
-					   kretprobe_blacklist[i].addr);
+			kprobe_lookup_name(kretprobe_blacklist[i].name,kretprobe_blacklist[i].addr);
 			if (!kretprobe_blacklist[i].addr)
-				printk("kretprobe: lookup failed: %s\n",
-				       kretprobe_blacklist[i].name);
+				printk("kretprobe: lookup failed: %s\n",kretprobe_blacklist[i].name);
 		}
 	}
 
@@ -1373,6 +1423,9 @@ static const struct file_operations debugfs_kprobes_operations = {
 };
 
 /* Disable one kprobe */
+/*
+临时暂停指定探测点的探测
+*/
 int __kprobes disable_kprobe(struct kprobe *kp)
 {
 	int ret = 0;
@@ -1405,6 +1458,9 @@ out:
 EXPORT_SYMBOL_GPL(disable_kprobe);
 
 /* Enable one kprobe */
+/*
+恢复指定探测点的探测
+*/
 int __kprobes enable_kprobe(struct kprobe *kp)
 {
 	int ret = 0;

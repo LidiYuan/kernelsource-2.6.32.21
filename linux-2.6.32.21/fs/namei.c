@@ -261,19 +261,20 @@ int inode_permission(struct inode *inode, int mask)
 {
 	int retval;
 
-	if (mask & MAY_WRITE) {
+	if (mask & MAY_WRITE) 
+	{
 		umode_t mode = inode->i_mode;
 
 		/*
 		 * Nobody gets write access to a read-only fs.
 		 */
-		if (IS_RDONLY(inode) &&
-		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
+		if (IS_RDONLY(inode) && (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
 			return -EROFS;
 
 		/*
 		 * Nobody gets write access to an immutable file.
 		 */
+		 
 		if (IS_IMMUTABLE(inode))
 			return -EACCES;
 	}

@@ -1314,29 +1314,42 @@ MODULE_LICENSE("GPL");
 module_param(scsi_logging_level, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(scsi_logging_level, "a bit mask of logging levels");
 
+
 static int __init init_scsi(void)
 {
 	int error;
 
+    ////初始化聚散列表等
 	error = scsi_init_queue();
 	if (error)
 		return error;
+
+	////初始化proc文件系统 创建/proc/scsi/目录 和/proc/scsi/scsi文件
 	error = scsi_init_procfs();
 	if (error)
 		goto cleanup_queue;
+
+	//设置scsi动态设备信息列表
 	error = scsi_init_devinfo();
 	if (error)
 		goto cleanup_procfs;
+
+	//注册shost_class类. 创建/sys/class/scsi_host/ 目录
 	error = scsi_init_hosts();
 	if (error)
 		goto cleanup_devlist;
+
+	//注册sysctl控制表  //在/proc/sys/下建立dev/scsi/logging_level 文件 可以直接控制变量scsi_logging_level的值
 	error = scsi_init_sysctl();
 	if (error)
 		goto cleanup_hosts;
+
+	//注册scsi总线和创建/sys/class/scsi_device/目录
 	error = scsi_sysfs_register();
 	if (error)
 		goto cleanup_sysctl;
 
+	
 	scsi_netlink_init();
 
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");

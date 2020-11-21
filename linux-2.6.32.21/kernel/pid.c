@@ -37,8 +37,8 @@
 #include <linux/init_task.h>
 #include <linux/syscalls.h>
 
-#define pid_hashfn(nr, ns)	\
-	hash_long((unsigned long)nr + (unsigned long)ns, pidhash_shift)
+#define pid_hashfn(nr, ns)	hash_long((unsigned long)nr + (unsigned long)ns, pidhash_shift)
+
 static struct hlist_head *pid_hash;
 static unsigned int pidhash_shift = 4;
 struct pid init_struct_pid = INIT_STRUCT_PID;
@@ -294,8 +294,7 @@ struct pid *find_pid_ns(int nr, struct pid_namespace *ns)
 	struct hlist_node *elem;
 	struct upid *pnr;
 
-	hlist_for_each_entry_rcu(pnr, elem,
-			&pid_hash[pid_hashfn(nr, ns)], pid_chain)
+	hlist_for_each_entry_rcu(pnr, elem,&pid_hash[pid_hashfn(nr, ns)], pid_chain)
 		if (pnr->nr == nr && pnr->ns == ns)
 			return container_of(pnr, struct pid,
 					numbers[ns->level]);
@@ -502,8 +501,7 @@ void __init pidhash_init(void)
 	int i, pidhash_size;
 
 	pid_hash = alloc_large_system_hash("PID", sizeof(*pid_hash), 0, 18,
-					   HASH_EARLY | HASH_SMALL,
-					   &pidhash_shift, NULL, 4096);
+					   HASH_EARLY | HASH_SMALL,&pidhash_shift, NULL, 4096);
 	pidhash_size = 1 << pidhash_shift;
 
 	for (i = 0; i < pidhash_size; i++)

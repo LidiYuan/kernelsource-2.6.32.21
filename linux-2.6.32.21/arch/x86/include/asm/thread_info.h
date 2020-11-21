@@ -84,11 +84,11 @@ struct thread_info {
 #define TIF_SYSCALL_TRACE	0	/* syscall trace active */
 #define TIF_NOTIFY_RESUME	1	/* callback before returning to user */
 #define TIF_SIGPENDING		2	/* signal pending 信号挂起*/
-#define TIF_NEED_RESCHED	3	/* rescheduling necessary */
-#define TIF_SINGLESTEP		4	/* reenable singlestep on user return*/
+#define TIF_NEED_RESCHED	3	/* rescheduling necessary 重新调度*/ 
+#define TIF_SINGLESTEP		4	/* reenable singlestep on user return 重新允许单步调试*/
 #define TIF_IRET		5	/* force IRET */
 #define TIF_SYSCALL_EMU		6	/* syscall emulation active */
-#define TIF_SYSCALL_AUDIT	7	/* syscall auditing active */
+#define TIF_SYSCALL_AUDIT	7	/* syscall auditing active   audit_alloc()中设置  ,用于标记有审计信息处理*/
 #define TIF_SECCOMP		8	/* secure computing */
 #define TIF_MCE_NOTIFY		10	/* notify userspace of an MCE */
 #define TIF_NOTSC		16	/* TSC is not accessible in userland */
@@ -102,11 +102,14 @@ struct thread_info {
 #define TIF_DEBUGCTLMSR		25	/* uses thread_struct.debugctlmsr */
 #define TIF_DS_AREA_MSR		26      /* uses thread_struct.ds_area_msr */
 #define TIF_LAZY_MMU_UPDATES	27	/* task is updating the mmu lazily */
-#define TIF_SYSCALL_TRACEPOINT	28	/* syscall tracepoint instrumentation */
+#define TIF_SYSCALL_TRACEPOINT	28	/* syscall tracepoint instrumentation  系统调用的跟踪 tracepoint机制*/
 
 #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
+
+//有信号挂起
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+
 #define _TIF_SINGLESTEP		(1 << TIF_SINGLESTEP)
 #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 #define _TIF_IRET		(1 << TIF_IRET)

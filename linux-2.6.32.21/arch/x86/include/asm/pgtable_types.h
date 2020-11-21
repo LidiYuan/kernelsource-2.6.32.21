@@ -30,12 +30,18 @@
 /* - set: nonlinear file mapping, saved PTE; unset:swap */
 #define _PAGE_BIT_FILE		_PAGE_BIT_DIRTY
 
+//指定了虚拟内存页是否存在于内存之中，这个之前的pte_present函数里有使用
 #define _PAGE_PRESENT	(_AT(pteval_t, 1) << _PAGE_BIT_PRESENT) //页面常驻内存 不进行换出操作
+
 #define _PAGE_RW	(_AT(pteval_t, 1) << _PAGE_BIT_RW) //页面可能被写入时 设置该位
+
+//如果设置了_PAGE_USER则允许用户访问该页，否则，只有内核能够访问
 #define _PAGE_USER	(_AT(pteval_t, 1) << _PAGE_BIT_USER)//页面可被用户空间访问 设置该位
 #define _PAGE_PWT	(_AT(pteval_t, 1) << _PAGE_BIT_PWT)
 #define _PAGE_PCD	(_AT(pteval_t, 1) << _PAGE_BIT_PCD)
 #define _PAGE_ACCESSED	(_AT(pteval_t, 1) << _PAGE_BIT_ACCESSED)//页面被访问 设置该位
+
+//表示页是否是脏的，即页的内容是否修改过
 #define _PAGE_DIRTY	(_AT(pteval_t, 1) << _PAGE_BIT_DIRTY)//页面被写入时 设置该位
 #define _PAGE_PSE	(_AT(pteval_t, 1) << _PAGE_BIT_PSE)
 #define _PAGE_GLOBAL	(_AT(pteval_t, 1) << _PAGE_BIT_GLOBAL)

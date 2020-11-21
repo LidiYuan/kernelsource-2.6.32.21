@@ -111,8 +111,7 @@ void make_8259A_irq(unsigned int irq)
 {
 	disable_irq_nosync(irq);
 	io_apic_irqs &= ~(1<<irq);
-	set_irq_chip_and_handler_name(irq, &i8259A_chip, handle_level_irq,
-				      "XT");
+	set_irq_chip_and_handler_name(irq, &i8259A_chip, handle_level_irq,"XT");
 	enable_irq(irq);
 }
 

@@ -41,16 +41,21 @@ ext4_xattr_user_get(struct inode *inode, const char *name,
 	return ext4_xattr_get(inode, EXT4_XATTR_INDEX_USER, name, buffer, size);
 }
 
-static int
-ext4_xattr_user_set(struct inode *inode, const char *name,
-		    const void *value, size_t size, int flags)
+/*ext4 设置命名空间为user的 扩展属性*/
+static int ext4_xattr_user_set(struct inode *inode, 
+                         const char *name,
+		                 const void *value, 
+		                 size_t size, 
+		                 int flags)
 {
 	if (strcmp(name, "") == 0)
 		return -EINVAL;
+
+	//文件系统是否支持XATTR_USER属性
 	if (!test_opt(inode->i_sb, XATTR_USER))
 		return -EOPNOTSUPP;
-	return ext4_xattr_set(inode, EXT4_XATTR_INDEX_USER, name,
-			      value, size, flags);
+	
+	return ext4_xattr_set(inode, EXT4_XATTR_INDEX_USER, name,value, size, flags);
 }
 
 struct xattr_handler ext4_xattr_user_handler = {

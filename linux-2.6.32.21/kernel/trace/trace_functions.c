@@ -96,7 +96,8 @@ function_trace_call(unsigned long ip, unsigned long parent_ip)
 	data = tr->data[cpu];
 	disabled = atomic_inc_return(&data->disabled);
 
-	if (likely(disabled == 1)) {
+	if (likely(disabled == 1)) 
+	{
 		pc = preempt_count();
 		trace_function(tr, ip, parent_ip, flags, pc);
 	}

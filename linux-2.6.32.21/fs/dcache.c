@@ -1913,17 +1913,18 @@ char *__d_path(const struct path *path, struct path *root,
 
 	spin_lock(&vfsmount_lock);
 	prepend(&end, &buflen, "\0", 1);
-	if (d_unlinked(dentry) &&
-		(prepend(&end, &buflen, " (deleted)", 10) != 0))
+	if (d_unlinked(dentry) && (prepend(&end, &buflen, " (deleted)", 10) != 0))
 			goto Elong;
 
 	if (buflen < 1)
 		goto Elong;
+	
 	/* Get '/' right */
 	retval = end-1;
 	*retval = '/';
 
-	for (;;) {
+	for (;;) 
+	{
 		struct dentry * parent;
 
 		if (dentry == root->dentry && vfsmnt == root->mnt)

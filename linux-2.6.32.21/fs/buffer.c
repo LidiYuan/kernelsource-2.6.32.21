@@ -3276,7 +3276,8 @@ SYSCALL_DEFINE2(bdflush, int, func, long, data)
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	if (msg_count < 5) {
+	if (msg_count < 5) 
+	{
 		msg_count++;
 		printk(KERN_INFO
 			"warning: process `%s' used the obsolete bdflush"

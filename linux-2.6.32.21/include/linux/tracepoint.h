@@ -21,17 +21,17 @@ struct module;
 struct tracepoint;
 
 struct tracepoint {
-	const char *name;		/* Tracepoint name */
-	int state;			/* State. */
-	void (*regfunc)(void);
-	void (*unregfunc)(void);
-	void **funcs;
+	const char *name;		/*trace point的名字，内核中通过hash表管理所有的trace point，找到对应的hash slot后，需要通过name来识别具体的trace point*/
+	int state;			    /* trace point状态，0表示disable，1表示enable */
+	void (*regfunc)(void);  //添加桩函数的函数
+	void (*unregfunc)(void);// 卸载桩函数的函数
+	void **funcs;           //trace point中所有的桩函数链表
 } __attribute__((aligned(32)));		/*
-					 * Aligned on 32 bytes because it is
-					 * globally visible and gcc happily
-					 * align these on the structure size.
-					 * Keep in sync with vmlinux.lds.h.
-					 */
+									 * Aligned on 32 bytes because it is
+									 * globally visible and gcc happily
+									 * align these on the structure size.
+									 * Keep in sync with vmlinux.lds.h.
+									 */
 
 #ifndef DECLARE_TRACE
 
@@ -52,7 +52,7 @@ struct tracepoint {
 		it_func = rcu_dereference((tp)->funcs);			\
 		if (it_func) {						\
 			do {						\
-				((void(*)(proto))(*it_func))(args);	\
+				((void(*)(proto)) (*it_func))(args);	\
 			} while (*(++it_func));				\
 		}							\
 		rcu_read_unlock_sched_notrace();			\
@@ -63,41 +63,49 @@ struct tracepoint {
  * not add unwanted padding between the beginning of the section and the
  * structure. Force alignment to the same alignment as the section start.
  */
-#define DECLARE_TRACE(name, proto, args)				\
-	extern struct tracepoint __tracepoint_##name;			\
-	static inline void trace_##name(proto)				\
-	{								\
-		if (unlikely(__tracepoint_##name.state))		\
-			__DO_TRACE(&__tracepoint_##name,		\
-				TP_PROTO(proto), TP_ARGS(args));	\
+
+/*定义trace point用到的函数，定义的函数原型如下3个
+extern struct tracepoint __tracepoint_##name;
+static inline void trace_##name(proto)
+register_trace_##name(void (*probe)(data_proto), void *data)
+unregister_trace_##name(void (*probe)(data_proto), void *data)
+*/			
+#define DECLARE_TRACE(name, proto, args)				        \
+	extern struct tracepoint __tracepoint_##name;			    \
+	                                                            \
+	static inline void trace_##name(proto)				       \
+	{	                                                    \
+	    //判断trace point是否disable                                                   \
+		if (  unlikely(__tracepoint_##name.state)  )		                     \
+			//遍历执行trace point中的桩函数 即 tracepoint{}->funcs                                                         \
+			__DO_TRACE(&__tracepoint_##name,TP_PROTO(proto), TP_ARGS(args));	    \
 	}								\
 	static inline int register_trace_##name(void (*probe)(proto))	\
 	{								\
 		return tracepoint_probe_register(#name, (void *)probe);	\
 	}								\
-	static inline int unregister_trace_##name(void (*probe)(proto))	\
+	static inline int unregister_trace_##name(void (*probe)(proto))	 \
 	{								\
 		return tracepoint_probe_unregister(#name, (void *)probe);\
 	}
 
 
+//定义一个 struct tracepoint 结构
 #define DEFINE_TRACE_FN(name, reg, unreg)				\
-	static const char __tpstrtab_##name[]				\
-	__attribute__((section("__tracepoints_strings"))) = #name;	\
-	struct tracepoint __tracepoint_##name				\
-	__attribute__((section("__tracepoints"), aligned(32))) =	\
-		{ __tpstrtab_##name, 0, reg, unreg, NULL }
+	static const char __tpstrtab_##name[]	__attribute__((section("__tracepoints_strings"))) = #name;	\
+	struct tracepoint __tracepoint_##name	__attribute__((section("__tracepoints"), aligned(32))) = { __tpstrtab_##name, 0, reg, unreg, NULL }
 
+//定义一个 struct tracepoint 结构
 #define DEFINE_TRACE(name)						\
-	DEFINE_TRACE_FN(name, NULL, NULL);
+	         DEFINE_TRACE_FN(name, NULL, NULL);
 
+//将符号导出能让别的模块使用
 #define EXPORT_TRACEPOINT_SYMBOL_GPL(name)				\
 	EXPORT_SYMBOL_GPL(__tracepoint_##name)
 #define EXPORT_TRACEPOINT_SYMBOL(name)					\
 	EXPORT_SYMBOL(__tracepoint_##name)
 
-extern void tracepoint_update_probe_range(struct tracepoint *begin,
-	struct tracepoint *end);
+extern void tracepoint_update_probe_range(struct tracepoint *begin,struct tracepoint *end);
 
 #else /* !CONFIG_TRACEPOINTS */
 #define DECLARE_TRACE(name, proto, args)				\
@@ -183,34 +191,36 @@ static inline void tracepoint_synchronize_unregister(void)
  *
  * Firstly, name your tracepoint via TRACE_EVENT(name : the
  * 'subsystem_event' notation is fine.
- *
+ *  
+ //下面用trace_sched_switch() 做例子来讲解 宏的构造方式
  * Think about this whole construct as the
  * 'trace_sched_switch() function' from now on.
  *
- *
+ *  //跟踪点的名字为sched_switch 
  *  TRACE_EVENT(sched_switch,
  *
- *	*
+ *	* 每个函数有个参数原型 用TP_PROTO()定义
  *	* A function has a regular function arguments
  *	* prototype, declare it via TP_PROTO():
  *	*
+ *  //表示函数有三个参数 struct rq *rq, struct task_struct *prev和 struct task_struct *next 
+ *	TP_PROTO(struct rq *rq, struct task_struct *prev, struct task_struct *next),
  *
- *	TP_PROTO(struct rq *rq, struct task_struct *prev,
- *		 struct task_struct *next),
- *
- *	*
+ *	*定义“函数”的调用签名
  *	* Define the call signature of the 'function'.
  *	* (Design sidenote: we use this instead of a
  *	*  TP_PROTO1/TP_PROTO2/TP_PROTO3 ugliness.)
  *	*
- *
+ *  //三个参数的名字  将会传给回调函数
  *	TP_ARGS(rq, prev, next),
  *
- *	*
+ *	* 通过TP_STRUCT__entry()构造跟踪记录,你可以把它当作规则的c结构定义
  *	* Fast binary tracing: define the trace record via
  *	* TP_STRUCT__entry(). You can think about it like a
  *	* regular C structure local variable definition.
- *	*
+ *	* 
+      //这就是跟踪记录的结构，并将其保存到环形缓冲区中. 
+      //这些信息将会在用户空间的/sys/kernel/debug/tracing/events/<*>/format.中显示
  *	* This is how the trace record is structured and will
  *	* be saved into the ring buffer. These are the fields
  *	* that will be exposed to user-space in
@@ -279,11 +289,8 @@ static inline void tracepoint_synchronize_unregister(void)
  * A set of (un)registration functions can be passed to the variant
  * TRACE_EVENT_FN to perform any (un)registration work.
  */
-
-#define TRACE_EVENT(name, proto, args, struct, assign, print)	\
-	DECLARE_TRACE(name, PARAMS(proto), PARAMS(args))
-#define TRACE_EVENT_FN(name, proto, args, struct,		\
-		assign, print, reg, unreg)			\
-	DECLARE_TRACE(name, PARAMS(proto), PARAMS(args))
+//参数的定义看上面的解释   For use with the TRACE_EVENT macro:
+#define TRACE_EVENT   (name, proto, args, struct, assign, print)	         DECLARE_TRACE(name, PARAMS(proto), PARAMS(args))
+#define TRACE_EVENT_FN(name, proto, args, struct, assign, print, reg, unreg) DECLARE_TRACE(name, PARAMS(proto), PARAMS(args))
 
 #endif /* ifdef TRACE_EVENT (see note above) */

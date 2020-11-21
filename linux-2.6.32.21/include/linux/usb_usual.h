@@ -95,9 +95,20 @@ enum { US_DO_ALL_FLAGS };
 
 /* Protocols */
 
-#define US_PR_CBI	0x00		/* Control/Bulk/Interrupt */
-#define US_PR_CB	0x01		/* Control/Bulk w/o interrupt */
-#define US_PR_BULK	0x50		/* bulk only */
+/*
+USB的传输模式有4种如下
+控制传输（Control Transfer）
+	所有设备都要求有支持控制传输的端点，一般端点号为0的为控制端点，USB协议将其定义设备的默认端点
+中断传输（Interrupt Transfer）
+	发送或接收少量的数据，而且并不经常进行数据传输,键盘、鼠标、游戏杆等
+批量传输或叫块传输（Bulk Transfer）
+    提供批量传输类型是为了支持在某些不确定的时间内进行大量的数据通信，如打印机、扫描仪、硬盘、光盘等
+实时传输或叫同步传输（Isochronous Transfer）
+	实时传输是为支持某些对时间要求很高、数据量很大应用要求而提出的，使用这种传输类型的设备有麦克风、调制解调器、音频设备等
+*/
+#define US_PR_CBI	0x00		/* Control/Bulk/Interrupt 支持控制传输 批量传输和终端传输*/
+#define US_PR_CB	0x01		/* Control/Bulk w/o interrupt 支持控制传输 批量传输*/
+#define US_PR_BULK	0x50		/* bulk only 对于U盘属于 Bulk-only批量传输*/
 
 #define US_PR_USBAT	0x80		/* SCM-ATAPI bridge */
 #define US_PR_EUSB_SDDR09	0x81	/* SCM-SCSI bridge for SDDR-09 */

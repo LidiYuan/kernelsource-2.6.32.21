@@ -433,8 +433,11 @@ int scsi_sysfs_register(void)
 {
 	int error;
 
+	//注册总线scsi
 	error = bus_register(&scsi_bus_type);
-	if (!error) {
+	if (!error) 
+	{
+	    //创建 /sys/class/scsi_device/目录
 		error = class_register(&sdev_class);
 		if (error)
 			bus_unregister(&scsi_bus_type);
@@ -1049,14 +1052,13 @@ void scsi_sysfs_device_initialize(struct scsi_device *sdev)
 	device_initialize(&sdev->sdev_gendev);
 	sdev->sdev_gendev.bus = &scsi_bus_type;
 	sdev->sdev_gendev.type = &scsi_dev_type;
-	dev_set_name(&sdev->sdev_gendev, "%d:%d:%d:%d",
-		     sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
+	dev_set_name(&sdev->sdev_gendev, "%d:%d:%d:%d",sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
 
 	device_initialize(&sdev->sdev_dev);
 	sdev->sdev_dev.parent = get_device(&sdev->sdev_gendev);
 	sdev->sdev_dev.class = &sdev_class;
-	dev_set_name(&sdev->sdev_dev, "%d:%d:%d:%d",
-		     sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
+	dev_set_name(&sdev->sdev_dev, "%d:%d:%d:%d",sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
+
 	sdev->scsi_level = starget->scsi_level;
 	transport_setup_device(&sdev->sdev_gendev);
 	spin_lock_irqsave(shost->host_lock, flags);

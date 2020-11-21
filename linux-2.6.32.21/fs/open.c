@@ -695,9 +695,11 @@ SYSCALL_DEFINE3(chown, const char __user *, filename, uid_t, user, gid_t, group)
 	struct path path;
 	int error;
 
+	//根据用户层提供的文件名 获得文件的path结构
 	error = user_path(filename, &path);
 	if (error)
 		goto out;
+	
 	error = mnt_want_write(path.mnt);
 	if (error)
 		goto out_release;

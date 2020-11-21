@@ -366,11 +366,15 @@ static int __init dmi_present(const char __iomem *p)
 	return 1;
 }
 
+//用户获取系统硬件信息
+//start_kernel()->setup_arch()->dmi_scan_machine()
 void __init dmi_scan_machine(void)
 {
 	char __iomem *p, *q;
 	int rc;
 
+
+	//系统支持uefi
 	if (efi_enabled) 
 	{
 		if (efi.smbios == EFI_INVALID_TABLE_ADDR)
@@ -398,6 +402,7 @@ void __init dmi_scan_machine(void)
 		 * it's so early in setup that sucker gets confused into doing
 		 * what it shouldn't if we actually call it.
 		 */
+		//在0xf0000 ~fffff中查找
 		p = dmi_ioremap(0xF0000, 0x10000);
 		if (p == NULL)
 			goto error;

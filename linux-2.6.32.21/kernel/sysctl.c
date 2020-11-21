@@ -2166,7 +2166,7 @@ struct ctl_table_header *register_sysctl_paths(const struct ctl_path *path,
  *
  * See register_sysctl_paths for more details.
  */
-//此函数的注册并不包含 table所对应的项应该加入到/proc/sys下的哪个目录下
+//此函数的注册并不包含 table所对应的项应该加入到/proc/sys下的那个目录下
 struct ctl_table_header *register_sysctl_table(struct ctl_table *table)
 {
 	static const struct ctl_path null_path[] = { {} };

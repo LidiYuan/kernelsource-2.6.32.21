@@ -633,7 +633,7 @@ extern struct bus_type pci_bus_type;
 
 /* Do NOT directly access these two variables, unless you are arch specific pci
  * code, or pci core code. */
-//连接所有的pci总线
+//连接所有的pci总线 根总线的number是0     ,pci_bus{node}成员连接到此链表中
 extern struct list_head pci_root_buses;	/* list of all known PCI buses */
 
 /* Some device drivers need know if pci is initiated */

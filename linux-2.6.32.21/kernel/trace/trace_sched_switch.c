@@ -78,19 +78,17 @@ probe_sched_switch(struct rq *__rq, struct task_struct *prev,
 	local_irq_restore(flags);
 }
 
-void
-tracing_sched_wakeup_trace(struct trace_array *tr,
-			   struct task_struct *wakee,
-			   struct task_struct *curr,
-			   unsigned long flags, int pc)
+void tracing_sched_wakeup_trace(struct trace_array *tr,
+			                           struct task_struct *wakee,
+			                           struct task_struct *curr,
+			                           unsigned long flags, int pc)
 {
 	struct ftrace_event_call *call = &event_wakeup;
 	struct ring_buffer_event *event;
 	struct ctx_switch_entry *entry;
 	struct ring_buffer *buffer = tr->buffer;
 
-	event = trace_buffer_lock_reserve(buffer, TRACE_WAKE,
-					  sizeof(*entry), flags, pc);
+	event = trace_buffer_lock_reserve(buffer, TRACE_WAKE, sizeof(*entry), flags, pc);
 	if (!event)
 		return;
 	entry	= ring_buffer_event_data(event);
@@ -108,8 +106,7 @@ tracing_sched_wakeup_trace(struct trace_array *tr,
 	ftrace_trace_userstack(tr->buffer, flags, pc);
 }
 
-static void
-probe_sched_wakeup(struct rq *__rq, struct task_struct *wakee, int success)
+static void probe_sched_wakeup(struct rq *__rq, struct task_struct *wakee, int success)
 {
 	struct trace_array_cpu *data;
 	unsigned long flags;
@@ -129,8 +126,7 @@ probe_sched_wakeup(struct rq *__rq, struct task_struct *wakee, int success)
 	data = ctx_trace->data[cpu];
 
 	if (likely(!atomic_read(&data->disabled)))
-		tracing_sched_wakeup_trace(ctx_trace, wakee, current,
-					   flags, pc);
+		tracing_sched_wakeup_trace(ctx_trace, wakee, current,flags, pc);
 
 	local_irq_restore(flags);
 }

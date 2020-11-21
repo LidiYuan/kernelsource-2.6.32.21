@@ -288,6 +288,7 @@ struct usb_interface_cache {
  * usb_reset_configuration() to reinitialize the current configuration and
  * all its interfaces.
  */
+
 struct usb_host_config {
 	struct usb_config_descriptor	desc;//usb配置描述符 
 
@@ -299,7 +300,7 @@ struct usb_host_config {
 
 	/* the interfaces associated with this configuration,
 	 * stored in no particular order */
-	struct usb_interface *interface[USB_MAXINTERFACES];//配置所包含的接口
+	struct usb_interface *interface[USB_MAXINTERFACES];//配置所包含的接口,每个接口对应一个驱动
 
 	/* Interface information available even when this is not the
 	 * active configuration */
@@ -464,6 +465,13 @@ usb_new_device()
 
 一个usb_host_endpoint包含一个端点描述符。
 */
+/*
+usb设备四种必备的描述符
+	设备描述符
+	配置描述符
+	接口描述符
+	端点描述符
+*/
 struct usb_device {
 	int		devnum; //设备的地址。这和咱们写程序时说的地址是不一样的，devnum只是usb设备在一条usb总线上的编号
                     /*
@@ -488,8 +496,8 @@ struct usb_device {
 
 	struct device dev;//嵌入到struct usb_device结构里的struct device结构
 
-	struct usb_device_descriptor descriptor;//设备描述符。
-	struct usb_host_config *config;//usb设备的配置数组
+	struct usb_device_descriptor descriptor;//设备描述符。一个USB设备只能有一个设备描述符
+	struct usb_host_config *config;//usb设备的配置数组 
 
 	struct usb_host_config *actconfig;//usb设备的当前激活配置
 	struct usb_host_endpoint *ep_in[16];//16个in端点 
@@ -497,7 +505,7 @@ struct usb_device {
 
 	char **rawdescriptors;//这是个字符指针数组，数组里的每一项都指向一个使用GET_DESCRIPTOR请求去获得配置描述符时所得到的结果
 
-	unsigned short bus_mA;
+	unsigned short bus_mA;//总线电源
 	u8 portnum; //端口号  
 	u8 level;//层次
 
@@ -511,9 +519,9 @@ struct usb_device {
 	int string_langid;
 
 	/* static strings from the device */
-	char *product;
-	char *manufacturer;
-	char *serial;
+	char *product;       //产品名
+	char *manufacturer; //厂商名
+	char *serial;       //u盘的序列号
 
 	struct list_head filelist;
 #ifdef CONFIG_USB_DEVICE_CLASS
@@ -551,6 +559,7 @@ struct usb_device {
 	struct wusb_dev *wusb_dev;
 	int slot_id;
 };
+
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 
 extern struct usb_device *usb_get_dev(struct usb_device *dev);
@@ -891,8 +900,7 @@ usb_device_driver{}是面向设备的
 struct usb_driver {
 	const char *name;////驱动程序的名字
 
-	int (*probe) (struct usb_interface *intf,
-		      const struct usb_device_id *id);
+	int (*probe) (struct usb_interface *intf,const struct usb_device_id *id);
 
 	void (*disconnect) (struct usb_interface *intf);
 

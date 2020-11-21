@@ -385,7 +385,7 @@ struct sk_buff {
 				
 				nohdr:1,//这个域如果为1,则说明这个skb的头域指针已经分配完毕，因此这个时候计算头的长度只需要head和data的差就可以了
 				nfctinfo:3;//用于连接跟踪方向
-	__u8		pkt_type:3,//pkt_type主要是表示数据包的类型，比如多播，单播，回环等等 PACKET_HOST,对于以太网设备此参数是由eth_type_trans()进行初始化
+	__u8		pkt_type:3,//pkt_type主要是表示数据包的类型，如PACKET_HOST,比如多播，单播，回环等等 PACKET_HOST,对于以太网设备此参数是由eth_type_trans()进行初始化
 				fclone:2,//这个域是一个clone标记。主要是在fast clone中被设置
 				ipvs_property:1,
 				peeked:1,//这个域应该是udp使用的一个域。表示只是查看数据

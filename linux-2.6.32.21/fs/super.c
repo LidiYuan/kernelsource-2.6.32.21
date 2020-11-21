@@ -539,14 +539,15 @@ rescan:
 
 SYSCALL_DEFINE2(ustat, unsigned, dev, struct ustat __user *, ubuf)
 {
-        struct super_block *s;
-        struct ustat tmp;
-        struct kstatfs sbuf;
+    struct super_block *s;
+    struct ustat tmp;
+    struct kstatfs sbuf;
 	int err = -EINVAL;
 
-        s = user_get_super(new_decode_dev(dev));
-        if (s == NULL)
-                goto out;
+    s = user_get_super(new_decode_dev(dev));
+    if (s == NULL)
+            goto out;
+	
 	err = vfs_statfs(s->s_root, &sbuf);
 	drop_super(s);
 	if (err)
@@ -938,7 +939,8 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	if (!mnt)
 		goto out;
 	
-	if (data && !(type->fs_flags & FS_BINARY_MOUNTDATA)) {
+	if (data && !(type->fs_flags & FS_BINARY_MOUNTDATA)) 
+	{
 		secdata = alloc_secdata();
 		if (!secdata)
 			goto out_mnt;
@@ -948,7 +950,6 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 			goto out_free_secdata;
 	}
 
-   //获得超级快
 	error = type->get_sb(type, flags, name, data, mnt);
 	if (error < 0)
 		goto out_free_secdata;
@@ -1019,8 +1020,7 @@ do_kern_mount(const char *fstype, int flags, const char *name, void *data)
 	if (!type)
 		return ERR_PTR(-ENODEV);
 	mnt = vfs_kern_mount(type, flags, name, data);
-	if (!IS_ERR(mnt) && (type->fs_flags & FS_HAS_SUBTYPE) &&
-	    !mnt->mnt_sb->s_subtype)
+	if (!IS_ERR(mnt) && (type->fs_flags & FS_HAS_SUBTYPE) && !mnt->mnt_sb->s_subtype)
 		mnt = fs_set_subtype(mnt, fstype);
 	put_filesystem(type);
 	return mnt;

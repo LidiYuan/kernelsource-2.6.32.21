@@ -169,7 +169,7 @@ static const char *sym_name(const char *sym_strtab, Elf32_Sym *sym)
 }
 
 
-
+//le 是little endian  be是big endian
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define le16_to_cpu(val) (val)
 #define le32_to_cpu(val) (val)

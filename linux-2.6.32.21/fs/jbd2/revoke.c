@@ -189,11 +189,16 @@ static struct jbd2_revoke_record_s *find_revoke_record(journal_t *journal,
 
 void jbd2_journal_destroy_revoke_caches(void)
 {
-	if (jbd2_revoke_record_cache) {
+    //销毁缓存
+	if (jbd2_revoke_record_cache) 
+	{
 		kmem_cache_destroy(jbd2_revoke_record_cache);
 		jbd2_revoke_record_cache = NULL;
 	}
-	if (jbd2_revoke_table_cache) {
+
+	//销毁缓存
+	if (jbd2_revoke_table_cache) 
+	{
 		kmem_cache_destroy(jbd2_revoke_table_cache);
 		jbd2_revoke_table_cache = NULL;
 	}
@@ -201,9 +206,11 @@ void jbd2_journal_destroy_revoke_caches(void)
 
 int __init jbd2_journal_init_revoke_caches(void)
 {
+    //断言 下面两个数据 没有被初始化
 	J_ASSERT(!jbd2_revoke_record_cache);
 	J_ASSERT(!jbd2_revoke_table_cache);
-
+   
+	//创建jbd2_revoke_record的缓存  大小为sizeof(struct jbd2_revoke_record_s)
 	jbd2_revoke_record_cache = kmem_cache_create("jbd2_revoke_record",
 					   sizeof(struct jbd2_revoke_record_s),
 					   0,
@@ -212,11 +219,13 @@ int __init jbd2_journal_init_revoke_caches(void)
 	if (!jbd2_revoke_record_cache)
 		goto record_cache_failure;
 
+	//创建jbd2_revoke_table 缓存  大小为sizeof(struct jbd2_revoke_table_s)
 	jbd2_revoke_table_cache = kmem_cache_create("jbd2_revoke_table",
 					   sizeof(struct jbd2_revoke_table_s),
 					   0, SLAB_TEMPORARY, NULL);
 	if (!jbd2_revoke_table_cache)
 		goto table_cache_failure;
+	
 	return 0;
 table_cache_failure:
 	jbd2_journal_destroy_revoke_caches();

@@ -6,7 +6,7 @@
 /**
  * __ffs - find first bit in word.
  * @word: The word to search
- *
+ * long型数据中从低位置开始寻找第一个不为0的位置
  * Undefined if no bit exists, so code should check against 0 first.
  */
 static __always_inline unsigned long __ffs(unsigned long word)

@@ -500,14 +500,15 @@ static inline pgd_t __pgd(pgdval_t val)
 	return (pgd_t) { ret };
 }
 
+//如果支持半虚拟化的化
 static inline pgdval_t pgd_val(pgd_t pgd)
 {
 	pgdval_t ret;
 
-	if (sizeof(pgdval_t) > sizeof(long))
+	if (sizeof(pgdval_t) > sizeof(long)) //说明是32位
 		ret =  PVOP_CALLEE2(pgdval_t, pv_mmu_ops.pgd_val,
 				    pgd.pgd, (u64)pgd.pgd >> 32);
-	else
+	else 
 		ret =  PVOP_CALLEE1(pgdval_t, pv_mmu_ops.pgd_val,
 				    pgd.pgd);
 

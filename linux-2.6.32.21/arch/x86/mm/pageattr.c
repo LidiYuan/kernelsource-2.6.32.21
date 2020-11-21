@@ -294,6 +294,7 @@ static inline pgprot_t static_protections(pgprot_t prot, unsigned long address,
  */
 pte_t *lookup_address(unsigned long address, unsigned int *level)
 {
+    //获得内核PGD数组中一个元素的地址 即 &pgd_t[x]
 	pgd_t *pgd = pgd_offset_k(address);
 	pud_t *pud;
 	pmd_t *pmd;

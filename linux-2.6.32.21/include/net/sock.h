@@ -295,7 +295,7 @@ struct sock {
 
     /*实际上在此时的sock 代表的是server端listen 的sock而不是客户端的sock,也就是在握手没有成功的过程中，在linux使用的sock都是server的listen的sock, 对客户端只是保留成request_sock*/
 	unsigned short		 sk_ack_backlog;/*当握手成功后每一个client就是一个sock, sk_ack_backlog 是队列长度*/
-	unsigned short		 sk_max_ack_backlog;/*握手成功的最大的队列长度*/
+	unsigned short		 sk_max_ack_backlog;/*握手成功的最大的队列长度  listen()设置的值*/
 	
 	__u32			     sk_priority;//该套接字所有发送数据包缓存到硬件缓冲区队列中的优先级
 	struct ucred		 sk_peercred;
@@ -303,7 +303,7 @@ struct sock {
 	long			     sk_sndtimeo;//发送设置超时时间
 	struct sk_filter     *sk_filter;
 	void			     *sk_protinfo;
-	struct timer_list	 sk_timer;//看inet_csk_init_xmit_timers()
+	struct timer_list	 sk_timer;//看 inet_csk_init_xmit_timers()
 	ktime_t			     sk_stamp;
 	struct socket		 *sk_socket;
 	void			     *sk_user_data;

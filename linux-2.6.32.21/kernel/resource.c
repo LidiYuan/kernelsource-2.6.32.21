@@ -40,15 +40,18 @@ EXPORT_SYMBOL(iomem_resource);
 
 static DEFINE_RWLOCK(resource_lock);
 
+//进行深度遍历
 static void *r_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct resource *p = v;
 	(*pos)++;
 	if (p->child)
-		return p->child;
-	while (!p->sibling && p->parent)
+		return p->child;  //先深度搜索所有的子节点
+	
+	while (!p->sibling && p->parent) //回溯找到没有兄弟的父节点
 		p = p->parent;
-	return p->sibling;
+	
+	return p->sibling; //然后遍历兄弟节点
 }
 
 #ifdef CONFIG_PROC_FS
@@ -61,6 +64,8 @@ static void *r_start(struct seq_file *m, loff_t *pos)
 	struct resource *p = m->private;
 	loff_t l = 0;
 	read_lock(&resource_lock);
+
+	//最开始的时候*pos=0  所以p会指向根节点root的第一个子节点
 	for (p = p->child; p && l < *pos; p = r_next(m, p, &l))
 		;
 	return p;
@@ -72,21 +77,22 @@ static void r_stop(struct seq_file *m, void *v)
 	read_unlock(&resource_lock);
 }
 
+//显示 /proc/ioprots下的内容
 static int r_show(struct seq_file *m, void *v)
 {
-	struct resource *root = m->private;
+	struct resource *root = m->private;//root指向 ioport_resource 的地址
 	struct resource *r = v, *p;
 	int width = root->end < 0x10000 ? 4 : 8;
 	int depth;
 
+	//获得当前打印资源的深度
 	for (depth = 0, p = r; depth < MAX_IORES_LEVEL; depth++, p = p->parent)
-		if (p->parent == root)
+		if (p->parent == root)//是否为根节点
 			break;
-	seq_printf(m, "%*s%0*llx-%0*llx : %s\n",
-			depth * 2, "",
-			width, (unsigned long long) r->start,
-			width, (unsigned long long) r->end,
-			r->name ? r->name : "<BAD>");
+
+	//不是根资源 则进行资源信息打印	 
+	//%*s 表示在左边至少输出depth * 2的空格              %0*llx  表示输出的long       long至少为width位不足的在前面补0 
+	seq_printf(m, "%*s%0*llx-%0*llx : %s\n", depth * 2, "",width, (unsigned long long) r->start,width, (unsigned long long) r->end,r->name ? r->name : "<BAD>");
 	return 0;
 }
 
@@ -100,7 +106,8 @@ static const struct seq_operations resource_op = {
 static int ioports_open(struct inode *inode, struct file *file)
 {
 	int res = seq_open(file, &resource_op);
-	if (!res) {
+	if (!res) 
+	{
 		struct seq_file *m = file->private_data;
 		m->private = &ioport_resource;
 	}
@@ -117,6 +124,7 @@ static int iomem_open(struct inode *inode, struct file *file)
 	return res;
 }
 
+// 对/proc/ioports的操作
 static const struct file_operations proc_ioports_operations = {
 	.open		= ioports_open,
 	.read		= seq_read,
@@ -124,6 +132,7 @@ static const struct file_operations proc_ioports_operations = {
 	.release	= seq_release,
 };
 
+//对  /proc/iomeme的操作
 static const struct file_operations proc_iomem_operations = {
 	.open		= iomem_open,
 	.read		= seq_read,
@@ -131,10 +140,21 @@ static const struct file_operations proc_iomem_operations = {
 	.release	= seq_release,
 };
 
+/*
+几乎每一种外设都是通过读写设备上的寄存器来进行的。外设寄存器也称为“I/O端口”，通常包括：控制寄存器、状态寄存器和数据寄存器三大类，而且一个外设的寄存器通常被连续地编址。CPU对外设IO端口物理地址的编址方式有两种：一种是I/O映射方式（I/O－mapped），另一种是内存映射方式（Memory－mapped）。而具体采用哪一种则取决于CPU的体系结构。
+有些体系结构的CPU（如，PowerPC、m68k等）通常只实现一个物理地址空间（RAM）。在这种情况下，外设I/O端口的物理地址就被映射到CPU的单一物理地址空间中，而成为内存的一部分。此时，CPU可象访问一个内存单元那样访问外设I/O端口，而无需设立专门的外设I/O指令。这就是所谓的“内存映射方式”（Memory－mapped）。
+而另外一些体系结构的CPU（典型地如X86）则为外设专门实现了一个单独地地址空间，称为“I/O地址空间”或“I/O端口空间”。这是个和CPU地RAM物理地址空间不同的地址空间，任何外设的I/O端口均在这一空间中进行编址。CPU通过设立专门的I/O指令（如X86的IN和OUT指令）来访问这一空间中的地址单元（也即I/O端口）。这就是所谓的“I/O映射方式”（I/O－mapped）。和RAM物理地址空间相比，I/O地址空间通常都比较小，如x86 CPU的I/O空间就只有64KB（0－0xffff）。这是“I/O映射方式”的一个主要缺点
+
+Linux设计了一个通用的数据结构resource来描述各种I/O资源（如：I/O端口、外设内存、DMA和IRQ等）。该结构定义在include/linux/ioport.h头文件中。
+Linux是以一种倒置的树形结构来管理每一类I/O资源（如：I/O端口、外设内存、DMA和IRQ）的。每一类I/O资源都对应有一颗倒置的资源树，树中的每一个节点都是个resource结构，而树的根结点root则描述了该类资源的整个资源空间。
+基于上述这个思想，Linux将基于I/O映射方式的I/O端口和基于内存映射方式的I/O端口资源统称为“I/O区域”（I/O Region）
+
+*/
+//在/proc下创建  ioports 和iomem文件
 static int __init ioresources_init(void)
 {
 	proc_create("ioports", 0, NULL, &proc_ioports_operations);
-	proc_create("iomem", 0, NULL, &proc_iomem_operations);
+	proc_create("iomem",   0, NULL, &proc_iomem_operations);
 	return 0;
 }
 __initcall(ioresources_init);
@@ -623,8 +643,10 @@ resource_size_t resource_alignment(struct resource *res)
  * @flags: IO resource flags
  */
 struct resource * __request_region(struct resource *parent,
-				   resource_size_t start, resource_size_t n,
-				   const char *name, int flags)
+				                        resource_size_t start, 
+				                        resource_size_t n,
+				                        const char *name, 
+				                        int flags)
 {
 	struct resource *res = kzalloc(sizeof(*res), GFP_KERNEL);
 

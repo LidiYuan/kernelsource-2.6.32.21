@@ -292,7 +292,8 @@ void free_pgd_range(struct mmu_gather *tlb,
 void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *vma,
 		unsigned long floor, unsigned long ceiling)
 {
-	while (vma) {
+	while (vma) 
+	{
 		struct vm_area_struct *next = vma->vm_next;
 		unsigned long addr = vma->vm_start;
 

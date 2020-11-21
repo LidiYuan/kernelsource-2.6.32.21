@@ -74,8 +74,7 @@ struct scsi_nl_drvr {
  *
  *
  **/
-static void
-scsi_nl_rcv_msg(struct sk_buff *skb)
+static void scsi_nl_rcv_msg(struct sk_buff *skb)
 {
 	struct nlmsghdr *nlh;
 	struct scsi_nl_hdr *hdr;

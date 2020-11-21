@@ -24,8 +24,7 @@ static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
 		strcat(buf, "\n");
 		length = strlen(buf);
 	} else {
-		length = sprintf(buf, "of:N%sT%s\n",
-				 of->node->name, of->node->type);
+		length = sprintf(buf, "of:N%sT%s\n",of->node->name, of->node->type);
 	}
 
 	return length;

@@ -5,16 +5,22 @@
 
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT	12
-#define PAGE_SIZE	(_AC(1,UL) << PAGE_SHIFT)
-#define PAGE_MASK	(~(PAGE_SIZE-1))
+#define PAGE_SIZE	(_AC(1,UL) << PAGE_SHIFT) //=0x1000
+#define PAGE_MASK	(~(PAGE_SIZE-1))   //=0xfffffffffffff000
 
-#define __PHYSICAL_MASK		((phys_addr_t)(1ULL << __PHYSICAL_MASK_SHIFT) - 1)
+#define __PHYSICAL_MASK		((phys_addr_t)(1ULL << __PHYSICAL_MASK_SHIFT) - 1) //0x3fffffffffff=( 1<<46 - 1)
 #define __VIRTUAL_MASK		((1UL << __VIRTUAL_MASK_SHIFT) - 1)
 
 /* Cast PAGE_MASK to a signed type so that it is sign-extended if
    virtual addresses are 32-bits but physical addresses are larger
    (ie, 32-bit PAE). */
-#define PHYSICAL_PAGE_MASK	(((signed long)PAGE_MASK) & __PHYSICAL_MASK)
+   /*
+__PHYSICAL_MASK_SHIFT= 46
+__PHYSICAL_MASK=3fffffffffff
+PAGE_MASK=fffffffffffff000
+PHYSICAL_PAGE_MASK=3ffffffff000
+*/
+#define PHYSICAL_PAGE_MASK	( ((signed long)PAGE_MASK) & __PHYSICAL_MASK)   //=0x3ffffffff000
 
 #define PMD_PAGE_SIZE		(_AC(1, UL) << PMD_SHIFT)
 #define PMD_PAGE_MASK		(~(PMD_PAGE_SIZE-1))

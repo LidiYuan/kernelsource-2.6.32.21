@@ -47,8 +47,7 @@ ext4_xattr_trusted_set(struct inode *inode, const char *name,
 {
 	if (strcmp(name, "") == 0)
 		return -EINVAL;
-	return ext4_xattr_set(inode, EXT4_XATTR_INDEX_TRUSTED, name,
-			      value, size, flags);
+	return ext4_xattr_set(inode, EXT4_XATTR_INDEX_TRUSTED, name,value, size, flags);
 }
 
 struct xattr_handler ext4_xattr_trusted_handler = {

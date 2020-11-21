@@ -1458,7 +1458,8 @@ struct tcp_seq_afinfo {
 	struct seq_operations	seq_ops;
 };
 
-struct tcp_iter_state {
+struct tcp_iter_state 
+{
 	struct seq_net_private	p;
 	sa_family_t		family;
 	enum tcp_seq_states	state;

@@ -887,7 +887,7 @@ struct request *blk_get_request(struct request_queue *q, int rw, gfp_t gfp_mask)
 
 	spin_lock_irq(q->queue_lock);
 	if (gfp_mask & __GFP_WAIT) {
-		rq = get_request_wait(q, rw, NULL);
+		rq = get_request_wait(q, rw, NULL); ////根据bio创建request
 	} else {
 		rq = get_request(q, rw, NULL, gfp_mask);
 		if (!rq)

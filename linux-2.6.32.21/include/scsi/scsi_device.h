@@ -66,35 +66,37 @@ struct scsi_event {
 };
 //逻辑单元
 struct scsi_device {
-	struct Scsi_Host *host;
-	struct request_queue *request_queue;
+	struct Scsi_Host *host;//指向主机适配器
+	struct request_queue *request_queue;//指向请求队列
 
 	/* the next two are protected by the host->host_lock */
-	struct list_head    siblings;   /* list of all devices on this host */
-	struct list_head    same_target_siblings; /* just the devices sharing same target id */
+	struct list_head    siblings;   /* list of all devices on this host //链入到主机适配器的设备链表*/
+	struct list_head    same_target_siblings; /* just the devices sharing same target id *///链入目标节点的设备链表
 
 	/* this is now protected by the request_queue->queue_lock */
 	unsigned int device_busy;	/* commands actually active on
-					 * low-level. protected by queue_lock. */
+					 * low-level. protected by queue_lock. *///已经派发的命令数
 	spinlock_t list_lock;
 	struct list_head cmd_list;	/* queue of in use SCSI Command structures */
-	struct list_head starved_entry;//连接主机适配器的Scsi_Host{}.starved_list
-	struct scsi_cmnd *current_cmnd;	/* currently active command */
-	unsigned short queue_depth;	/* How deep of a queue we want */
+	struct list_head starved_entry;//连接主机适配器的Scsi_Host{}.starved_list//链入所属主机适配器的饥饿链表的连接件
+	struct scsi_cmnd *current_cmnd;	/* currently active command *///指向当前活动命令结构
+	unsigned short queue_depth;	/* How deep of a queue we want *///队列深度
 	unsigned short last_queue_full_depth; /* These two are used by */
 	unsigned short last_queue_full_count; /* scsi_track_queue_full() */
 	unsigned long last_queue_full_time;/* don't let QUEUE_FULLs on the same
 					   jiffie count on our counter, they
 					   could all be from the same event. */
 
-	unsigned int id, lun, channel;
+	unsigned int channel, //scsi 通道  每个host id可能存在对各通道,每个channel拥有一条scsi总线  
+	             id,   //target标识 传统scsi bus上最多可以连接16个scsi target
+	             lun ; ////logical unit number逻辑单元号,一个scsi target可以存在多种功能，每种功能称之为LUN，对于单功能设备(例如磁盘)，其LUN通常为0
 
 	unsigned int manufacturer;	/* Manufacturer of device, for using 
 					 * vendor-specific cmd's */
 	unsigned sector_size;	/* size in bytes */
 
 	void *hostdata;		/* available to low-level driver */
-	char type;
+	char type;          //此处的值为  TYPE_DISK    等类似的值 , scsi设备类型 全局变量               scsi_device_types 中保存对应的字符串
 	char scsi_level;
 	char inq_periph_qual;	/* PQ from INQUIRY data */	
 	unsigned char inquiry_len;	/* valid bytes in 'inquiry' */
@@ -161,7 +163,7 @@ struct scsi_device {
 	atomic_t ioerr_cnt;
 
 	struct device		sdev_gendev,
-				sdev_dev;
+				        sdev_dev;
 
 	struct execute_work	ew; /* used to get process context on put */
 

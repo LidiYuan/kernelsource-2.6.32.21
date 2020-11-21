@@ -745,6 +745,7 @@ asmlinkage void __init start_kernel(void)
 	//和虚拟文件相关初始化
 	vfs_caches_init(totalram_pages);
 
+    //对基数树 进行初始化,一种整型到指针的映射树
 	radix_tree_init();
 	
 	signals_init();
@@ -792,7 +793,8 @@ int do_one_initcall(initcall_t fn)
 	int count = preempt_count();
 	ktime_t calltime, delta, rettime;
 
-	if (initcall_debug) {
+	if (initcall_debug) 
+	{
 		call.caller = task_pid_nr(current);
 		printk("calling  %pF @ %i\n", fn, call.caller);
 		calltime = ktime_get();
@@ -802,7 +804,8 @@ int do_one_initcall(initcall_t fn)
 
 	ret.result = fn();
 
-	if (initcall_debug) {
+	if (initcall_debug) 
+	{
 		disable_boot_trace();
 		rettime = ktime_get();
 		delta = ktime_sub(rettime, calltime);
@@ -817,11 +820,14 @@ int do_one_initcall(initcall_t fn)
 	if (ret.result && ret.result != -ENODEV && initcall_debug)
 		sprintf(msgbuf, "error code %d ", ret.result);
 
-	if (preempt_count() != count) {
+	if (preempt_count() != count) 
+	{
 		strlcat(msgbuf, "preemption imbalance ", sizeof(msgbuf));
 		preempt_count() = count;
 	}
-	if (irqs_disabled()) {
+
+	if ( irqs_disabled() ) 
+	{
 		strlcat(msgbuf, "disabled interrupts ", sizeof(msgbuf));
 		local_irq_enable();
 	}

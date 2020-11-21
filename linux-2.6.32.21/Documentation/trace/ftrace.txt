@@ -68,11 +68,18 @@ of ftrace. Here is a list of some of the key files:
 
  Note: all time values are in microseconds.
 
+  用于设置或显示当前使用的跟踪器；使用 echo 
+将跟踪器名字写入该文件可以切换到不同的跟踪器。系统启动后，其缺省值为 nop,
+即不做任何跟踪操作。在执行完一段跟踪任务后，可以通过向该文件写入 nop 
+来重置跟踪器. 
   current_tracer:
 
 	This is used to set or display the current tracer
 	that is configured.
 
+
+记录了当前编译进内核的跟踪器的列表，可以通过 cat 查看其内容,并通过echo ‘name’ >> 
+current_tracer 设置当前的跟踪器
   available_tracers:
 
 	This holds the different types of tracers that
@@ -80,17 +87,22 @@ of ftrace. Here is a list of some of the key files:
 	tracers listed here can be configured by
 	echoing their name into current_tracer.
 
+用于控制 current_tracer 中的跟踪器是否可以跟踪内核函数的调用情况。写入 0 
+会关闭跟踪活动，写入 1 则激活跟踪功能；其缺省值为 1 
   tracing_enabled:
 
 	This sets or displays whether the current_tracer
 	is activated and tracing or not. Echo 0 into this
 	file to disable the tracer or 1 to enable it.
 
+此文件保存跟踪信息的输出,并且格式是人可阅读的
   trace:
 
 	This file holds the output of the trace in a human
 	readable format (described below).
 
+和trace类似,都是跟踪信息的输出,但这个是个管道,跟踪信息往里写,用户从另一端读,
+读过后信息就不在存在
   trace_pipe:
 
 	The output is the same as the "trace" file but this

@@ -176,8 +176,9 @@ struct audit_context {
 	u64		    prio;
 	int		    return_valid; /* return code is valid */
 	
-	int		    name_count;
-	struct audit_names  names[AUDIT_NAMES];
+	int		    name_count;  //audit_path 个数
+	struct audit_names  names[AUDIT_NAMES]; //存放所有的audit path
+	
 	char *		    filterkey;	/* key for rule that triggered record */
 	struct path	    pwd;
 	struct audit_context *previous; /* For nested syscalls */
@@ -679,7 +680,8 @@ static enum audit_state audit_filter_task(struct task_struct *tsk, char **key)
 	enum audit_state   state;
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_TASK], list) {
+	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_TASK], list) 
+	{
 		if (audit_filter_rules(tsk, &e->rule, NULL, NULL, &state)) 
 		{
 			if (state == AUDIT_RECORD_CONTEXT)
@@ -887,13 +889,18 @@ int audit_alloc(struct task_struct *tsk)
 	enum audit_state     state;
 	char *key = NULL;
 
+    //审计是否允许
 	if (likely(!audit_ever_enabled))
 		return 0; /* Return if not auditing. */
 
+    //查找task表是否将此审计过滤掉
 	state = audit_filter_task(tsk, &key);
+
+	//将此信息过滤掉
 	if (likely(state == AUDIT_DISABLED))
 		return 0;
 
+	//分配一个审计上下文 存储审计信息
 	if (!(context = audit_alloc_context(state))) 
 	{
 		kfree(key);
@@ -903,6 +910,8 @@ int audit_alloc(struct task_struct *tsk)
 	context->filterkey = key;
 
 	tsk->audit_context  = context;
+
+	//设置有审计信息需要处理
 	set_tsk_thread_flag(tsk, TIF_SYSCALL_AUDIT);
 	return 0;
 }
@@ -1171,8 +1180,8 @@ static int audit_log_single_execve_arg(struct audit_context *context,
 }
 
 static void audit_log_execve_info(struct audit_context *context,
-				  struct audit_buffer **ab,
-				  struct audit_aux_data_execve *axi)
+				                        struct audit_buffer **ab,
+				                        struct audit_aux_data_execve *axi)
 {
 	int i;
 	size_t len, len_sent = 0;
@@ -1184,6 +1193,7 @@ static void audit_log_execve_info(struct audit_context *context,
 
 	p = (const char __user *)axi->mm->arg_start;
 
+	//参数的个数
 	audit_log_format(*ab, "argc=%d", axi->argc);
 
 	/*
@@ -1192,13 +1202,17 @@ static void audit_log_execve_info(struct audit_context *context,
 	 * for every single argument inside audit_log_single_execve_arg()
 	 * should be <8k allocation so should be pretty safe.
 	 */
+	 
 	buf = kmalloc(MAX_EXECVE_AUDIT_LEN + 1, GFP_KERNEL);
 	if (!buf) {
 		audit_panic("out of memory for argv string\n");
 		return;
 	}
 
-	for (i = 0; i < axi->argc; i++) {
+    //输出参数
+	for (i = 0; i < axi->argc; i++) 
+	{
+	
 		len = audit_log_single_execve_arg(context, ab, i,
 						  &len_sent, p, buf);
 		if (len <= 0)
@@ -1391,15 +1405,18 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 	audit_log_key(ab, context->filterkey);
 	audit_log_end(ab);
 
-	for (aux = context->aux; aux; aux = aux->next) {
+	for (aux = context->aux; aux; aux = aux->next) 
+	{
 
 		ab = audit_log_start(context, GFP_KERNEL, aux->type);
 		if (!ab)
 			continue; /* audit_panic has been called */
 
-		switch (aux->type) {
-
-		case AUDIT_EXECVE: {
+		switch (aux->type) 
+		{
+         
+		case AUDIT_EXECVE: //对于execve启动一个程序
+		{
 			struct audit_aux_data_execve *axi = (void *)aux;
 			audit_log_execve_info(context, &ab, axi);
 			break; }
@@ -1472,17 +1489,21 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 			audit_log_end(ab);
 		}
 	}
-	for (i = 0; i < context->name_count; i++) {
+	for (i = 0; i < context->name_count; i++) 
+	{
 		struct audit_names *n = &context->names[i];
 
 		ab = audit_log_start(context, GFP_KERNEL, AUDIT_PATH);
 		if (!ab)
 			continue; /* audit_panic has been called */
 
+		//打印第几个path
 		audit_log_format(ab, "item=%d", i);
 
-		if (n->name) {
-			switch(n->name_len) {
+		if (n->name) 
+		{
+			switch(n->name_len) 
+			{
 			case AUDIT_NAME_FULL:
 				/* log the full path */
 				audit_log_format(ab, " name=");
@@ -1496,13 +1517,15 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 			default:
 				/* log the name's directory component */
 				audit_log_format(ab, " name=");
-				audit_log_n_untrustedstring(ab, n->name,
-							    n->name_len);
+				audit_log_n_untrustedstring(ab, n->name,n->name_len);
 			}
-		} else
+		} 
+		else
 			audit_log_format(ab, " name=(null)");
 
-		if (n->ino != (unsigned long)-1) {
+		//输出节点信息
+		if (n->ino != (unsigned long)-1) 
+		{
 			audit_log_format(ab, " inode=%lu"
 					 " dev=%02x:%02x mode=%#o"
 					 " ouid=%u ogid=%u rdev=%02x:%02x",
@@ -1515,14 +1538,19 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 					 MAJOR(n->rdev),
 					 MINOR(n->rdev));
 		}
-		if (n->osid != 0) {
+
+		if (n->osid != 0) 
+		{
 			char *ctx = NULL;
 			u32 len;
 			if (security_secid_to_secctx(
-				n->osid, &ctx, &len)) {
+				n->osid, &ctx, &len)) 
+			{
 				audit_log_format(ab, " osid=%u", n->osid);
 				call_panic = 2;
-			} else {
+			} 
+			else 
+			{
 				audit_log_format(ab, " obj=%s", ctx);
 				security_release_secctx(ctx, len);
 			}
@@ -1570,8 +1598,8 @@ void audit_free(struct task_struct *tsk)
 
 /**
  * audit_syscall_entry - fill in an audit record at syscall entry
- * @arch: architecture type
- * @major: major syscall type (function)
+ * @arch: architecture type 
+ * @major: major syscall type (function) 系统调用号
  * @a1: additional syscall register 1
  * @a2: additional syscall register 2
  * @a3: additional syscall register 3
@@ -1586,8 +1614,7 @@ void audit_free(struct task_struct *tsk)
  * be written).
  */
  //系统调用进入 时候会调用此函数
-void audit_syscall_entry(int arch, int major,unsigned long a1, 
-                                     unsigned long a2,unsigned long a3, unsigned long a4)
+void audit_syscall_entry(int arch, int major,unsigned long a1,  unsigned long a2,unsigned long a3, unsigned long a4)
 {
 	struct task_struct *tsk = current;
 	struct audit_context *context = tsk->audit_context;
@@ -1647,7 +1674,8 @@ void audit_syscall_entry(int arch, int major,unsigned long a1,
 
 	state = context->state;
 	context->dummy = !audit_n_rules;
-	if (!context->dummy && state == AUDIT_BUILD_CONTEXT) {
+	if (!context->dummy && state == AUDIT_BUILD_CONTEXT) 
+	{
 		context->prio = 0;
 		state = audit_filter_syscall(tsk, context, &audit_filter_list[AUDIT_FILTER_ENTRY]);
 	}
@@ -1712,12 +1740,15 @@ void audit_syscall_exit(int valid, long return_code)
 	if (!list_empty(&context->killed_trees))
 		audit_kill_trees(&context->killed_trees);
 
-	if (context->previous) {
+	if (context->previous) 
+	{
 		struct audit_context *new_context = context->previous;
 		context->previous  = NULL;
 		audit_free_context(context);
 		tsk->audit_context = new_context;
-	} else {
+	} 
+	else 
+	{
 		audit_free_names(context);
 		unroll_tree_refs(context, NULL, 0);
 		audit_free_aux(context);
@@ -2495,6 +2526,7 @@ int __audit_log_bprm_fcaps(struct linux_binprm *bprm,
  * Record the aguments userspace sent to sys_capset for later printing by the
  * audit system if applicable
  */
+ //对capset进行审计信息记录
 void __audit_log_capset(pid_t pid,
 		       const struct cred *new, const struct cred *old)
 {

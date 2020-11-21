@@ -231,6 +231,7 @@ static void cn_proc_ack(int err, int rcvd_seq, int rcvd_ack)
  * cn_proc_mcast_ctl
  * @data: message sent from userspace via the connector
  */
+//通过应用层来设置标志
 static void cn_proc_mcast_ctl(struct cn_msg *msg,struct netlink_skb_parms *nsp)
 {
 	enum proc_cn_mcast_op *mc_op = NULL;
@@ -264,8 +265,8 @@ static int __init cn_proc_init(void)
 {
 	int err;
 
-	if ((err = cn_add_callback(&cn_proc_event_id, "cn_proc",
-	 			   &cn_proc_mcast_ctl))) {
+	if ((err = cn_add_callback(&cn_proc_event_id, "cn_proc",&cn_proc_mcast_ctl))) 
+	{
 		printk(KERN_WARNING "cn_proc failed to register\n");
 		return err;
 	}

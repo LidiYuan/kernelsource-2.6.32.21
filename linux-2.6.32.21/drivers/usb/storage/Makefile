@@ -5,6 +5,7 @@
 # Rewritten to use lists instead of if-statements.
 #
 
+#需要用到scsi驱动中的信息
 EXTRA_CFLAGS	:= -Idrivers/scsi
 
 obj-$(CONFIG_USB_STORAGE)	+= usb-storage.o

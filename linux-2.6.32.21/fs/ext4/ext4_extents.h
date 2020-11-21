@@ -69,11 +69,12 @@
  * This is the extent on-disk structure.
  * It's used at the bottom of the tree.
  */
+ //extent树的叶子节点
 struct ext4_extent {
-	__le32	ee_block;	/* first logical block extent covers */
-	__le16	ee_len;		/* number of blocks covered by extent */
-	__le16	ee_start_hi;	/* high 16 bits of physical block */
-	__le32	ee_start_lo;	/* low 32 bits of physical block */
+	__le32	ee_block;	/* first logical block extent covers extent包含的第一个逻辑块*/
+	__le16	ee_len;		/* number of blocks covered by extent 包含的数据块的个数*/
+	__le16	ee_start_hi;	/* high 16 bits of physical block 物理数据块的高16位*/
+	__le32	ee_start_lo;	/* low 32 bits of physical block 物理数据快的低16位*/
 };
 
 /*
@@ -81,7 +82,7 @@ struct ext4_extent {
  * It's used at all the levels except the bottom.
  */
 struct ext4_extent_idx {
-	__le32	ei_block;	/* index covers logical blocks from 'block' */
+	__le32	ei_block;	/* index covers logical blocks from 'block'索引包含的逻辑数据块 */
 	__le32	ei_leaf_lo;	/* pointer to the physical block of the next *
 				 * level. leaf or next index could be there */
 	__le16	ei_leaf_hi;	/* high 16 bits of physical block */
@@ -92,11 +93,11 @@ struct ext4_extent_idx {
  * Each block (leaves and indexes), even inode-stored has header.
  */
 struct ext4_extent_header {
-	__le16	eh_magic;	/* probably will support different formats */
-	__le16	eh_entries;	/* number of valid entries */
-	__le16	eh_max;		/* capacity of store in entries */
-	__le16	eh_depth;	/* has tree real underlying blocks? */
-	__le32	eh_generation;	/* generation of the tree */
+	__le16	eh_magic;	/* probably will support different formats 可以支持不同的格式*/
+	__le16	eh_entries;	/* number of valid entries 有效项的个数*/
+	__le16	eh_max;		/* capacity of store in entries x项中的存储容量*/
+	__le16	eh_depth;	/* has tree real underlying blocks? 树的深度*/
+	__le32	eh_generation;	/* generation of the tree 树的代数*/
 };
 
 #define EXT4_EXT_MAGIC		cpu_to_le16(0xf30a)

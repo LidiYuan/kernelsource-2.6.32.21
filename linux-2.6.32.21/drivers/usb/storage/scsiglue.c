@@ -410,8 +410,7 @@ void usb_stor_report_bus_reset(struct us_data *us)
 #define SPRINTF(args...) \
 	do { if (pos < buffer+length) pos += sprintf(pos, ## args); } while (0)
 
-static int proc_info (struct Scsi_Host *host, char *buffer,
-		char **start, off_t offset, int length, int inout)
+static int proc_info (struct Scsi_Host *host, char *buffer,char **start, off_t offset, int length, int inout)
 {
 	struct us_data *us = host_to_us(host);
 	char *pos = buffer;
@@ -421,32 +420,43 @@ static int proc_info (struct Scsi_Host *host, char *buffer,
 	if (inout)
 		return length;
 
+    //%d表示的是scsi host适配器号  usb-storage是控制器的名字
 	/* print the controller name */
 	SPRINTF("   Host scsi%d: usb-storage\n", host->host_no);
 
+
+	//厂商名字 
 	/* print product, vendor, and serial number strings */
 	if (us->pusb_dev->manufacturer)
 		string = us->pusb_dev->manufacturer;
 	else if (us->unusual_dev->vendorName)
 		string = us->unusual_dev->vendorName;
 	else
-		string = "Unknown";
+		string = "Unknown";   
 	SPRINTF("       Vendor: %s\n", string);
+
+	//产品名字
 	if (us->pusb_dev->product)
 		string = us->pusb_dev->product;
 	else if (us->unusual_dev->productName)
 		string = us->unusual_dev->productName;
 	else
 		string = "Unknown";
+	 
 	SPRINTF("      Product: %s\n", string);
+
+	//u盘序列号
 	if (us->pusb_dev->serial)
 		string = us->pusb_dev->serial;
 	else
 		string = "None";
 	SPRINTF("Serial Number: %s\n", string);
 
+    //遵循的协议规范字符串
 	/* show the protocol and transport */
 	SPRINTF("     Protocol: %s\n", us->protocol_name);
+
+	//传输方式
 	SPRINTF("    Transport: %s\n", us->transport_name);
 
 	/* show the device flags */
@@ -517,7 +527,7 @@ struct scsi_host_template usb_stor_host_template = {
 	.name =				"usb-storage",
 	.proc_name =			"usb-storage",
 	.proc_info =			proc_info,
-	.info =				host_info,
+	.info =				    host_info,
 
 	/* command interface -- queued only */
 	.queuecommand =			queuecommand,

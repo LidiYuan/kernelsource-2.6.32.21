@@ -1083,7 +1083,7 @@ struct napi_gro_cb {
 struct packet_type {
 	__be16			type;	/* htons(ether_type).type 成员保存了网络层协议类型，ETH_P_IP、ETH_P_ARP */
 	struct net_device	*dev;	/* 网络接口设备 当为NULL表示所有的设备 */
-	int			(*func) (struct sk_buff *, //协议处理函数func 成员就是钩子函数了，如 ip_rcv()、arp_rcv()
+	int			(*func) (struct sk_buff *, //协议处理函数func 成员就是钩子函数了，如 ip_rcv()、arp_rcv() packet_rcv()
 					 struct net_device *,
 					 struct packet_type *,
 					 struct net_device *);

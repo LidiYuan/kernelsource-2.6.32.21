@@ -56,6 +56,7 @@ struct upid {
 
 struct pid
 {
+   
 	atomic_t count;//指向该数据结构的引用次数
 	unsigned int level;//level是该pid在pid_namespace中处于第几层。当level=0时表示是global namespace，即最高层
 

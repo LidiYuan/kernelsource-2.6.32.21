@@ -136,8 +136,7 @@ void __init init_ISA_irqs(void)
 		desc->depth = 1;
 
 	    //ÉèÖÃdesc->handle_irq = handle_level_irq
-		set_irq_chip_and_handler_name(i, &i8259A_chip,
-					      handle_level_irq, "XT");
+		set_irq_chip_and_handler_name(i, &i8259A_chip,handle_level_irq, "XT");
 	}
 }
 

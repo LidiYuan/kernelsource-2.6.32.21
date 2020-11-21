@@ -1072,7 +1072,8 @@ struct ctl_table
 	void *extra2;    //extra1 extra2可选参数 通常定义变量的最小值 或最大值
 };
 
-struct ctl_table_root {
+struct ctl_table_root 
+{
 	struct list_head root_list;
 	struct ctl_table_set default_set;
 	struct ctl_table_set *(*lookup)(struct ctl_table_root *root,

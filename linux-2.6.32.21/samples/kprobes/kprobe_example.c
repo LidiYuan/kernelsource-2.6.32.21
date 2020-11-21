@@ -20,17 +20,18 @@ static struct kprobe kp = {
 };
 
 /* kprobe pre_handler: called just before the probed instruction is executed */
-static int handler_pre(struct kprobe *p, struct pt_regs *regs)
+static int handler_pre(struct kprobe *p, 
+                          struct pt_regs *regs)
 {
+
 #ifdef CONFIG_X86
 	printk(KERN_INFO "pre_handler: p->addr = 0x%p, ip = %lx,"
-			" flags = 0x%lx\n",
-		p->addr, regs->ip, regs->flags);
+			" flags = 0x%lx\n",p->addr, regs->ip, regs->flags);
 #endif
+
 #ifdef CONFIG_PPC
 	printk(KERN_INFO "pre_handler: p->addr = 0x%p, nip = 0x%lx,"
-			" msr = 0x%lx\n",
-		p->addr, regs->nip, regs->msr);
+			" msr = 0x%lx\n",p->addr, regs->nip, regs->msr);
 #endif
 
 	/* A dump_stack() here will give a stack backtrace */
@@ -45,6 +46,7 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
 	printk(KERN_INFO "post_handler: p->addr = 0x%p, flags = 0x%lx\n",
 		p->addr, regs->flags);
 #endif
+
 #ifdef CONFIG_PPC
 	printk(KERN_INFO "post_handler: p->addr = 0x%p, msr = 0x%lx\n",
 		p->addr, regs->msr);
@@ -67,10 +69,13 @@ static int handler_fault(struct kprobe *p, struct pt_regs *regs, int trapnr)
 static int __init kprobe_init(void)
 {
 	int ret;
-	kp.pre_handler = handler_pre;
-	kp.post_handler = handler_post;
-	kp.fault_handler = handler_fault;
+	//上面的kp 符号名设置为 do_fork即对此函数进行探测
+	//设个前 后 异常的回调函数
+	kp.pre_handler = handler_pre;  //探测点执行前
+	kp.post_handler = handler_post;//探测点执行后
+	kp.fault_handler = handler_fault; //异常
 
+    //注册探测点
 	ret = register_kprobe(&kp);
 	if (ret < 0) {
 		printk(KERN_INFO "register_kprobe failed, returned %d\n", ret);

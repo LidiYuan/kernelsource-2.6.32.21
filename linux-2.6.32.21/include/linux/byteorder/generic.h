@@ -84,10 +84,10 @@
 
 #define cpu_to_le64 __cpu_to_le64
 #define le64_to_cpu __le64_to_cpu
-#define cpu_to_le32 __cpu_to_le32
-#define le32_to_cpu __le32_to_cpu
-#define cpu_to_le16 __cpu_to_le16
-#define le16_to_cpu __le16_to_cpu
+#define cpu_to_le32 __cpu_to_le32// 将一个32位的数据从特定于cpu的格式转换为小端格式
+#define le32_to_cpu __le32_to_cpu //将一个32位的数据从小端格式转换为特定于cpu的格式
+#define cpu_to_le16 __cpu_to_le16 //将一个16位的数据从特定于cpu的格式转换为小端格式
+#define le16_to_cpu __le16_to_cpu//将一个16位的数据从小端格式转换为特定于cpu的格式
 #define cpu_to_be64 __cpu_to_be64
 #define be64_to_cpu __be64_to_cpu
 #define cpu_to_be32 __cpu_to_be32

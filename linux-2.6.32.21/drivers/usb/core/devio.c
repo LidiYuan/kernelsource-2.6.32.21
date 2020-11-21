@@ -1925,8 +1925,8 @@ int __init usb_devio_init(void)
 {
 	int retval;
 
-	retval = register_chrdev_region(USB_DEVICE_DEV, USB_DEVICE_MAX,
-					"usb_device");
+	//注册字符设备usb_devices,主设备号189，可通过cat /proc/devices查看
+	retval = register_chrdev_region(USB_DEVICE_DEV, USB_DEVICE_MAX,"usb_device");
 	if (retval) {
 		printk(KERN_ERR "Unable to register minors for usb_device\n");
 		goto out;

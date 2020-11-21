@@ -661,8 +661,7 @@ static int pagemap_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
  * determine which areas of memory are actually mapped and llseek to
  * skip over unmapped regions.
  */
-static ssize_t pagemap_read(struct file *file, char __user *buf,
-			    size_t count, loff_t *ppos)
+static ssize_t pagemap_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	struct task_struct *task = get_proc_task(file->f_path.dentry->d_inode);
 	struct page **pages, *page;

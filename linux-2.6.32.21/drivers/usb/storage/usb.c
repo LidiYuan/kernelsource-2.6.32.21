@@ -331,7 +331,7 @@ static int usb_stor_control_thread(void * __us)
 		/* we've got a command, let's do it! */
 		else {
 			US_DEBUG(usb_stor_show_command(us->srb));
-			us->proto_handler(us->srb, us);
+			us->proto_handler(us->srb, us);// usb_stor_Bulk_transport
 		}
 
 		/* lock access to the state */
@@ -404,16 +404,16 @@ static int associate_dev(struct us_data *us, struct usb_interface *intf)
 	usb_set_intfdata(intf, us);
 
 	/* Allocate the device-related DMA-mapped buffers */
-	us->cr = usb_buffer_alloc(us->pusb_dev, sizeof(*us->cr),
-			GFP_KERNEL, &us->cr_dma);
-	if (!us->cr) {
+	us->cr = usb_buffer_alloc(us->pusb_dev, sizeof(*us->cr),GFP_KERNEL, &us->cr_dma);
+	if (!us->cr) 
+	{
 		US_DEBUGP("usb_ctrlrequest allocation failed\n");
 		return -ENOMEM;
 	}
 
-	us->iobuf = usb_buffer_alloc(us->pusb_dev, US_IOBUF_SIZE,
-			GFP_KERNEL, &us->iobuf_dma);
-	if (!us->iobuf) {
+	us->iobuf = usb_buffer_alloc(us->pusb_dev, US_IOBUF_SIZE,GFP_KERNEL, &us->iobuf_dma);
+	if (!us->iobuf) 
+	{
 		US_DEBUGP("I/O buffer allocation failed\n");
 		return -ENOMEM;
 	}
@@ -570,7 +570,7 @@ static int get_device_info(struct us_data *us, const struct usb_device_id *id,
 	return 0;
 }
 
-/* Get the transport settings */
+/* Get the transport settings 鑾峰緱璁剧疆鐨勬暟鎹紶杈撴柟寮?/
 static void get_transport(struct us_data *us)
 {
 	switch (us->protocol) {
@@ -629,7 +629,7 @@ static void get_protocol(struct us_data *us)
 		break;
 
 	case US_SC_UFI:
-		us->protocol_name = "Uniform Floppy Interface (UFI)";
+		us->protocol_name = "Uniform Floppy Interface (UFI)";//姝よ鑼冩槸鐢ㄤ簬杞洏鐨?
 		us->proto_handler = usb_stor_ufi_command;
 		break;
 	}
@@ -813,21 +813,19 @@ static int usb_stor_scan_thread(void * __us)
 {
 	struct us_data *us = (struct us_data *)__us;
 
-	printk(KERN_DEBUG
-		"usb-storage: device found at %d\n", us->pusb_dev->devnum);
+	printk(KERN_DEBUG "usb-storage: device found at %d\n", us->pusb_dev->devnum);
 
 	set_freezable();
 	/* Wait for the timeout to expire or for a disconnect */
-	if (delay_use > 0) {
-		printk(KERN_DEBUG "usb-storage: waiting for device "
-				"to settle before scanning\n");
-		wait_event_freezable_timeout(us->delay_wait,
-				test_bit(US_FLIDX_DONT_SCAN, &us->dflags),
-				delay_use * HZ);
+	if (delay_use > 0) 
+	{
+		printk(KERN_DEBUG "usb-storage: waiting for device ""to settle before scanning\n");
+		wait_event_freezable_timeout(us->delay_wait,test_bit(US_FLIDX_DONT_SCAN, &us->dflags),delay_use * HZ);
 	}
 
 	/* If the device is still connected, perform the scanning */
-	if (!test_bit(US_FLIDX_DONT_SCAN, &us->dflags)) {
+	if (!test_bit(US_FLIDX_DONT_SCAN, &us->dflags)) 
+	{
 
 		/* For bulk-only devices, determine the max LUN value */
 		if (us->protocol == US_PR_BULK &&
@@ -862,7 +860,7 @@ int usb_stor_probe1(struct us_data **pus,
 	 * Ask the SCSI layer to allocate a host structure, with extra
 	 * space at the end for our private us_data structure.
 	 */
-	//分配Scsi_Host结构体
+	//分配Scsi_Host结构体 和scsi进行关联起来 //虚拟出一个scsi host主机适配器
 	host = scsi_host_alloc(&usb_stor_host_template, sizeof(*us));
 	if (!host) {
 		printk(KERN_WARNING USB_STORAGE
@@ -932,10 +930,11 @@ int usb_stor_probe2(struct us_data *us)
 		goto BadDevice;
 
 	/* Acquire all the other resources and add the host */
-	result = usb_stor_acquire_resources(us);
+	result = usb_stor_acquire_resources(us);//在这个函数里面还创建了内核线程usb-storage
 	if (result)
 		goto BadDevice;
-	result = scsi_add_host(us_to_host(us), &us->pusb_intf->dev);
+	
+	result = scsi_add_host(us_to_host(us), &us->pusb_intf->dev);//看到了熟悉的scsi_add_host函数
 	if (result) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to add the scsi host\n");
@@ -943,10 +942,10 @@ int usb_stor_probe2(struct us_data *us)
 	}
 
 	/* Start up the thread for delayed SCSI-device scanning */
-	th = kthread_create(usb_stor_scan_thread, us, "usb-stor-scan");
-	if (IS_ERR(th)) {
-		printk(KERN_WARNING USB_STORAGE 
-		       "Unable to start the device-scanning thread\n");
+	th = kthread_create(usb_stor_scan_thread, us, "usb-stor-scan");	//scsi_scan_host函数是在这个内核线程里面被调用的
+	if (IS_ERR(th)) 
+	{
+		printk(KERN_WARNING USB_STORAGE "Unable to start the device-scanning thread\n");
 		complete(&us->scanning_done);
 		quiesce_and_remove_host(us);
 		result = PTR_ERR(th);
@@ -977,8 +976,8 @@ void usb_stor_disconnect(struct usb_interface *intf)
 EXPORT_SYMBOL_GPL(usb_stor_disconnect);
 
 /* The main probe routine for standard devices */
-static int storage_probe(struct usb_interface *intf,
-			 const struct usb_device_id *id)
+//usb驱动去识别一个设备
+static int storage_probe(struct usb_interface *intf,const struct usb_device_id *id)
 {
 	struct us_data *us;
 	int result;
@@ -989,8 +988,7 @@ static int storage_probe(struct usb_interface *intf,
 	 * If the device isn't standard (is handled by a subdriver
 	 * module) then don't accept it.
 	 */
-	if (usb_usual_check_type(id, USB_US_TYPE_STOR) ||
-			usb_usual_ignore_device(intf))
+	if (usb_usual_check_type(id, USB_US_TYPE_STOR) || usb_usual_ignore_device(intf))
 		return -ENXIO;
 
 	/*
@@ -1000,8 +998,7 @@ static int storage_probe(struct usb_interface *intf,
 	 * table, so we use the index of the id entry to find the
 	 * corresponding unusual_devs entry.
 	 */
-	result = usb_stor_probe1(&us, intf, id,
-			(id - usb_storage_usb_ids) + us_unusual_dev_list);
+	result = usb_stor_probe1(&us, intf, id,(id - usb_storage_usb_ids) + us_unusual_dev_list);
 	if (result)
 		return result;
 
@@ -1017,8 +1014,10 @@ static int storage_probe(struct usb_interface *intf,
 
 static struct usb_driver usb_storage_driver = {
 	.name =		"usb-storage",
+
 	.probe =	storage_probe,
 	.disconnect =	usb_stor_disconnect,
+	
 	.suspend =	usb_stor_suspend,
 	.resume =	usb_stor_resume,
 	.reset_resume =	usb_stor_reset_resume,
@@ -1036,8 +1035,10 @@ static int __init usb_stor_init(void)
 
 	/* register the driver, return usb_register return code if error */
 	//usb_register_driver
+	//凡是 USB 设备驱动，都要调用这个函数来向 USB Core 注册，从而让 USB Core 知道有这个设备
 	retval = usb_register(&usb_storage_driver); //注册usb_driver驱动
-	if (retval == 0) {
+	if (retval == 0) 
+	{
 		printk(KERN_INFO "USB Mass Storage support registered.\n");
 		usb_usual_set_present(USB_US_TYPE_STOR);
 	}

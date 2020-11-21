@@ -97,7 +97,7 @@ struct hd_struct
 	struct device __dev;//一个分区也被视为一个设备
 
 	struct kobject *holder_dir;
-	int policy, 
+	int policy, //策略
 		partno; //分区编号
 
 #ifdef CONFIG_FAIL_MAKE_REQUEST
@@ -105,7 +105,7 @@ struct hd_struct
 #endif
 
 	unsigned long stamp;
-	int in_flight[2];
+	int in_flight[2]; //当前读写请求的个数     ,  一个读请求的个数, 一个写请求的个数
 
 #ifdef	CONFIG_SMP
 	struct disk_stats *dkstats;
@@ -116,13 +116,13 @@ struct hd_struct
 	struct rcu_head rcu_head;
 };
 
-#define GENHD_FL_REMOVABLE			        1
+#define GENHD_FL_REMOVABLE			        1 //如果你的设备有可移出的介质, 你应当设置
 #define GENHD_FL_DRIVERFS			        2
 #define GENHD_FL_MEDIA_CHANGE_NOTIFY		4
-#define GENHD_FL_CD				8
+#define GENHD_FL_CD				8             //CD-ROM 驱动器可设置 GENHD_FL_CD
 #define GENHD_FL_UP				16
-#define GENHD_FL_SUPPRESS_PARTITION_INFO	32  //分区不需要出现在/proc/partitions
-#define GENHD_FL_EXT_DEVT			64 /* allow extended devt */
+#define GENHD_FL_SUPPRESS_PARTITION_INFO	32      //分区不需要出现在/proc/partitions
+#define GENHD_FL_EXT_DEVT			64               /* allow extended devt */
 #define GENHD_FL_NATIVE_CAPACITY		128
 
 #define BLK_SCSI_MAX_CMDS	(256)
@@ -159,7 +159,7 @@ struct gendisk {
 	int first_minor;    /*次设备号*/
 	int minors;         /* 最大的分区数，如果不能分区，则为1*/
 
-	char disk_name[DISK_NAME_LEN];	//设备名称/* name of major driver */
+	char disk_name[DISK_NAME_LEN];	//设备名称/* name of major driver 显示在/proc/partitions和sysfs中  */
 
 	
 	char *(*devnode)(struct gendisk *gd, mode_t *mode);
@@ -169,7 +169,7 @@ struct gendisk {
 	 * helpers.
 	 */
 	 
-	struct disk_part_tbl *part_tbl;//磁盘分区信息
+	struct disk_part_tbl *part_tbl;//磁盘分区信息 /表示容纳分区表
 	struct hd_struct part0;//指向part_tbl->part[0]  当前块设备的第一个分区  没有分区则代表整个设备
 
     

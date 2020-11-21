@@ -222,13 +222,25 @@ struct inodes_stat_t {
 #define MS_MGC_VAL 0xC0ED0000
 #define MS_MGC_MSK 0xffff0000
 
+/*
+chattr 修改文件在linux上第二扩展文件系统上的特有属性
+*/
 /* Inode flags - they have nothing to superblock flags now */
 
+//写入后立即同步
 #define S_SYNC		1	/* Writes are synced at once */
+
+//不更新访问时间
 #define S_NOATIME	2	/* Do not update access times */
+
+//只能添加 只能以"a"属性打开的文件
 #define S_APPEND	4	/* Append-only file */
+
+//不可改变
 #define S_IMMUTABLE	8	/* Immutable file */
+
 #define S_DEAD		16	/* removed, but still open directory */
+
 #define S_NOQUOTA	32	/* Inode is not counted to quota */
 #define S_DIRSYNC	64	/* Directory modifications are synchronous */
 #define S_NOCMTIME	128	/* Do not update file c/mtime */
@@ -629,6 +641,7 @@ struct backing_dev_info;
 //来管理page cache  通过add_to_page_cache插入页面到page cache,  
 //find_get_page():用来在页高速缓存中找到需要的数据
 //页高速缓存
+//一个address_space管理了一个文件在内存中缓存的所有pages，这部分缓存也是页高速缓存
 struct address_space {
 	struct inode		*host;		/*若关联对象是一个文件则此处为文件节点 
                                       若和swapper对象关联 则此处为NULL
@@ -798,7 +811,7 @@ struct inode {
 	struct mutex		i_mutex; //写文件会用到的锁
 	struct rw_semaphore	i_alloc_sem;
 
-	const struct inode_operations	*i_op;
+	const struct inode_operations	*i_op;//如 ext4_file_inode_operations
 	const struct file_operations	*i_fop;	/* former ->i_op->default_file_ops */
 	struct super_block	*i_sb; //相关的超级快
 	struct file_lock	*i_flock; //文件锁链表
@@ -1425,7 +1438,7 @@ struct super_block {
 	void                    *s_security;//安全模块
 #endif
 
-	struct xattr_handler	**s_xattr;//扩展属性操作
+	struct xattr_handler	**s_xattr;//扩展属性操作 如 ext4_xattr_handlers
 
 	struct list_head	s_inodes;	/* 指向文件系统内所有的inode可以遍历inode对象*/
 	struct hlist_head	s_anon;		/* 匿名目录项 anonymous dentries for (nfs) exporting */
@@ -1608,7 +1621,7 @@ struct file_operations {
 
 //内核针对特定文件的操作方法
 struct inode_operations {
-	int (*create) (struct inode *,struct dentry *,int, struct nameidata *);
+	int (*create) (struct inode *,struct dentry *,int, struct nameidata *); //创建文件
 	struct dentry * (*lookup) (struct inode *,struct dentry *, struct nameidata *);
 	int (*link) (struct dentry *,struct inode *,struct dentry *);
 	int (*unlink) (struct inode *,struct dentry *);

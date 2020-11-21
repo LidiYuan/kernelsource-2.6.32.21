@@ -181,7 +181,8 @@ static int symbol_valid(struct sym_entry *s)
 	 * after pass 1, they would be included in pass 2 when --all-symbols is
 	 * specified so exclude them to get a stable symbol list.
 	 */
-	static char *special_symbols[] = {
+	static char *special_symbols[] = 
+	{
 		"kallsyms_addresses",
 		"kallsyms_num_syms",
 		"kallsyms_names",

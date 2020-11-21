@@ -6,7 +6,7 @@
 #include <linux/seq_file.h>
 
 /*
- * /proc/interrupts
+ *  /proc/interrupts
  */
 static void *int_seq_start(struct seq_file *f, loff_t *pos)
 {
@@ -38,6 +38,7 @@ static int interrupts_open(struct inode *inode, struct file *filp)
 	return seq_open(filp, &int_seq_ops);
 }
 
+
 static const struct file_operations proc_interrupts_operations = {
 	.open		= interrupts_open,
 	.read		= seq_read,
@@ -45,9 +46,13 @@ static const struct file_operations proc_interrupts_operations = {
 	.release	= seq_release,
 };
 
+
+//创建/proc/interrupts 文件 用于存储中断信息
 static int __init proc_interrupts_init(void)
 {
+    
 	proc_create("interrupts", 0, NULL, &proc_interrupts_operations);
 	return 0;
 }
+
 module_init(proc_interrupts_init);

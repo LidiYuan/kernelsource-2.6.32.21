@@ -147,7 +147,8 @@ static int __register_ftrace_function(struct ftrace_ops *ops)
 	smp_wmb();
 	ftrace_list = ops;
 
-	if (ftrace_enabled) {
+	if (ftrace_enabled) 
+	{
 		ftrace_func_t func;
 
 		if (ops->next == &ftrace_list_end)

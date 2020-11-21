@@ -264,6 +264,7 @@ sd_show_app_tag_own(struct device *dev, struct device_attribute *attr,
 	return snprintf(buf, 20, "%u\n", sdkp->ATO);
 }
 
+//这些属性文件在/sys/class/scsi_disk/x:x:x:x/下的属性文件
 static struct device_attribute sd_disk_attrs[] = {
 	__ATTR(cache_type, S_IRUGO|S_IWUSR, sd_show_cache_type,
 	       sd_store_cache_type),

@@ -61,9 +61,16 @@
 #include "xattr.h"
 #include "acl.h"
 
+//获取存放在磁盘块中的扩展属性列表的首部
 #define BHDR(bh) ((struct ext4_xattr_header *)((bh)->b_data))
+
+//将ptr指针强制转换为ext4_xattr_entry类型
 #define ENTRY(ptr) ((struct ext4_xattr_entry *)(ptr))
+
+//查找扩展属性表中的第一项
 #define BFIRST(bh) ENTRY(BHDR(bh)+1)
+
+//判断entry指向的表项是否是扩展属性列表中的最后一项
 #define IS_LAST_ENTRY(entry) (*(__u32 *)(entry) == 0)
 
 #ifdef EXT4_XATTR_DEBUG
@@ -143,10 +150,13 @@ ext4_listxattr(struct dentry *dentry, char *buffer, size_t size)
 	return ext4_xattr_list(dentry->d_inode, buffer, size);
 }
 
-static int
-ext4_xattr_check_names(struct ext4_xattr_entry *entry, void *end)
+
+//判断各个扩展属性项是否位于指定的空间内.若均在指定的存储空间内则返回0；反之返回-EIO
+static int ext4_xattr_check_names(struct ext4_xattr_entry *entry,//entry表示待检查的第一个扩展属性项 
+										void *end)   //表示存放扩展属性的存储空间的的末尾
 {
-	while (!IS_LAST_ENTRY(entry)) {
+	while (!IS_LAST_ENTRY(entry)) 
+	{
 		struct ext4_xattr_entry *next = EXT4_XATTR_NEXT(entry);
 		if ((void *)next >= end)
 			return -EIO;
@@ -155,8 +165,9 @@ ext4_xattr_check_names(struct ext4_xattr_entry *entry, void *end)
 	return 0;
 }
 
-static inline int
-ext4_xattr_check_block(struct buffer_head *bh)
+
+//检查目标对象所在的磁盘块所对应的缓冲区是否正确
+static inline int ext4_xattr_check_block(struct buffer_head *bh)//bh表示磁盘块对应的缓冲区的缓冲头
 {
 	int error;
 
@@ -178,9 +189,12 @@ ext4_xattr_check_entry(struct ext4_xattr_entry *entry, size_t size)
 	return 0;
 }
 
-static int
-ext4_xattr_find_entry(struct ext4_xattr_entry **pentry, int name_index,
-		      const char *name, size_t size, int sorted)
+//在扩展属性列表中查找参数name指定的扩展属性
+static int ext4_xattr_find_entry(struct ext4_xattr_entry **pentry, //指向扩展属性各表项的起始地址
+                                       int name_index,//表示待查找的扩展属性所属命名空间
+		                               const char *name, //扩展属性名字
+		                               size_t size,   //扩展属性名长度
+		                               int sorted)  //表示扩展属性表项是否是有序的 
 {
 	struct ext4_xattr_entry *entry;
 	size_t name_len;
@@ -205,9 +219,13 @@ ext4_xattr_find_entry(struct ext4_xattr_entry **pentry, int name_index,
 	return cmp ? -ENODATA : 0;
 }
 
-static int
-ext4_xattr_block_get(struct inode *inode, int name_index, const char *name,
-		     void *buffer, size_t buffer_size)
+
+//在扩展属性所在的外部数据块中查找指定的扩展属性
+static int ext4_xattr_block_get(struct inode *inode,// inode表示要操作的目标文件
+                                     int name_index, //命名空间索引
+                                     const char *name,//扩展属性的名字
+		                             void *buffer, //存储扩展属性值的存储空间
+		                             size_t buffer_size)//表示存储空间的长度
 {
 	struct buffer_head *bh = NULL;
 	struct ext4_xattr_entry *entry;
@@ -255,9 +273,12 @@ cleanup:
 	return error;
 }
 
-static int
-ext4_xattr_ibody_get(struct inode *inode, int name_index, const char *name,
-		     void *buffer, size_t buffer_size)
+//在索引节点的空闲空间中查找指定的扩展属性
+static int ext4_xattr_ibody_get(struct inode *inode, //要操作的对象
+                           int name_index,   //命名空间索引
+                           const char *name,  //扩展属性的名字
+		                   void *buffer,      //扩展属性值空间
+		                   size_t buffer_size)//扩展属性空间的大小
 {
 	struct ext4_xattr_ibody_header *header;
 	struct ext4_xattr_entry *entry;
@@ -308,15 +329,17 @@ cleanup:
  * Returns a negative error number on failure, or the number of bytes
  * used / required on success.
  */
-int
-ext4_xattr_get(struct inode *inode, int name_index, const char *name,
-	       void *buffer, size_t buffer_size)
+ //拷贝一个扩展属性到buffer种,如果buffferis空 则计算需要buffer的大小返回
+int ext4_xattr_get(struct inode *inode, 
+                       int name_index, 
+                       const char *name,
+	                   void *buffer, 
+	                   size_t buffer_size)
 {
 	int error;
 
 	down_read(&EXT4_I(inode)->xattr_sem);
-	error = ext4_xattr_ibody_get(inode, name_index, name, buffer,
-				     buffer_size);
+	error = ext4_xattr_ibody_get(inode, name_index, name, buffer,buffer_size);
 	if (error == -ENODATA)
 		error = ext4_xattr_block_get(inode, name_index, name, buffer,
 					     buffer_size);
@@ -324,13 +347,15 @@ ext4_xattr_get(struct inode *inode, int name_index, const char *name,
 	return error;
 }
 
-static int
-ext4_xattr_list_entries(struct inode *inode, struct ext4_xattr_entry *entry,
+
+//
+static int ext4_xattr_list_entries(struct inode *inode, struct ext4_xattr_entry *entry,
 			char *buffer, size_t buffer_size)
 {
 	size_t rest = buffer_size;
 
-	for (; !IS_LAST_ENTRY(entry); entry = EXT4_XATTR_NEXT(entry)) {
+	for (; !IS_LAST_ENTRY(entry); entry = EXT4_XATTR_NEXT(entry)) 
+	{
 		struct xattr_handler *handler =
 			ext4_xattr_handler(entry->e_name_index);
 
@@ -448,13 +473,16 @@ ext4_xattr_list(struct inode *inode, char *buffer, size_t buffer_size)
  * If the EXT4_FEATURE_COMPAT_EXT_ATTR feature of this file system is
  * not set, set it.
  */
-static void ext4_xattr_update_super_block(handle_t *handle,
-					  struct super_block *sb)
+ //判断参数sb指定的文件系统是否设置了EXT4_FEATURE_COMPAT_EXT_ATTR标志，如果没有，则设置该标志
+static void ext4_xattr_update_super_block(handle_t *handle,//handle表示相应的扩展属性处理程序
+					                              struct super_block *sb)//待判定的文件系统
 {
+     //
 	if (EXT4_HAS_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_EXT_ATTR))
 		return;
 
-	if (ext4_journal_get_write_access(handle, EXT4_SB(sb)->s_sbh) == 0) {
+	if (ext4_journal_get_write_access(handle, EXT4_SB(sb)->s_sbh) == 0) 
+	{
 		EXT4_SET_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_EXT_ATTR);
 		sb->s_dirt = 1;
 		ext4_handle_dirty_metadata(handle, NULL, EXT4_SB(sb)->s_sbh);
@@ -520,11 +548,12 @@ static size_t ext4_xattr_free_space(struct ext4_xattr_entry *last,
 	return (*min_offs - ((void *)last - base) - sizeof(__u32));
 }
 
+//表示一个扩展属性结构
 struct ext4_xattr_info {
-	int name_index;
-	const char *name;
-	const void *value;
-	size_t value_len;
+	int name_index;           //表示命名空间索引 如 EXT4_XATTR_INDEX_USER
+	const char *name;         //扩展属性的名字
+	const void *value;        //扩展属性的值
+	size_t value_len;         //扩展属性值的长度
 };
 
 struct ext4_xattr_search {
@@ -532,11 +561,13 @@ struct ext4_xattr_search {
 	void *base;
 	void *end;
 	struct ext4_xattr_entry *here;
-	int not_found;
+	int not_found; //表示是否找到
 };
 
-static int
-ext4_xattr_set_entry(struct ext4_xattr_info *i, struct ext4_xattr_search *s)
+
+//根据参数指定的相关信息处理扩展属性的值
+static int ext4_xattr_set_entry(struct ext4_xattr_info *i,  //表示待操作的扩展属性表项的相关信息 
+	                                 struct ext4_xattr_search *s)//扩展属性列表的相关信息并记录了待设置的扩展属性表项是否位于扩展属性列表中
 {
 	struct ext4_xattr_entry *last;
 	size_t free, min_offs = s->end - s->base, name_len = strlen(i->name);
@@ -641,9 +672,11 @@ struct ext4_xattr_block_find {
 	struct buffer_head *bh;
 };
 
-static int
-ext4_xattr_block_find(struct inode *inode, struct ext4_xattr_info *i,
-		      struct ext4_xattr_block_find *bs)
+
+//在扩展属性所在的外部数据块中查找参数i指定的扩展属性
+static int ext4_xattr_block_find(struct inode *inode, //表示表示待操作的目标文件
+	                                   struct ext4_xattr_info *i,//表示待操作的扩展属性表项的相关信息
+		                               struct ext4_xattr_block_find *bs)//存放扩展属性列表的相关信息以及目标文件的扩展属性所在的缓冲区
 {
 	struct super_block *sb = inode->i_sb;
 	int error;
@@ -684,10 +717,12 @@ cleanup:
 	return error;
 }
 
-static int
-ext4_xattr_block_set(handle_t *handle, struct inode *inode,
-		     struct ext4_xattr_info *i,
-		     struct ext4_xattr_block_find *bs)
+
+//根据参数在扩展属性所在的外部数据块中创建、替换或删除一个扩展属性。如果数据缓冲区为空，则该函数用于删除相应的扩展属性；如果数据缓冲区非空，则替换现存的扩展属性值或创建一个的新的扩展属性
+static int ext4_xattr_block_set(handle_t *handle,//表示用于日志处理的原子更新操作 
+                                     struct inode *inode,//表示待设置的目标文件
+		                             struct ext4_xattr_info *i,//表示要设置的扩展属性的相关信息
+		                             struct ext4_xattr_block_find *bs)//表示存放在数据块中的扩展属性及相应扩展属性的查找结果的相关信息
 {
 	struct super_block *sb = inode->i_sb;
 	struct buffer_head *new_bh = NULL;
@@ -888,9 +923,11 @@ struct ext4_xattr_ibody_find {
 	struct ext4_iloc iloc;
 };
 
-static int
-ext4_xattr_ibody_find(struct inode *inode, struct ext4_xattr_info *i,
-		      struct ext4_xattr_ibody_find *is)
+
+//在索引节点中查找参数i指定的属性
+static int ext4_xattr_ibody_find(struct inode *inode,  //inode表示待设置的目标文件 
+	                                   struct ext4_xattr_info *i,//表示要设置的扩展属性的相关信息
+		                               struct ext4_xattr_ibody_find *is)//表示存放在索引节点中的扩展属性及相应扩展属性的查找结果的相关信息
 {
 	struct ext4_xattr_ibody_header *header;
 	struct ext4_inode *raw_inode;
@@ -918,10 +955,11 @@ ext4_xattr_ibody_find(struct inode *inode, struct ext4_xattr_info *i,
 	return 0;
 }
 
-static int
-ext4_xattr_ibody_set(handle_t *handle, struct inode *inode,
-		     struct ext4_xattr_info *i,
-		     struct ext4_xattr_ibody_find *is)
+//在索引节点中删除、替换或创建一个扩展属性
+static int ext4_xattr_ibody_set(handle_t *handle, //handle表示用于日志处理的原子更新操作
+                                      struct inode *inode,//inode表示待设置的目标文件
+		                              struct ext4_xattr_info *i,//表示要设置的扩展属性的相关信息
+		                              struct ext4_xattr_ibody_find *is)//表示存放在目标文件索引节点内的扩展属性的相关信息
 {
 	struct ext4_xattr_ibody_header *header;
 	struct ext4_xattr_search *s = &is->s;
@@ -955,32 +993,44 @@ ext4_xattr_ibody_set(handle_t *handle, struct inode *inode,
  *
  * Returns 0, or a negative error number on failure.
  */
-int
-ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
-		      const char *name, const void *value, size_t value_len,
-		      int flags)
+ //根据参数为相应的索引节点中创建、替换或删除一个扩展属性。如果数据缓冲区为空，则该函数用于删除相应的扩展属性；如果数据缓冲区非空，则替换现存的扩展属性值或创建一个的新的扩展属性
+int ext4_xattr_set_handle(handle_t *handle,  //表示用于日志处理的原子更新操作
+                                struct inode *inode, //表示待设置的目标文件
+                                int name_index,        //此值表示属于哪个命名空间 如EXT4_XATTR_INDEX_USER
+		                        const char *name, 
+		                        const void *value, 
+		                        size_t value_len,
+		                        int flags)
 {
-	struct ext4_xattr_info i = {
+	struct ext4_xattr_info i = 
+	{
 		.name_index = name_index,
 		.name = name,
 		.value = value,
 		.value_len = value_len,
 
 	};
+		
 	struct ext4_xattr_ibody_find is = {
 		.s = { .not_found = -ENODATA, },
 	};
+		
 	struct ext4_xattr_block_find bs = {
 		.s = { .not_found = -ENODATA, },
 	};
 	unsigned long no_expand;
 	int error;
 
+    //对参数做检查
 	if (!name)
 		return -EINVAL;
+	
 	if (strlen(name) > 255)
 		return -ERANGE;
+
+	//锁定写
 	down_write(&EXT4_I(inode)->xattr_sem);
+
 	no_expand = ext4_test_inode_state(inode, EXT4_STATE_NO_EXPAND);
 	ext4_set_inode_state(inode, EXT4_STATE_NO_EXPAND);
 
@@ -992,7 +1042,8 @@ ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	if (error)
 		goto cleanup;
 
-	if (ext4_test_inode_state(inode, EXT4_STATE_NEW)) {
+	if (ext4_test_inode_state(inode, EXT4_STATE_NEW)) 
+	{
 		struct ext4_inode *raw_inode = ext4_raw_inode(&is.iloc);
 		memset(raw_inode, 0, EXT4_SB(inode->i_sb)->s_inode_size);
 		ext4_clear_inode_state(inode, EXT4_STATE_NEW);
@@ -1001,11 +1052,16 @@ ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 	error = ext4_xattr_ibody_find(inode, &i, &is);
 	if (error)
 		goto cleanup;
+
+	//在inode内部没有找到,则到数据块块种查找
 	if (is.s.not_found)
 		error = ext4_xattr_block_find(inode, &i, &bs);
 	if (error)
 		goto cleanup;
-	if (is.s.not_found && bs.s.not_found) {
+
+	//
+	if (is.s.not_found && bs.s.not_found) 
+	{
 		error = -ENODATA;
 		if (flags & XATTR_REPLACE)
 			goto cleanup;
@@ -1017,17 +1073,24 @@ ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 		if (flags & XATTR_CREATE)
 			goto cleanup;
 	}
-	if (!value) {
+	
+	if (!value) 
+	{
 		if (!is.s.not_found)
 			error = ext4_xattr_ibody_set(handle, inode, &i, &is);
 		else if (!bs.s.not_found)
 			error = ext4_xattr_block_set(handle, inode, &i, &bs);
-	} else {
+	}
+	else 
+	{
 		error = ext4_xattr_ibody_set(handle, inode, &i, &is);
-		if (!error && !bs.s.not_found) {
+		if (!error && !bs.s.not_found) 
+		{
 			i.value = NULL;
 			error = ext4_xattr_block_set(handle, inode, &i, &bs);
-		} else if (error == -ENOSPC) {
+		} 
+		else if (error == -ENOSPC) 
+		{
 			if (EXT4_I(inode)->i_file_acl && !bs.s.base) {
 				error = ext4_xattr_block_find(inode, &i, &bs);
 				if (error)
@@ -1043,11 +1106,17 @@ ext4_xattr_set_handle(handle_t *handle, struct inode *inode, int name_index,
 			}
 		}
 	}
-	if (!error) {
+
+	if (!error) 
+	{
 		ext4_xattr_update_super_block(handle, inode->i_sb);
+
+		//更新修改时间 
 		inode->i_ctime = ext4_current_time(inode);
 		if (!value)
 			ext4_clear_inode_state(inode, EXT4_STATE_NO_EXPAND);
+
+		//标记为已修改
 		error = ext4_mark_iloc_dirty(handle, inode, &is.iloc);
 		/*
 		 * The bh is consumed by ext4_mark_iloc_dirty, even with
@@ -1075,25 +1144,34 @@ cleanup:
  *
  * Returns 0, or a negative error number on failure.
  */
-int
-ext4_xattr_set(struct inode *inode, int name_index, const char *name,
-	       const void *value, size_t value_len, int flags)
+
+//设置扩展属性
+int ext4_xattr_set(struct inode *inode, 
+                       int name_index, 
+                       const char *name,
+	                   const void *value, 
+	                   size_t value_len, 
+	                   int flags)
 {
 	handle_t *handle;
 	int error, retries = 0;
 
 retry:
+    //开始jbd2日志记录
+    /*开始一个原子操作 将属性修改写到日志种*/
 	handle = ext4_journal_start(inode, EXT4_DATA_TRANS_BLOCKS(inode->i_sb));
-	if (IS_ERR(handle)) {
+	if (IS_ERR(handle)) 
+	{
 		error = PTR_ERR(handle);
-	} else {
+	} 
+	else 
+	{
 		int error2;
 
-		error = ext4_xattr_set_handle(handle, inode, name_index, name,
-					      value, value_len, flags);
+		error = ext4_xattr_set_handle(handle, inode, name_index, name,value, value_len, flags);
 		error2 = ext4_journal_stop(handle);
-		if (error == -ENOSPC &&
-		    ext4_should_retry_alloc(inode->i_sb, &retries))
+		
+		if (error == -ENOSPC && ext4_should_retry_alloc(inode->i_sb, &retries))
 			goto retry;
 		if (error == 0)
 			error = error2;
@@ -1405,8 +1483,8 @@ ext4_xattr_put_super(struct super_block *sb)
  *
  * Returns 0, or a negative error number on failure.
  */
-static void
-ext4_xattr_cache_insert(struct buffer_head *bh)
+ //创建一个新的扩展属性表项，如果该表项不在缓冲中，则将其插入到缓存中
+static void ext4_xattr_cache_insert(struct buffer_head *bh)//bh表示扩展属性所在的缓冲区的缓冲头
 {
 	__u32 hash = le32_to_cpu(BHDR(bh)->h_hash);
 	struct mb_cache_entry *ce;

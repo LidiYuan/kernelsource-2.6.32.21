@@ -765,6 +765,8 @@ EXPORT_SYMBOL_GPL(usb_deregister_device_driver);
  * usb_register_dev() to enable that functionality.  This function no longer
  * takes care of that.
  */
+
+//将驱动挂载到usb总线上去
 int usb_register_driver(struct usb_driver *new_driver, struct module *owner,
 			const char *mod_name)
 {
@@ -785,12 +787,15 @@ int usb_register_driver(struct usb_driver *new_driver, struct module *owner,
 
 	retval = driver_register(&new_driver->drvwrap.driver);
 
-	if (!retval) {
+	if (!retval) 
+	{
 		pr_info("%s: registered new interface driver %s\n",
 			usbcore_name, new_driver->name);
 		usbfs_update_special();
 		usb_create_newid_file(new_driver);
-	} else {
+	} 
+	else 
+	{
 		printk(KERN_ERR "%s: error %d registering interface "
 			"	driver %s\n",
 			usbcore_name, retval, new_driver->name);

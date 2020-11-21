@@ -264,7 +264,8 @@ SYSCALL_DEFINE2(capset, cap_user_header_t, header, const cap_user_data_t, data)
 		permitted.cap[i] = kdata[i].permitted;
 		inheritable.cap[i] = kdata[i].inheritable;
 	}
-	while (i < _KERNEL_CAPABILITY_U32S) {
+	while (i < _KERNEL_CAPABILITY_U32S) 
+	{
 		effective.cap[i] = 0;
 		permitted.cap[i] = 0;
 		inheritable.cap[i] = 0;
@@ -280,6 +281,7 @@ SYSCALL_DEFINE2(capset, cap_user_header_t, header, const cap_user_data_t, data)
 	if (ret < 0)
 		goto error;
 
+    //对capset做审计信息记录
 	audit_log_capset(pid, new, current_cred());
 
 	return commit_creds(new);

@@ -25,14 +25,17 @@ struct pt_regs;
 /*
  * This structure is used to hold the arguments that are used when loading binaries.
  */
-struct linux_binprm{
+struct linux_binprm
+{
 	char buf[BINPRM_BUF_SIZE];//保存可执行文件的头128字节
-#ifdef CONFIG_MMU
+
+#ifdef CONFIG_MMU   //是否使用MMU
 	struct vm_area_struct *vma;
 #else
-# define MAX_ARG_PAGES	32
+    #define MAX_ARG_PAGES	32
 	struct page *page[MAX_ARG_PAGES];
 #endif
+
 	struct mm_struct *mm;
 	unsigned long p; /* current top of mem 当前内存最高地址*/
 	unsigned int
@@ -44,19 +47,23 @@ struct linux_binprm{
 #ifdef __alpha__
 	unsigned int taso:1;
 #endif
+
 	unsigned int recursion_depth;
 	struct file * file;//要执行的文件
 	struct cred *cred;	/* new credentials */
 	int unsafe;		/* how unsafe this exec is (mask of LSM_UNSAFE_*) */
 	unsigned int per_clear;	/* bits to clear in current->personality */
 	int argc, envc;//命令行参数和环境变量数目
+	
 	char * filename;	/* Name of binary as seen by procps 要执行的文件的名称(一个全路径) */
 	char * interp;		/* Name of the binary really executed. Most
-				   of the time same as filename, but could be
-				   different for binfmt_{misc,script} 要执行的文件的真实名称，通常和filename相同*/
+				           of the time same as filename, but could be
+				           different for binfmt_{misc,script} 要执行的文件的真实名称，通常和filename相同*/
 	unsigned interp_flags;
 	unsigned interp_data;
-	unsigned long loader, exec;
+	
+	unsigned long loader, 
+		          exec;
 };
 
 #define BINPRM_FLAGS_ENFORCE_NONDUMP_BIT 0

@@ -452,8 +452,11 @@ out_unlock:
  *	it after the associated handler has acknowledged the device, so the
  *	interrupt line is back to inactive.
  */
-void
-handle_level_irq(unsigned int irq, struct irq_desc *desc)
+
+//当中断线电平达到激活电平，中断一直会被激活。 所以需要刚进中断处理函数就要屏蔽掉中断
+//等handler 处理完后再打开中断(unmask)
+//由于irq在整个处理过程中都被屏蔽，所以需要handle_level_irq里的action要尽量简短
+void handle_level_irq(unsigned int irq, struct irq_desc *desc)
 {
 	struct irqaction *action;
 	irqreturn_t action_ret;
@@ -567,6 +570,16 @@ out:
  *	the handler was running. If all pending interrupts are handled, the
  *	loop is left.
  */
+ /*
+中断发生在上升沿/下降沿， 它会被中断控制器锁存起来，需要ack 后才能重新使能。 Ack 后新的
+
+中断可以在前一个中断正在被处理时产生，如果这种情况发生，则需要屏蔽中断。同时，需要用一个loop
+
+来处理中断处理过程中又有中断产生的情况，在这个loop中重新把中断屏蔽打开。 如果所有pending的
+
+中断都处理完了，loop就可以离开
+
+*/
 void
 handle_edge_irq(unsigned int irq, struct irq_desc *desc)
 {
@@ -598,7 +611,8 @@ handle_edge_irq(unsigned int irq, struct irq_desc *desc)
 		struct irqaction *action = desc->action;
 		irqreturn_t action_ret;
 
-		if (unlikely(!action)) {
+		if (unlikely(!action)) 
+		{
 			desc->chip->mask(irq);
 			goto out_unlock;
 		}
@@ -715,8 +729,10 @@ set_irq_chip_and_handler(unsigned int irq, struct irq_chip *chip,
 }
 
 void
-set_irq_chip_and_handler_name(unsigned int irq, struct irq_chip *chip,
-			      irq_flow_handler_t handle, const char *name)
+set_irq_chip_and_handler_name(unsigned int irq, 
+                                      struct irq_chip *chip,
+			                          irq_flow_handler_t handle, 
+			                          const char *name)
 {
 	set_irq_chip(irq, chip);
 	__set_irq_handler(irq, handle, 0, name);

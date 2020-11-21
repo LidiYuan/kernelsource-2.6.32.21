@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 
+/*下面两个是 __tracepoints节的起始和结束地址  ,其中*/
 extern struct tracepoint __start___tracepoints[];
 extern struct tracepoint __stop___tracepoints[];
 
@@ -69,8 +70,7 @@ struct tp_probes {
 
 static inline void *allocate_probes(int count)
 {
-	struct tp_probes *p  = kmalloc(count * sizeof(void *)
-			+ sizeof(struct tp_probes), GFP_KERNEL);
+	struct tp_probes *p  = kmalloc(count * sizeof(void *) + sizeof(struct tp_probes), GFP_KERNEL);
 	return p == NULL ? NULL : p->probes;
 }
 
@@ -99,8 +99,7 @@ static void debug_print_probes(struct tracepoint_entry *entry)
 		printk(KERN_DEBUG "Probe %d : %p\n", i, entry->funcs[i]);
 }
 
-static void *
-tracepoint_entry_add_probe(struct tracepoint_entry *entry, void *probe)
+static void * tracepoint_entry_add_probe(struct tracepoint_entry *entry, void *probe)
 {
 	int nr_probes = 0;
 	void **old, **new;
@@ -204,7 +203,8 @@ static struct tracepoint_entry *add_tracepoint(const char *name)
 	u32 hash = jhash(name, name_len-1, 0);
 
 	head = &tracepoint_table[hash & (TRACEPOINT_TABLE_SIZE - 1)];
-	hlist_for_each_entry(e, node, head, hlist) {
+	hlist_for_each_entry(e, node, head, hlist) 
+	{
 		if (!strcmp(name, e->name)) {
 			printk(KERN_NOTICE
 				"tracepoint %s busy\n", name);
@@ -239,7 +239,7 @@ static inline void remove_tracepoint(struct tracepoint_entry *e)
  * Sets the probe callback corresponding to one tracepoint.
  */
 static void set_tracepoint(struct tracepoint_entry **entry,
-	struct tracepoint *elem, int active)
+	                           struct tracepoint *elem, int active)
 {
 	WARN_ON(strcmp((*entry)->name, elem->name) != 0);
 
@@ -281,8 +281,7 @@ static void disable_tracepoint(struct tracepoint *elem)
  *
  * Updates the probe callback corresponding to a range of tracepoints.
  */
-void
-tracepoint_update_probe_range(struct tracepoint *begin, struct tracepoint *end)
+void tracepoint_update_probe_range(struct tracepoint *begin, struct tracepoint *end)
 {
 	struct tracepoint *iter;
 	struct tracepoint_entry *mark_entry;
@@ -291,12 +290,15 @@ tracepoint_update_probe_range(struct tracepoint *begin, struct tracepoint *end)
 		return;
 
 	mutex_lock(&tracepoints_mutex);
-	for (iter = begin; iter < end; iter++) {
+	for (iter = begin; iter < end; iter++) 
+	{
 		mark_entry = get_tracepoint(iter->name);
-		if (mark_entry) {
-			set_tracepoint(&mark_entry, iter,
-					!!mark_entry->refcount);
-		} else {
+		if (mark_entry) 
+		{
+			set_tracepoint(&mark_entry, iter,!!mark_entry->refcount);
+		} 
+		else 
+		{
 			disable_tracepoint(iter);
 		}
 	}
@@ -309,8 +311,7 @@ tracepoint_update_probe_range(struct tracepoint *begin, struct tracepoint *end)
 static void tracepoint_update_probes(void)
 {
 	/* Core kernel tracepoints */
-	tracepoint_update_probe_range(__start___tracepoints,
-		__stop___tracepoints);
+	tracepoint_update_probe_range(__start___tracepoints,__stop___tracepoints);
 	/* tracepoints in modules. */
 	module_update_tracepoints();
 }
@@ -321,7 +322,8 @@ static void *tracepoint_add_probe(const char *name, void *probe)
 	void *old;
 
 	entry = get_tracepoint(name);
-	if (!entry) {
+	if (!entry) 
+	{
 		entry = add_tracepoint(name);
 		if (IS_ERR(entry))
 			return entry;
@@ -564,8 +566,7 @@ int tracepoint_module_notify(struct notifier_block *self,
 	switch (val) {
 	case MODULE_STATE_COMING:
 	case MODULE_STATE_GOING:
-		tracepoint_update_probe_range(mod->tracepoints,
-			mod->tracepoints + mod->num_tracepoints);
+		tracepoint_update_probe_range(mod->tracepoints,mod->tracepoints + mod->num_tracepoints);
 		break;
 	}
 	return 0;
@@ -578,8 +579,11 @@ struct notifier_block tracepoint_module_nb = {
 
 static int init_tracepoints(void)
 {
+    //注册一个和模块加载卸载相关的通知连
 	return register_module_notifier(&tracepoint_module_nb);
 }
+
+
 __initcall(init_tracepoints);
 
 #endif /* CONFIG_MODULES */
@@ -589,14 +593,17 @@ __initcall(init_tracepoints);
 /* NB: reg/unreg are called while guarded with the tracepoints_mutex */
 static int sys_tracepoint_refcount;
 
+//给所有的进程设置TIF_SYSCALL_TRACEPOINT标志 但内核线程除外
 void syscall_regfunc(void)
 {
 	unsigned long flags;
 	struct task_struct *g, *t;
 
-	if (!sys_tracepoint_refcount) {
+	if (!sys_tracepoint_refcount) 
+	{
 		read_lock_irqsave(&tasklist_lock, flags);
-		do_each_thread(g, t) {
+		do_each_thread(g, t) 
+		{
 			/* Skip kernel threads. */
 			if (t->mm)
 				set_tsk_thread_flag(t, TIF_SYSCALL_TRACEPOINT);
@@ -606,6 +613,7 @@ void syscall_regfunc(void)
 	sys_tracepoint_refcount++;
 }
 
+//给所有的进程取消TIF_SYSCALL_TRACEPOINT标志
 void syscall_unregfunc(void)
 {
 	unsigned long flags;

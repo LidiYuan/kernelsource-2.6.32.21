@@ -34,8 +34,8 @@
 
 struct kernel_symbol
 {
-	unsigned long value;
-	const char *name;
+	unsigned long value;//符号值
+	const char *name;  //符号名
 };
 
 struct modversion_info
@@ -226,38 +226,48 @@ void *__symbol_get_gpl(const char *symbol);
 
 enum module_state
 {
-	MODULE_STATE_LIVE,
-	MODULE_STATE_COMING,
-	MODULE_STATE_GOING,
+	MODULE_STATE_LIVE,   //模块当前正常使用中（存活状态）
+	MODULE_STATE_COMING, //模块当前正在被加载  1
+	MODULE_STATE_GOING,  //模块当前正在被卸载  2
 };
 
+/*
+load_module() 完成模块的部分创建工作把状态置为 MODULE_STATE_COMING, sys_init_module()函数中完成模块的全部初始化工作后（包括把模块加入全局的模块列表，调用模块本身的初始化函数)，把模块状态置为MODULE_STATE_LIVE，最后，使用rmmod工具卸载模块时，会调用系统调用 delete_module，会把模块的状态置为MODULE_STATE_GOING。这是模块内部维护的一个状态
+*/
 struct module
 {
-	enum module_state state;
+	enum module_state state; //模块的状态
 
 	/* Member of list of modules */
-	struct list_head list;
+	struct list_head list;//list是作为一个列表的成员，所有的内核模块都被维护在一个全局链表( modules 中)
 
 	/* Unique handle for this module */
-	char name[MODULE_NAME_LEN];
+	char name[MODULE_NAME_LEN];//name是模块的名字，一般会拿模块文件的文件名作为模块名
 
-	/* Sysfs stuff. */
+	/* Sysfs stuff. 
+     //与设备模型相关 在这里先理解会在/sys/modules下创建此模块的文件
+	*/
 	struct module_kobject mkobj;
 	struct module_attribute *modinfo_attrs;
+
 	const char *version;
 	const char *srcversion;
+	
 	struct kobject *holders_dir;
 
-	/* Exported symbols */
-	const struct kernel_symbol *syms;
+	/* Exported symbols 看 is_exported() 函数*/
+	const struct kernel_symbol *syms; //模块符号导出地址的起始位置,管理内核的导出符号
 	const unsigned long *crcs;
-	unsigned int num_syms;
+	unsigned int num_syms;  //符号的个数 每个符号用结构kernel_symbol来表示,  此处的值也是kernel_symbol结构的个数
 
 	/* Kernel parameters. */
+	//加载模块时传入的参数和个数
 	struct kernel_param *kp;
 	unsigned int num_kp;
 
-	/* GPL-only exported symbols. */
+	/* GPL-only exported symbols. 
+
+	//仅供gpl兼容模块使用的符号表*/
 	unsigned int num_gpl_syms;
 	const struct kernel_symbol *gpl_syms;
 	const unsigned long *gpl_crcs;
@@ -280,27 +290,35 @@ struct module
 	unsigned int num_gpl_future_syms;
 
 	/* Exception table */
+	 //模块的新的异常表
 	unsigned int num_exentries;
 	struct exception_table_entry *extable;
 
 	/* Startup function. */
-	int (*init)(void);
+	int (*init)(void); //模块的init函数地址
 
+    //如果module_init不为空，则在init函数返回后会调用vfree释放
+    //这块内存。init区域的内存只在初始化（调用init的时候)有用
 	/* If this is non-NULL, vfree after init() returns */
 	void *module_init;
 
 	/* Here is the actual code + data, vfree'd on unload. */
-	void *module_core;
+	void *module_core; //core区域存放非初始化的代码和数据，在模块卸载的时候才可释放 
 
-	/* Here are the sizes of the init and core sections */
-	unsigned int init_size, core_size;
+	/* Here are the sizes of the init and core sections 
+     //init和core两个区域的大小
+	*/
+	unsigned int init_size, 
+	             core_size;
 
+    //每个区域中可执行代码的大小
 	/* The size of the executable code in each section.  */
 	unsigned int init_text_size, core_text_size;
 
 	/* Arch-specific module values */
 	struct mod_arch_specific arch;
 
+    //如果模块会污染内核，则设置此位
 	unsigned int taints;	/* same bits as kernel:tainted */
 
 #ifdef CONFIG_GENERIC_BUG
@@ -317,8 +335,11 @@ struct module
 	 * could really be discarded after module init).
 	 */
 	Elf_Sym *symtab, *core_symtab;
-	unsigned int num_symtab, core_num_syms;
-	char *strtab, *core_strtab;
+	unsigned int num_symtab, //符号的数量
+		         core_num_syms;
+	
+	char *strtab, //该模块的字符串表 
+		  *core_strtab;
 
 	/* Section attributes */
 	struct module_sect_attrs *sect_attrs;
@@ -332,7 +353,9 @@ struct module
 
 	/* The command line arguments (may be mangled).  People like
 	   keeping pointers to this stuff */
-	char *args;
+	char *args; //模块的命令行参数
+
+	//和tracepoint 跟踪技术相关
 #ifdef CONFIG_TRACEPOINTS
 	struct tracepoint *tracepoints;
 	unsigned int num_tracepoints;
@@ -352,12 +375,15 @@ struct module
 #endif
 
 #ifdef CONFIG_MODULE_UNLOAD
-	/* What modules depend on me? */
+	
+	/* What modules depend on me? 哪写模块依赖我*/
 	struct list_head modules_which_use_me;
 
+     //等待当前模块卸载完成的进程的task_struct
 	/* Who is waiting for us to be unloaded */
 	struct task_struct *waiter;
 
+    //模块卸载函数
 	/* Destruction function. */
 	void (*exit)(void);
 
@@ -383,6 +409,8 @@ extern struct mutex module_mutex;
 /* FIXME: It'd be nice to isolate modules during init, too, so they
    aren't used before they (may) fail.  But presently too much code
    (IDE & SCSI) require entry into the module during init.*/
+
+//用于判断模块是否处于活动状态
 static inline int module_is_live(struct module *mod)
 {
 	return mod->state != MODULE_STATE_GOING;

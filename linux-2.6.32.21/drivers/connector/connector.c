@@ -72,11 +72,14 @@ int cn_netlink_send(struct cn_msg *msg, u32 __group, gfp_t gfp_mask)
 	u32 group = 0;
 	int found = 0;
 
-	if (!__group) {
+	//组为0则查找
+	if (!__group) 
+	{
 		spin_lock_bh(&dev->cbdev->queue_lock);
-		list_for_each_entry(__cbq, &dev->cbdev->queue_list,
-				    callback_entry) {
-			if (cn_cb_equal(&__cbq->id.id, &msg->id)) {
+		list_for_each_entry(__cbq, &dev->cbdev->queue_list,callback_entry) 
+		{
+			if (cn_cb_equal(&__cbq->id.id, &msg->id)) 
+			{
 				found = 1;
 				group = __cbq->group;
 				break;
@@ -86,7 +89,9 @@ int cn_netlink_send(struct cn_msg *msg, u32 __group, gfp_t gfp_mask)
 
 		if (!found)
 			return -ENODEV;
-	} else {
+	} 
+	else 
+	{
 		group = __group;
 	}
 
@@ -213,14 +218,14 @@ static void cn_rx_skb(struct sk_buff *__skb)
  *
  * May sleep.
  */
-int cn_add_callback(struct cb_id *id, char *name,
-		    void (*callback)(struct cn_msg *, struct netlink_skb_parms *))
+int cn_add_callback(struct cb_id *id, char *name,void (*callback)(struct cn_msg *, struct netlink_skb_parms *))
 {
 	int err;
 	struct cn_dev *dev = &cdev;
 
 	if (!cn_already_initialized)
 		return -EAGAIN;
+
 
 	err = cn_queue_add_callback(dev->cbdev, name, id, callback);
 	if (err)
